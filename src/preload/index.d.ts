@@ -6,6 +6,10 @@ import { IPCResponse } from '../shared/types'
  */
 export interface API {
   ping: () => Promise<IPCResponse<string>>
+  testExport: (
+    inputPath: string,
+    outputPath: string
+  ) => Promise<IPCResponse<{ outputPath: string }>>
 }
 
 declare global {

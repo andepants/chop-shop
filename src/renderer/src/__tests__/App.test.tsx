@@ -1,82 +1,42 @@
 /**
  * Tests for App component
- * Validates "Hello Chop Shop" rendering and IPC communication
+ * Validates MainLayout rendering with 3-panel structure
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { describe, it, expect } from 'vitest'
+import { render, screen } from '@testing-library/react'
 import App from '../App'
 
 describe('App Component', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
+  it('renders the main layout', () => {
+    render(<App />)
+    // Should render MainLayout with all its components
+    expect(screen.getByText('Chop Shop')).toBeInTheDocument()
   })
 
-  it('renders "Hello Chop Shop" heading', () => {
+  it('renders TopBar with title', () => {
     render(<App />)
-    expect(screen.getByText('Hello Chop Shop')).toBeInTheDocument()
+    expect(screen.getByText('Chop Shop')).toBeInTheDocument()
   })
 
-  it('displays Electron logo', () => {
+  it('renders Sidebar with Media Library', () => {
     render(<App />)
-    const logo = screen.getByAltText('Electron logo')
-    expect(logo).toBeInTheDocument()
+    expect(screen.getByText('Media Library')).toBeInTheDocument()
   })
 
-  it('shows IPC test button', () => {
+  it('renders Preview area', () => {
     render(<App />)
-    expect(screen.getByText('Test IPC (Ping)')).toBeInTheDocument()
+    expect(screen.getByText('Preview')).toBeInTheDocument()
   })
 
-  it('successfully handles IPC ping response', async () => {
-    const user = userEvent.setup()
-    const mockPing = vi.fn().mockResolvedValue({
-      success: true,
-      data: 'pong'
-    })
-    window.api.ping = mockPing
-
+  it('renders Timeline area', () => {
     render(<App />)
-
-    const button = screen.getByText('Test IPC (Ping)')
-    await user.click(button)
-
-    await waitFor(() => {
-      expect(mockPing).toHaveBeenCalledOnce()
-      expect(screen.getByText(/IPC Success: Received "pong"/)).toBeInTheDocument()
-    })
+    expect(screen.getByText('Timeline')).toBeInTheDocument()
   })
 
-  it('displays error message when IPC fails', async () => {
-    const user = userEvent.setup()
-    const mockPing = vi.fn().mockResolvedValue({
-      success: false,
-      error: 'Connection failed'
-    })
-    window.api.ping = mockPing
-
+  it('renders Export button', () => {
     render(<App />)
-
-    const button = screen.getByText('Test IPC (Ping)')
-    await user.click(button)
-
-    await waitFor(() => {
-      expect(screen.getByText(/Error: Connection failed/)).toBeInTheDocument()
-    })
-  })
-
-  it('handles IPC exception gracefully', async () => {
-    const user = userEvent.setup()
-    const mockPing = vi.fn().mockRejectedValue(new Error('Network error'))
-    window.api.ping = mockPing
-
-    render(<App />)
-
-    const button = screen.getByText('Test IPC (Ping)')
-    await user.click(button)
-
-    await waitFor(() => {
-      expect(screen.getByText(/Error: Network error/)).toBeInTheDocument()
-    })
+    const exportButton = screen.getByRole('button', { name: /export/i })
+    expect(exportButton).toBeInTheDocument()
+    expect(exportButton).toBeDisabled()
   })
 })

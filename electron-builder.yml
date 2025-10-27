@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: chop-shop
+appId: com.chopshop.app
+productName: Chop Shop
 directories:
   buildResources: build
 files:

@@ -11,7 +11,19 @@ const api = {
    * Send a ping to the main process and receive a pong response
    * Used for testing IPC communication
    */
-  ping: (): Promise<IPCResponse<string>> => ipcRenderer.invoke(IPC_CHANNELS.PING)
+  ping: (): Promise<IPCResponse<string>> => ipcRenderer.invoke(IPC_CHANNELS.PING),
+
+  /**
+   * Test FFmpeg export - converts input video to MP4
+   * @param inputPath - Path to input video file
+   * @param outputPath - Path to output MP4 file
+   * @returns Promise with export result
+   */
+  testExport: (
+    inputPath: string,
+    outputPath: string
+  ): Promise<IPCResponse<{ outputPath: string }>> =>
+    ipcRenderer.invoke('test-export', inputPath, outputPath)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

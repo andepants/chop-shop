@@ -3,6 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { IPCResponse, IPC_CHANNELS } from '../shared/types'
+import { registerIPCHandlers } from './ipc'
 
 function createWindow(): void {
   // Create the browser window.
@@ -59,6 +60,9 @@ app.whenReady().then(() => {
       data: 'pong'
     }
   })
+
+  // Register all IPC handlers
+  registerIPCHandlers()
 
   createWindow()
 
