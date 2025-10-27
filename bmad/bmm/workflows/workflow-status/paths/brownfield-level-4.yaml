@@ -1,87 +1,87 @@
 # Brownfield Level 4 - Enterprise Scale Changes to Existing System
 # 40+ stories, major expansion of existing enterprise system
 
-project_type: "software"
+project_type: 'software'
 level: 4
-field_type: "brownfield"
-description: "Enterprise scale expansion of existing system"
+field_type: 'brownfield'
+description: 'Enterprise scale expansion of existing system'
 
 phases:
   - phase: 0
-    name: "Documentation"
-    conditional: "if_undocumented"
+    name: 'Documentation'
+    conditional: 'if_undocumented'
     workflows:
-      - id: "document-project"
+      - id: 'document-project'
         required: true
-        agent: "analyst"
-        command: "document-project"
-        output: "Comprehensive codebase documentation"
-        note: "Critical for enterprise-scale changes"
+        agent: 'analyst'
+        command: 'document-project'
+        output: 'Comprehensive codebase documentation'
+        note: 'Critical for enterprise-scale changes'
 
   - phase: 1
-    name: "Analysis"
+    name: 'Analysis'
     required: true
     workflows:
-      - id: "brainstorm-project"
+      - id: 'brainstorm-project'
         recommended: true
-        agent: "analyst"
-        command: "brainstorm-project"
-      - id: "research"
+        agent: 'analyst'
+        command: 'brainstorm-project'
+      - id: 'research'
         required: true
-        agent: "analyst"
-        command: "research"
-        note: "Research existing system architecture deeply"
-      - id: "product-brief"
+        agent: 'analyst'
+        command: 'research'
+        note: 'Research existing system architecture deeply'
+      - id: 'product-brief'
         required: true
-        agent: "analyst"
-        command: "product-brief"
-        note: "Strategic brief for major expansion"
+        agent: 'analyst'
+        command: 'product-brief'
+        note: 'Strategic brief for major expansion'
 
   - phase: 2
-    name: "Planning"
+    name: 'Planning'
     required: true
     workflows:
-      - id: "prd"
+      - id: 'prd'
         required: true
-        agent: "pm"
-        command: "prd"
-        output: "Comprehensive PRD considering existing system"
-      - id: "validate-prd"
+        agent: 'pm'
+        command: 'prd'
+        output: 'Comprehensive PRD considering existing system'
+      - id: 'validate-prd'
         optional: true
-        agent: "pm"
-        command: "validate-prd"
-      - id: "create-design"
+        agent: 'pm'
+        command: 'validate-prd'
+      - id: 'create-design'
         required: true
-        agent: "ux-designer"
-        command: "create-design"
-        note: "Multiple UI/UX specifications"
+        agent: 'ux-designer'
+        command: 'create-design'
+        note: 'Multiple UI/UX specifications'
 
   - phase: 3
-    name: "Solutioning"
+    name: 'Solutioning'
     required: true
     workflows:
-      - id: "create-architecture"
+      - id: 'create-architecture'
         required: true
-        agent: "architect"
-        command: "create-architecture"
-        output: "Architecture for system expansion"
-        note: "Must maintain backward compatibility"
-      - id: "validate-architecture"
+        agent: 'architect'
+        command: 'create-architecture'
+        output: 'Architecture for system expansion'
+        note: 'Must maintain backward compatibility'
+      - id: 'validate-architecture'
         optional: true
-        agent: "architect"
-        command: "validate-architecture"
-      - id: "solutioning-gate-check"
+        agent: 'architect'
+        command: 'validate-architecture'
+      - id: 'solutioning-gate-check'
         required: true
-        agent: "architect"
-        command: "solutioning-gate-check"
-        note: "Critical validation before major changes"
+        agent: 'architect'
+        command: 'solutioning-gate-check'
+        note: 'Critical validation before major changes'
 
   - phase: 4
-    name: "Implementation"
+    name: 'Implementation'
     required: true
     workflows:
-      - id: "sprint-planning"
+      - id: 'sprint-planning'
         required: true
-        agent: "sm"
-        command: "sprint-planning"
-        note: "Creates sprint plan with all stories - subsequent work tracked in sprint plan output, not workflow-status"
+        agent: 'sm'
+        command: 'sprint-planning'
+        note: 'Creates sprint plan with all stories - subsequent work tracked in sprint plan output, not workflow-status'

@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { IPCResponse, IPC_CHANNELS } from '../shared/types'
 
 function createWindow(): void {
   // Create the browser window.
@@ -49,8 +50,15 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
+  // IPC handlers
+  // Ping-pong test handler for IPC communication verification
+  ipcMain.handle(IPC_CHANNELS.PING, async (): Promise<IPCResponse<string>> => {
+    console.log('Received ping from renderer')
+    return {
+      success: true,
+      data: 'pong'
+    }
+  })
 
   createWindow()
 

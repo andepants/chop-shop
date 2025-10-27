@@ -11,7 +11,7 @@ To maximize compatibility with modern AI tools, files should not exceed 500 line
 
 Development Guidelines:
 
-- Use Context7 (mcp__context7 tools) to fetch up-to-date documentation before implementing third-party libraries.
+- Use Context7 (mcp\_\_context7 tools) to fetch up-to-date documentation before implementing third-party libraries.
 - Always verify library compatibility with Electron before adding dependencies.
 
 Code Style and Structure:

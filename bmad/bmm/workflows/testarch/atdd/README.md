@@ -287,16 +287,18 @@ All tests follow BDD format for clarity:
 ```typescript
 test('should display error for invalid credentials', async ({ page }) => {
   // GIVEN: User is on login page
-  await page.goto('/login');
+  await page.goto('/login')
 
   // WHEN: User submits invalid credentials
-  await page.fill('[data-testid="email-input"]', 'invalid@example.com');
-  await page.fill('[data-testid="password-input"]', 'wrongpassword');
-  await page.click('[data-testid="login-button"]');
+  await page.fill('[data-testid="email-input"]', 'invalid@example.com')
+  await page.fill('[data-testid="password-input"]', 'wrongpassword')
+  await page.click('[data-testid="login-button"]')
 
   // THEN: Error message is displayed
-  await expect(page.locator('[data-testid="error-message"]')).toHaveText('Invalid email or password');
-});
+  await expect(page.locator('[data-testid="error-message"]')).toHaveText(
+    'Invalid email or password'
+  )
+})
 ```
 
 ### Network-First Testing Pattern
@@ -305,12 +307,12 @@ test('should display error for invalid credentials', async ({ page }) => {
 
 ```typescript
 // ✅ CORRECT: Intercept BEFORE navigation
-await page.route('**/api/data', handler);
-await page.goto('/page');
+await page.route('**/api/data', handler)
+await page.goto('/page')
 
 // ❌ WRONG: Navigate then intercept (race condition)
-await page.goto('/page');
-await page.route('**/api/data', handler); // Too late!
+await page.goto('/page')
+await page.route('**/api/data', handler) // Too late!
 ```
 
 Always set up route interception before navigating to pages that make network requests.
@@ -321,17 +323,17 @@ Use faker for all test data generation:
 
 ```typescript
 // tests/support/factories/user.factory.ts
-import { faker } from '@faker-js/faker';
+import { faker } from '@faker-js/faker'
 
 export const createUser = (overrides = {}) => ({
   id: faker.number.int(),
   email: faker.internet.email(),
   name: faker.person.fullName(),
   createdAt: faker.date.recent().toISOString(),
-  ...overrides,
-});
+  ...overrides
+})
 
-export const createUsers = (count: number) => Array.from({ length: count }, () => createUser());
+export const createUsers = (count: number) => Array.from({ length: count }, () => createUser())
 ```
 
 **Factory principles:**
@@ -347,25 +349,25 @@ Playwright fixtures with automatic data cleanup:
 
 ```typescript
 // tests/support/fixtures/auth.fixture.ts
-import { test as base } from '@playwright/test';
+import { test as base } from '@playwright/test'
 
 export const test = base.extend({
   authenticatedUser: async ({ page }, use) => {
     // Setup: Create and authenticate user
-    const user = await createUser();
-    await page.goto('/login');
-    await page.fill('[data-testid="email"]', user.email);
-    await page.fill('[data-testid="password"]', 'password123');
-    await page.click('[data-testid="login-button"]');
-    await page.waitForURL('/dashboard');
+    const user = await createUser()
+    await page.goto('/login')
+    await page.fill('[data-testid="email"]', user.email)
+    await page.fill('[data-testid="password"]', 'password123')
+    await page.click('[data-testid="login-button"]')
+    await page.waitForURL('/dashboard')
 
     // Provide to test
-    await use(user);
+    await use(user)
 
     // Cleanup: Delete user (automatic)
-    await deleteUser(user.id);
-  },
-});
+    await deleteUser(user.id)
+  }
+})
 ```
 
 **Fixture principles:**
@@ -382,14 +384,14 @@ Each test should verify exactly one behavior:
 ```typescript
 // ✅ CORRECT: One assertion
 test('should display user name', async ({ page }) => {
-  await expect(page.locator('[data-testid="user-name"]')).toHaveText('John');
-});
+  await expect(page.locator('[data-testid="user-name"]')).toHaveText('John')
+})
 
 // ❌ WRONG: Multiple assertions (not atomic)
 test('should display user info', async ({ page }) => {
-  await expect(page.locator('[data-testid="user-name"]')).toHaveText('John');
-  await expect(page.locator('[data-testid="user-email"]')).toHaveText('john@example.com');
-});
+  await expect(page.locator('[data-testid="user-name"]')).toHaveText('John')
+  await expect(page.locator('[data-testid="user-email"]')).toHaveText('john@example.com')
+})
 ```
 
 **Why?** If second assertion fails, you don't know if first is still valid. Split into separate tests for clear failure diagnosis.
@@ -466,10 +468,10 @@ If a test passes before implementation, it's not testing the right thing.
 
 ```typescript
 // ✅ CORRECT: Stable selector
-await page.click('[data-testid="login-button"]');
+await page.click('[data-testid="login-button"]')
 
 // ❌ FRAGILE: Class-based selector
-await page.click('.btn.btn-primary.login-btn');
+await page.click('.btn.btn-primary.login-btn')
 ```
 
 ATDD checklist includes complete list of required data-testid attributes for DEV team.
@@ -480,11 +482,11 @@ ATDD checklist includes complete list of required data-testid attributes for DEV
 
 ```typescript
 // ✅ CORRECT: Explicit wait for condition
-await page.waitForSelector('[data-testid="user-name"]');
-await expect(page.locator('[data-testid="user-name"]')).toBeVisible();
+await page.waitForSelector('[data-testid="user-name"]')
+await expect(page.locator('[data-testid="user-name"]')).toBeVisible()
 
 // ❌ WRONG: Hard wait (flaky, slow)
-await page.waitForTimeout(2000);
+await page.waitForTimeout(2000)
 ```
 
 Playwright's auto-waiting is preferred (expect() automatically waits up to timeout).

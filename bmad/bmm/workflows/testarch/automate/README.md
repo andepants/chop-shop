@@ -286,22 +286,22 @@ When Playwright MCP is available, TEA **additionally**:
 
 ```typescript
 // ❌ Original (failing): CSS class selector
-await page.locator('.btn-primary').click();
+await page.locator('.btn-primary').click()
 
 // ✅ Healed: data-testid selector
-await page.getByTestId('submit-button').click();
+await page.getByTestId('submit-button').click()
 
 // ❌ Original (failing): Hard wait
-await page.waitForTimeout(3000);
+await page.waitForTimeout(3000)
 
 // ✅ Healed: Network-first pattern
-await page.waitForResponse('**/api/data');
+await page.waitForResponse('**/api/data')
 
 // ❌ Original (failing): Hardcoded ID
-await expect(page.getByText('User 123')).toBeVisible();
+await expect(page.getByText('User 123')).toBeVisible()
 
 // ✅ Healed: Regex pattern
-await expect(page.getByText(/User \d+/)).toBeVisible();
+await expect(page.getByText(/User \d+/)).toBeVisible()
 ```
 
 **Unfixable Tests (Marked as test.fixme()):**
@@ -317,7 +317,7 @@ test.fixme('[P1] should handle complex interaction', async ({ page }) => {
   // Manual investigation needed: Selector may require application code changes
   // TODO: Review with team, may need data-testid added to button component
   // Original test code...
-});
+})
 ```
 
 **When to Enable Healing:**
@@ -505,17 +505,17 @@ All tests follow BDD format for clarity:
 ```typescript
 test('[P0] should login with valid credentials and load dashboard', async ({ page }) => {
   // GIVEN: User is on login page
-  await page.goto('/login');
+  await page.goto('/login')
 
   // WHEN: User submits valid credentials
-  await page.fill('[data-testid="email-input"]', 'user@example.com');
-  await page.fill('[data-testid="password-input"]', 'Password123!');
-  await page.click('[data-testid="login-button"]');
+  await page.fill('[data-testid="email-input"]', 'user@example.com')
+  await page.fill('[data-testid="password-input"]', 'Password123!')
+  await page.click('[data-testid="login-button"]')
 
   // THEN: User is redirected to dashboard
-  await expect(page).toHaveURL('/dashboard');
-  await expect(page.locator('[data-testid="user-name"]')).toBeVisible();
-});
+  await expect(page).toHaveURL('/dashboard')
+  await expect(page.locator('[data-testid="user-name"]')).toBeVisible()
+})
 ```
 
 ### One Assertion Per Test (Atomic Design)
@@ -525,14 +525,14 @@ Each test verifies exactly one behavior:
 ```typescript
 // ✅ CORRECT: One assertion
 test('[P0] should display user name', async ({ page }) => {
-  await expect(page.locator('[data-testid="user-name"]')).toHaveText('John');
-});
+  await expect(page.locator('[data-testid="user-name"]')).toHaveText('John')
+})
 
 // ❌ WRONG: Multiple assertions (not atomic)
 test('[P0] should display user info', async ({ page }) => {
-  await expect(page.locator('[data-testid="user-name"]')).toHaveText('John');
-  await expect(page.locator('[data-testid="user-email"]')).toHaveText('john@example.com');
-});
+  await expect(page.locator('[data-testid="user-name"]')).toHaveText('John')
+  await expect(page.locator('[data-testid="user-email"]')).toHaveText('john@example.com')
+})
 ```
 
 **Why?** If second assertion fails, you don't know if first is still valid. Split into separate tests for clear failure diagnosis.
@@ -547,15 +547,15 @@ test('should load user dashboard after login', async ({ page }) => {
   await page.route('**/api/user', (route) =>
     route.fulfill({
       status: 200,
-      body: JSON.stringify({ id: 1, name: 'Test User' }),
-    }),
-  );
+      body: JSON.stringify({ id: 1, name: 'Test User' })
+    })
+  )
 
   // NOW navigate
-  await page.goto('/dashboard');
+  await page.goto('/dashboard')
 
-  await expect(page.locator('[data-testid="user-name"]')).toHaveText('Test User');
-});
+  await expect(page.locator('[data-testid="user-name"]')).toHaveText('Test User')
+})
 ```
 
 Always set up route interception before navigating to pages that make network requests.
@@ -566,26 +566,26 @@ Playwright fixtures with automatic data cleanup:
 
 ```typescript
 // tests/support/fixtures/auth.fixture.ts
-import { test as base } from '@playwright/test';
-import { createUser, deleteUser } from '../factories/user.factory';
+import { test as base } from '@playwright/test'
+import { createUser, deleteUser } from '../factories/user.factory'
 
 export const test = base.extend({
   authenticatedUser: async ({ page }, use) => {
     // Setup: Create and authenticate user
-    const user = await createUser();
-    await page.goto('/login');
-    await page.fill('[data-testid="email"]', user.email);
-    await page.fill('[data-testid="password"]', user.password);
-    await page.click('[data-testid="login-button"]');
-    await page.waitForURL('/dashboard');
+    const user = await createUser()
+    await page.goto('/login')
+    await page.fill('[data-testid="email"]', user.email)
+    await page.fill('[data-testid="password"]', user.password)
+    await page.click('[data-testid="login-button"]')
+    await page.waitForURL('/dashboard')
 
     // Provide to test
-    await use(user);
+    await use(user)
 
     // Cleanup: Delete user automatically
-    await deleteUser(user.id);
-  },
-});
+    await deleteUser(user.id)
+  }
+})
 ```
 
 **Fixture principles:**
@@ -601,7 +601,7 @@ Use faker for all test data generation:
 
 ```typescript
 // tests/support/factories/user.factory.ts
-import { faker } from '@faker-js/faker';
+import { faker } from '@faker-js/faker'
 
 export const createUser = (overrides = {}) => ({
   id: faker.number.int(),
@@ -610,15 +610,15 @@ export const createUser = (overrides = {}) => ({
   name: faker.person.fullName(),
   role: 'user',
   createdAt: faker.date.recent().toISOString(),
-  ...overrides,
-});
+  ...overrides
+})
 
-export const createUsers = (count: number) => Array.from({ length: count }, () => createUser());
+export const createUsers = (count: number) => Array.from({ length: count }, () => createUser())
 
 // API helper for cleanup
 export const deleteUser = async (userId: number) => {
-  await fetch(`/api/users/${userId}`, { method: 'DELETE' });
-};
+  await fetch(`/api/users/${userId}`, { method: 'DELETE' })
+}
 ```
 
 **Factory principles:**
@@ -655,30 +655,30 @@ Use fixtures for setup/teardown, not page objects for actions.
 
 ```typescript
 // ❌ WRONG: Hard wait
-await page.waitForTimeout(2000);
+await page.waitForTimeout(2000)
 
 // ✅ CORRECT: Explicit wait
-await page.waitForSelector('[data-testid="user-name"]');
-await expect(page.locator('[data-testid="user-name"]')).toBeVisible();
+await page.waitForSelector('[data-testid="user-name"]')
+await expect(page.locator('[data-testid="user-name"]')).toBeVisible()
 
 // ❌ WRONG: Conditional flow
 if (await element.isVisible()) {
-  await element.click();
+  await element.click()
 }
 
 // ✅ CORRECT: Deterministic assertion
-await expect(element).toBeVisible();
-await element.click();
+await expect(element).toBeVisible()
+await element.click()
 
 // ❌ WRONG: Try-catch for test logic
 try {
-  await element.click();
+  await element.click()
 } catch (e) {
   // Test shouldn't catch errors
 }
 
 // ✅ CORRECT: Let test fail if element not found
-await element.click();
+await element.click()
 ```
 
 ## Integration with Other Workflows

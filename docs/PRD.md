@@ -29,29 +29,34 @@ Chop Shop addresses this gap by providing a focused desktop video editor that co
 ### Functional Requirements
 
 **Core Application & Import**
+
 - FR001: Application shall launch as a native desktop application (Electron/Tauri) on macOS within 5 seconds
 - FR002: Application shall support drag-and-drop import of video files (MP4, MOV, WebM formats)
 - FR003: Application shall provide a file picker dialog for video import
 - FR004: Application shall display imported video clips in a media library panel with thumbnail previews
 
 **Timeline & Preview**
+
 - FR005: Application shall provide a visual timeline interface showing imported clips with playhead/scrubber
 - FR006: Application shall display video preview with HTML5 video player supporting play/pause controls
 - FR007: Application shall synchronize playhead position between timeline and preview player
 - FR008: Application shall support timeline scrubbing with real-time preview updates
 
 **Editing Operations**
+
 - FR009: Application shall allow users to set in/out trim points on individual clips
 - FR010: Application shall support multi-clip arrangement on timeline with drag-to-reorder functionality
 - FR011: Application shall support split operation at playhead position to divide clips
 - FR012: Application shall allow deletion of clips from timeline
 
 **Recording Capabilities**
+
 - FR013: Application shall provide screen recording (full screen or window selection)
 - FR014: Application shall provide webcam recording with device selection
 - FR015: Application shall support picture-in-picture recording (screen + webcam simultaneously)
 
 **Export**
+
 - FR016: Application shall export edited timeline to MP4 format using FFmpeg
 - FR017: Application shall provide resolution options for export (720p, 1080p, source quality)
 - FR018: Application shall display real-time export progress indicator with percentage complete
@@ -138,6 +143,7 @@ Chop Shop addresses this gap by providing a focused desktop video editor that co
 **Visual Reference:** `docs/design/capcut_reference.jpg` - CapCut-inspired interface (simplified)
 
 **Layout Structure:**
+
 - **Left Sidebar**: Media library with import area (drag-and-drop zone) and Record button
 - **Center**: Large video preview player
 - **Right Sidebar**: Clip details and properties panel
@@ -145,11 +151,13 @@ Chop Shop addresses this gap by providing a focused desktop video editor that co
 - **Top Bar**: Project title, Export button
 
 **Simplified from CapCut Reference:**
+
 - **Remove**: AI media, avatars, text tools, stickers, effects, transitions, captions, filters, adjustments
 - **Keep**: Media import, Record button, Timeline, Preview player, Export, basic trim/split/delete tools
 - **Focus**: Clean 3-panel layout (media/preview/timeline) with minimal toolbar
 
 **Visual Design:**
+
 - Dark theme for video editing context
 - High contrast for playhead and selected clips
 - Accent color (cyan/teal) for primary actions (Export button)
@@ -162,22 +170,26 @@ Chop Shop addresses this gap by providing a focused desktop video editor that co
 ### Epic Structure for 72-Hour Sprint
 
 **Epic 1: Project Foundation & Setup**
+
 - Goal: Establish Electron desktop application with deployable build system and basic UI shell
 - Estimated stories: 3-4 stories
 - Deliverable: Packaged desktop app that launches with empty UI shell
 
 **Epic 2: Media Import & Timeline Foundation**
+
 - Goal: Enable video import and create functional timeline with playback controls
 - Estimated stories: 4-5 stories
 - Deliverable: User can import videos, see them in media library, drag to timeline, and play in preview
 
 **Epic 3: Editing & Export (MVP Checkpoint)**
+
 - Goal: Implement trim/split operations and FFmpeg export pipeline
 - Estimated stories: 4-5 stories
 - Deliverable: User can trim/split clips and export to MP4
 - **HARD GATE: Due Tuesday, October 28, 10:59 PM CT**
 
 **Epic 4: Recording Capabilities & Enhanced Editing**
+
 - Goal: Add screen/webcam recording, picture-in-picture, and multi-clip timeline enhancements
 - Estimated stories: 5-7 stories
 - Deliverable: Full recording suite with enhanced timeline (drag-reorder, multiple clips, complete workflow)
@@ -186,6 +198,7 @@ Chop Shop addresses this gap by providing a focused desktop video editor that co
 **Total: 4 epics, 16-21 stories**
 
 ### Epic Dependencies
+
 - Epic 2 builds on Epic 1 (needs app shell)
 - Epic 3 builds on Epic 2 (needs timeline + preview)
 - Epic 4 builds on Epic 3 (needs complete editing pipeline)
@@ -198,6 +211,7 @@ Chop Shop addresses this gap by providing a focused desktop video editor that co
 ## Out of Scope
 
 **Deferred to Future Phases:**
+
 - Text overlays and custom fonts
 - Transitions (fade, slide, dissolve)
 - Audio controls (volume adjustments, fade in/out)
@@ -209,12 +223,14 @@ Chop Shop addresses this gap by providing a focused desktop video editor that co
 - Auto-save functionality
 
 **Platform Limitations:**
+
 - Windows and Linux builds (macOS only for sprint)
 - Mobile companion app
 - Browser-based version
 - Cloud upload/sharing features
 
 **Advanced Features:**
+
 - AI-powered features (auto-captions via Whisper - reserved for optional Epic 5)
 - GPU-accelerated rendering
 - Plugin architecture for effects
@@ -224,12 +240,14 @@ Chop Shop addresses this gap by providing a focused desktop video editor that co
 - Advanced timeline features (snap-to-grid, markers, nested sequences)
 
 **Integration & Collaboration:**
+
 - Cloud collaboration features
 - Team/enterprise features
 - Social media direct publishing
 - Third-party integrations
 
 **Scope Boundaries:**
+
 - Professional-grade color grading
 - Multi-camera editing
 - 360° video support

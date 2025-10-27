@@ -36,12 +36,12 @@ generated: 2025-10-27
 project: chop-shop
 project_key: chop-shop
 tracking_system: file-system
-story_location: "{project-root}/docs/stories"
+story_location: '{project-root}/docs/stories'
 
 development_status:
   epic-1: backlog
-  1-1-electron-project-setup: backlog
-  1-2-build-and-packaging-system: backlog
+  1-1-electron-project-setup: done
+  1-2-build-and-packaging-system: drafted
   1-3-ui-shell-with-3-panel-layout: backlog
   1-4-ffmpeg-integration-setup: backlog
   epic-1-retrospective: optional

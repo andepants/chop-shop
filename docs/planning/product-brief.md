@@ -63,6 +63,7 @@ The application focuses on the essential editing workflow without unnecessary co
 **Primary Goal**: Complete a shippable desktop video editor within 72 hours (by October 29, 10:59 PM CT)
 
 **Secondary Goals**:
+
 - Demonstrate desktop application development expertise
 - Show media processing and FFmpeg integration knowledge
 - Prove ability to make pragmatic technical decisions under pressure
@@ -79,12 +80,14 @@ The application focuses on the essential editing workflow without unnecessary co
 ### Key Performance Indicators (KPIs)
 
 **Technical KPIs**:
+
 - MVP checkpoint passed by Tuesday 10:59 PM CT (October 28)
 - Final submission ready by Wednesday 10:59 PM CT (October 29)
 - Application successfully builds and packages for distribution
 - Zero crashes during core workflow testing (import → edit → export)
 
 **Performance KPIs**:
+
 - Timeline UI: 30+ fps with 10 clips
 - App launch: < 5 seconds cold start
 - Export: No memory leaks during 15-minute editing sessions
@@ -97,6 +100,7 @@ The application focuses on the essential editing workflow without unnecessary co
 ### Financial Impact
 
 This is a portfolio/learning project with no direct financial impact. The value is in:
+
 - Demonstrating technical capabilities to potential employers/clients
 - Building reusable knowledge in desktop and media processing
 - Creating a foundation for potential future commercial tools
@@ -110,6 +114,7 @@ N/A - Personal project
 **Career Development**: Builds expertise in desktop application development and media processing, valuable skills for video/media product companies.
 
 **Portfolio Enhancement**: Demonstrates ability to:
+
 - Ship complete products under extreme deadlines
 - Make pragmatic technical tradeoffs
 - Build native applications with complex requirements
@@ -179,12 +184,14 @@ N/A - Personal project
 ### Phase 2 Features (Tuesday Night - Wednesday)
 
 **Recording Capabilities**:
+
 - Screen recording (full screen or window)
 - Webcam recording
 - Picture-in-picture (screen + webcam)
 - Audio capture from microphone
 
 **Enhanced Timeline**:
+
 - Multi-clip arrangement
 - Drag clips to reorder
 - Split clips at playhead
@@ -194,16 +201,19 @@ N/A - Personal project
 - Zoom controls
 
 **Improved Preview**:
+
 - Real-time timeline preview
 - Audio synchronization
 - Scrubbing with audio feedback
 
 **Better Export**:
+
 - Resolution options (720p, 1080p, source)
 - Progress indicator
 - Export settings UI
 
 **Media Management**:
+
 - Media library panel
 - Thumbnail previews
 - Metadata display (duration, resolution, size)
@@ -237,11 +247,13 @@ N/A - Personal project
 ### Platform Requirements
 
 **Desktop Platforms**:
+
 - macOS (primary development and testing)
 - Windows (secondary, if time permits)
 - Linux (stretch goal)
 
 **Minimum System Requirements**:
+
 - 8GB RAM
 - Dual-core processor
 - 2GB free disk space
@@ -250,26 +262,31 @@ N/A - Personal project
 ### Technology Preferences
 
 **Desktop Framework**:
+
 - **Electron** (Recommended): More mature, extensive documentation, larger community, proven for media apps
 - **Tauri** (Alternative): Smaller bundle size, Rust-based, better performance but less mature ecosystem
 
 **Frontend Framework**:
+
 - React (preferred for speed and familiarity)
 - Vue or Svelte (acceptable alternatives)
 - Vanilla JS (if no build complexity desired)
 
 **Media Processing**:
+
 - **FFmpeg** (Required): Industry standard for video processing
   - `fluent-ffmpeg` for Node.js integration
   - `@ffmpeg/ffmpeg` for WebAssembly fallback
   - Native FFmpeg binaries bundled with app
 
 **Timeline Implementation**:
+
 - HTML5 Canvas for performance
 - Fabric.js or Konva.js for interactive objects
 - Custom CSS/DOM solution for simpler approach
 
 **Video Playback**:
+
 - HTML5 `<video>` element (simplest)
 - Video.js (more features, better controls)
 - Plyr (modern, lightweight)
@@ -277,21 +294,25 @@ N/A - Personal project
 ### Architecture Considerations
 
 **Separation of Concerns**:
+
 - **Main Process**: File system access, FFmpeg operations, native dialogs
 - **Renderer Process**: UI, timeline, preview player
 - **IPC**: Communication between processes
 
 **Media Pipeline**:
+
 ```
 Import → Decode (FFmpeg) → Timeline Representation → Preview (HTML5) → Export (FFmpeg Encode)
 ```
 
 **State Management**:
+
 - Timeline state (clips, tracks, edits)
 - Preview state (playhead position, playing/paused)
 - Export state (progress, settings)
 
 **Performance Optimization**:
+
 - Lazy load thumbnails
 - Virtual scrolling for long timelines
 - Web Workers for heavy computation
@@ -299,6 +320,7 @@ Import → Decode (FFmpeg) → Timeline Representation → Preview (HTML5) → E
 - Debounce/throttle for scrubbing
 
 **File Management**:
+
 - Temporary directory for recordings
 - Project file format (JSON)
 - Cleanup strategy for temp files
@@ -310,6 +332,7 @@ Import → Decode (FFmpeg) → Timeline Representation → Preview (HTML5) → E
 ### Constraints
 
 **Time**: 72 hours total (October 27-29, 2025)
+
 - Must pass MVP checkpoint by Tuesday 10:59 PM CT
 - Final submission by Wednesday 10:59 PM CT
 - Cannot extend beyond October 29th due to relocation
@@ -319,6 +342,7 @@ Import → Decode (FFmpeg) → Timeline Representation → Preview (HTML5) → E
 **Scope**: Desktop-only (no web, no mobile)
 
 **Technical**:
+
 - Must use FFmpeg (no alternative video processing libraries)
 - Must be native app (not Electron wrapper around web app)
 - Must package and distribute (not just dev mode)
@@ -326,18 +350,21 @@ Import → Decode (FFmpeg) → Timeline Representation → Preview (HTML5) → E
 ### Key Assumptions
 
 **Technical Assumptions**:
+
 - FFmpeg binaries can be bundled with app
 - HTML5 video element handles common formats (MP4, MOV, WebM)
 - Desktop APIs provide adequate screen/webcam capture
 - Export doesn't require GPU acceleration (CPU encoding acceptable)
 
 **User Assumptions**:
+
 - Users have basic video editing knowledge
 - Users work with standard video formats
 - Users have modern computers (< 5 years old)
 - Users don't need advanced color grading or effects
 
 **Scope Assumptions**:
+
 - Simple is better than feature-rich
 - Working software beats perfect architecture
 - MVP can be ugly but must be functional
@@ -391,17 +418,20 @@ Import → Decode (FFmpeg) → Timeline Representation → Preview (HTML5) → E
 ### Open Questions
 
 **Technical Questions**:
+
 - Electron vs Tauri: Which ships faster? (Decision: Electron for maturity)
 - FFmpeg: Bundle or require user install? (Decision: Bundle for better UX)
 - Timeline: Canvas or DOM? (Decision: Start with DOM, move to Canvas if needed)
 - State Management: Redux/Zustand or local state? (Decision: Local state for speed)
 
 **UX Questions**:
+
 - Keyboard shortcuts: Essential or nice-to-have? (Decision: Nice-to-have, defer)
 - Project save: Required or optional? (Decision: Optional for MVP)
 - Multi-track: How many tracks needed? (Decision: 2 minimum - main + overlay)
 
 **Scope Questions**:
+
 - Recording: Must-have for final submission? (Decision: Yes, core feature)
 - Text overlays: Include or defer? (Decision: Defer to stretch goals)
 - Transitions: Required? (Decision: Defer to stretch goals)
@@ -409,16 +439,19 @@ Import → Decode (FFmpeg) → Timeline Representation → Preview (HTML5) → E
 ### Areas Needing Further Research
 
 **Before Starting**:
+
 - [ ] Electron screen capture API documentation
 - [ ] FFmpeg encoding presets for web video
 - [ ] Timeline UI libraries comparison
 
 **During Development**:
+
 - [ ] Memory profiling for video playback
 - [ ] FFmpeg optimal settings for export quality/speed
 - [ ] Audio synchronization techniques
 
 **For Future Versions**:
+
 - [ ] GPU acceleration for rendering
 - [ ] WebCodecs API for browser-based encoding
 - [ ] WebRTC for collaborative editing
@@ -430,12 +463,14 @@ Import → Decode (FFmpeg) → Timeline Representation → Preview (HTML5) → E
 ### A. Research Summary
 
 **Competitive Analysis**:
+
 - **CapCut**: Mobile-first, simple timeline, template-driven
 - **Loom**: Recording focus, minimal editing, cloud-first
 - **OBS Studio**: Recording powerhouse, no editing
 - **Shotcut**: Open-source, desktop, full-featured but complex UI
 
 **Key Insights**:
+
 - Users value speed over features
 - Recording + editing in one tool is rare
 - Export quality matters more than preview quality
@@ -444,12 +479,14 @@ Import → Decode (FFmpeg) → Timeline Representation → Preview (HTML5) → E
 ### B. Stakeholder Input
 
 **Self (Developer/User)**:
+
 - Must ship before Thursday morning
 - Quality over features, but MVP must be complete
 - Learning opportunity in desktop + media processing
 - Portfolio piece that demonstrates shipping under pressure
 
 **Evaluators (Implicit)**:
+
 - Looking for working software, not perfect code
 - Expecting pragmatic technical choices
 - Valuing completion over perfectionism
@@ -458,17 +495,20 @@ Import → Decode (FFmpeg) → Timeline Representation → Preview (HTML5) → E
 ### C. References
 
 **Technical Documentation**:
+
 - FFmpeg Documentation: https://ffmpeg.org/documentation.html
 - Electron Documentation: https://www.electronjs.org/docs
 - Tauri Documentation: https://tauri.app/
 - MediaRecorder API: https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder
 
 **Inspiration**:
+
 - CapCut Desktop: https://www.capcut.com/
 - Loom: https://www.loom.com/
 - Descript: https://www.descript.com/
 
 **Libraries to Consider**:
+
 - fluent-ffmpeg: https://github.com/fluent-ffmpeg/node-fluent-ffmpeg
 - fabric.js: http://fabricjs.com/
 - video.js: https://videojs.com/
@@ -478,6 +518,7 @@ Import → Decode (FFmpeg) → Timeline Representation → Preview (HTML5) → E
 _This Product Brief serves as the foundational document for Chop Shop development._
 
 _Next Steps:_
+
 1. Technical architecture planning (stack selection, component design)
 2. MVP implementation (Tuesday 10:59 PM CT deadline)
 3. Core features implementation (Wednesday 10:59 PM CT deadline)
@@ -488,6 +529,7 @@ _Next Steps:_
 ---
 
 **Project Timeline**:
+
 - **Monday, October 27**: Planning and MVP start
 - **Tuesday, October 28, 10:59 PM CT**: MVP checkpoint (HARD GATE)
 - **Wednesday, October 29, 10:59 PM CT**: Final submission

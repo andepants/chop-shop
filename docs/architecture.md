@@ -16,6 +16,7 @@ Chop Shop is a desktop video editor built with Electron, React, TypeScript, and 
 **Foundation: electron-react-boilerplate (Already Initialized)**
 
 The project is already initialized with electron-react-boilerplate, which provides:
+
 - Electron + React + TypeScript + Webpack
 - electron-builder for macOS packaging
 - Jest testing framework
@@ -36,19 +37,19 @@ Configure Tailwind for renderer process (see Styling section below).
 
 ## Decision Summary
 
-| Category | Decision | Version | Affects Epics | Rationale |
-|----------|----------|---------|---------------|-----------|
-| **State Management** | Zustand | 5.0.8 | All | Minimal boilerplate, excellent TypeScript support, perfect for 72-hour timeline |
-| **Electron Framework** | electron-react-boilerplate | Latest | All | Pre-configured build system, eliminates setup time |
-| **FFmpeg Integration** | ffmpeg-static | 5.2.0 (FFmpeg 6.0) | Epic 3, 4 | Bundles FFmpeg binaries, no external dependencies |
-| **IPC Architecture** | Main: FFmpeg/File I/O, Renderer: UI | N/A | All | Security best practice, prevents UI freezing |
-| **Screen Recording** | desktopCapturer + getUserMedia | Native Electron | Epic 4 | Native API, no external libraries needed |
-| **Preview Rendering** | HTML5 video + Canvas overlay | Native | Epic 2, 4 | Simple, performant, meets 30fps requirement |
-| **Styling** | Tailwind CSS | 3.x | All | Co-located styles, faster development, fewer files |
-| **Testing** | Jest | From boilerplate | All | Pre-configured, unit tests for logic |
-| **File Management** | OS temp directory | Node.js os module | Epic 3, 4 | Standard approach, automatic cleanup |
-| **Error Handling** | Try-catch + user-friendly messages | N/A | All | Pragmatic, user-focused error recovery |
-| **TypeScript** | Strict mode | 5.x | All | Type safety, better AI agent collaboration |
+| Category               | Decision                            | Version            | Affects Epics | Rationale                                                                       |
+| ---------------------- | ----------------------------------- | ------------------ | ------------- | ------------------------------------------------------------------------------- |
+| **State Management**   | Zustand                             | 5.0.8              | All           | Minimal boilerplate, excellent TypeScript support, perfect for 72-hour timeline |
+| **Electron Framework** | electron-react-boilerplate          | Latest             | All           | Pre-configured build system, eliminates setup time                              |
+| **FFmpeg Integration** | ffmpeg-static                       | 5.2.0 (FFmpeg 6.0) | Epic 3, 4     | Bundles FFmpeg binaries, no external dependencies                               |
+| **IPC Architecture**   | Main: FFmpeg/File I/O, Renderer: UI | N/A                | All           | Security best practice, prevents UI freezing                                    |
+| **Screen Recording**   | desktopCapturer + getUserMedia      | Native Electron    | Epic 4        | Native API, no external libraries needed                                        |
+| **Preview Rendering**  | HTML5 video + Canvas overlay        | Native             | Epic 2, 4     | Simple, performant, meets 30fps requirement                                     |
+| **Styling**            | Tailwind CSS                        | 3.x                | All           | Co-located styles, faster development, fewer files                              |
+| **Testing**            | Jest                                | From boilerplate   | All           | Pre-configured, unit tests for logic                                            |
+| **File Management**    | OS temp directory                   | Node.js os module  | Epic 3, 4     | Standard approach, automatic cleanup                                            |
+| **Error Handling**     | Try-catch + user-friendly messages  | N/A                | All           | Pragmatic, user-focused error recovery                                          |
+| **TypeScript**         | Strict mode                         | 5.x                | All           | Type safety, better AI agent collaboration                                      |
 
 ---
 
@@ -217,12 +218,12 @@ chop-shop/
 
 ## Epic to Architecture Mapping
 
-| Epic | Primary Components | Services | State |
-|------|-------------------|----------|-------|
-| **Epic 1: Foundation** | `Layout/MainLayout`, `Layout/TopBar`, `Layout/Sidebar` | `ffmpeg.service` (setup) | `uiStore` |
-| **Epic 2: Import & Timeline** | `MediaLibrary/*`, `Timeline/*`, `Preview/PreviewPlayer` | `file.service`, `thumbnail.service` | `mediaStore`, `timelineStore`, `playbackStore` |
-| **Epic 3: Editing & Export** | `EditTools/*`, `Export/*`, `Timeline/*` (operations) | `ffmpeg.service` (export) | `timelineStore` (mutations) |
-| **Epic 4: Recording** | `Recording/*`, `Timeline/*` (multi-track), `Preview/VideoCanvas` | `recording.service` | `recordingStore`, `timelineStore` (multi-track) |
+| Epic                          | Primary Components                                               | Services                            | State                                           |
+| ----------------------------- | ---------------------------------------------------------------- | ----------------------------------- | ----------------------------------------------- |
+| **Epic 1: Foundation**        | `Layout/MainLayout`, `Layout/TopBar`, `Layout/Sidebar`           | `ffmpeg.service` (setup)            | `uiStore`                                       |
+| **Epic 2: Import & Timeline** | `MediaLibrary/*`, `Timeline/*`, `Preview/PreviewPlayer`          | `file.service`, `thumbnail.service` | `mediaStore`, `timelineStore`, `playbackStore`  |
+| **Epic 3: Editing & Export**  | `EditTools/*`, `Export/*`, `Timeline/*` (operations)             | `ffmpeg.service` (export)           | `timelineStore` (mutations)                     |
+| **Epic 4: Recording**         | `Recording/*`, `Timeline/*` (multi-track), `Preview/VideoCanvas` | `recording.service`                 | `recordingStore`, `timelineStore` (multi-track) |
 
 ---
 
@@ -231,30 +232,36 @@ chop-shop/
 ### Core Technologies
 
 **Runtime:**
+
 - Electron (from boilerplate) - Desktop application framework
 - Node.js (from boilerplate) - Main process runtime
 - React 18 (from boilerplate) - UI framework
 - TypeScript 5.x (from boilerplate) - Type safety
 
 **State Management:**
+
 - Zustand 5.0.8 - Global state management
 - React hooks - Local component state
 
 **Build & Dev Tools:**
+
 - Webpack (from boilerplate) - Module bundler
 - electron-builder (from boilerplate) - Packaging for macOS
 - Babel (from boilerplate) - JavaScript transpilation
 - ESLint + Prettier (from boilerplate) - Code quality
 
 **Styling:**
+
 - Tailwind CSS 3.x - Utility-first CSS framework
 - PostCSS + Autoprefixer - CSS processing
 
 **Testing:**
+
 - Jest (from boilerplate) - Unit testing framework
 - React Testing Library (from boilerplate) - Component testing
 
 **Video Processing:**
+
 - ffmpeg-static 5.2.0 - FFmpeg binaries (FFmpeg 6.0)
 - Native Electron APIs - Screen/webcam capture
 - MediaRecorder API - Recording to WebM
@@ -264,21 +271,25 @@ chop-shop/
 ### Integration Points
 
 **Main ↔ Renderer Communication:**
+
 - IPC (Inter-Process Communication) via Electron
 - Secure preload script exposes limited API
 - Type-safe request/response patterns
 
 **FFmpeg Integration:**
+
 - Executed from main process via Node.js child_process
 - Progress monitoring via stdout/stderr parsing
 - Command building in ffmpeg.service.ts
 
 **File System:**
+
 - Import: User selects files via native dialog
 - Temp storage: `os.tmpdir()/chop-shop/recordings/`
 - Export: User selects destination via native dialog
 
 **Media Capture:**
+
 - Screen: `desktopCapturer.getSources()` → `getUserMedia`
 - Webcam: `getUserMedia({video: true, audio: true})`
 - Recording: MediaRecorder API → WebM files
@@ -290,6 +301,7 @@ chop-shop/
 ### NAMING CONVENTIONS (MANDATORY)
 
 **Files:**
+
 ```
 ✅ Components: PascalCase.tsx
    Timeline.tsx, MediaLibrary.tsx, ExportModal.tsx
@@ -314,6 +326,7 @@ chop-shop/
 ```
 
 **Code:**
+
 ```typescript
 // ✅ camelCase for variables, functions
 const playheadPosition = 0
@@ -327,16 +340,16 @@ const MAX_TRACKS = 2
 const SUPPORTED_FORMATS = ['mp4', 'mov', 'webm']
 
 // ✅ kebab-case for IPC channels
-'start-export', 'import-file', 'update-progress'
+;('start-export', 'import-file', 'update-progress')
 ```
 
 ### COMPONENT STRUCTURE (MANDATORY ORDER)
 
 ```tsx
 // 1. Imports (grouped)
-import React from 'react'                    // React imports
-import { useTimelineStore } from '@/store'   // Internal imports
-import type { Clip } from '@/types'          // Type imports
+import React from 'react' // React imports
+import { useTimelineStore } from '@/store' // Internal imports
+import type { Clip } from '@/types' // Type imports
 
 // 2. Types/Interfaces (component-specific)
 interface TimelineProps {
@@ -346,7 +359,7 @@ interface TimelineProps {
 // 3. Component definition
 export function Timeline({ onClipSelect }: TimelineProps) {
   // 3a. Hooks (grouped by type)
-  const clips = useTimelineStore(state => state.clips)
+  const clips = useTimelineStore((state) => state.clips)
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
 
   // 3b. Handlers
@@ -361,11 +374,7 @@ export function Timeline({ onClipSelect }: TimelineProps) {
   }, [clips])
 
   // 3d. Render
-  return (
-    <div className="timeline">
-      {/* JSX */}
-    </div>
-  )
+  return <div className="timeline">{/* JSX */}</div>
 }
 ```
 
@@ -377,7 +386,7 @@ import { create } from 'zustand'
 // Types
 interface Clip {
   id: string
-  sourceFile: string  // Absolute path
+  sourceFile: string // Absolute path
   startTime: number
   duration: number
   trimIn: number
@@ -402,21 +411,24 @@ export const useTimelineStore = create<TimelineState>((set) => ({
   playheadPosition: 0,
 
   // Actions
-  addClip: (clip) => set((state) => ({
-    clips: [...state.clips, clip]
-  })),
+  addClip: (clip) =>
+    set((state) => ({
+      clips: [...state.clips, clip]
+    })),
 
-  removeClip: (id) => set((state) => ({
-    clips: state.clips.filter(c => c.id !== id)
-  })),
+  removeClip: (id) =>
+    set((state) => ({
+      clips: state.clips.filter((c) => c.id !== id)
+    })),
 
-  updatePlayhead: (position) => set({ playheadPosition: position }),
+  updatePlayhead: (position) => set({ playheadPosition: position })
 }))
 ```
 
 ### IPC PATTERNS
 
 **Channel Naming:**
+
 ```typescript
 // constants.ts
 export const IPC_CHANNELS = {
@@ -427,11 +439,12 @@ export const IPC_CHANNELS = {
   STOP_RECORDING: 'stop-recording',
   GET_SOURCES: 'get-sources',
   OPEN_FILE_DIALOG: 'open-file-dialog',
-  GENERATE_THUMBNAIL: 'generate-thumbnail',
+  GENERATE_THUMBNAIL: 'generate-thumbnail'
 } as const
 ```
 
 **Request/Response Format:**
+
 ```typescript
 // All IPC handlers return this shape
 interface IPCResponse<T = unknown> {
@@ -462,6 +475,7 @@ ipcMain.handle('start-export', async (event, options) => {
 ```
 
 **Renderer Usage:**
+
 ```typescript
 // Invoke (request-response)
 const response = await window.electron.ipcRenderer.invoke('start-export', options)
@@ -475,6 +489,7 @@ window.electron.ipcRenderer.on('export-progress', (data) => {
 ### STYLING PATTERNS (TAILWIND)
 
 **Setup:**
+
 ```javascript
 // tailwind.config.js
 module.exports = {
@@ -482,11 +497,11 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        accent: '#06b6d4',
-      },
-    },
+        accent: '#06b6d4'
+      }
+    }
   },
-  plugins: [],
+  plugins: []
 }
 ```
 
@@ -505,6 +520,7 @@ module.exports = {
 ```
 
 **Component Usage:**
+
 ```tsx
 import { cn } from '@/utils/cn.util'
 
@@ -514,15 +530,12 @@ export function Timeline() {
   return (
     <div className="flex flex-col h-full bg-zinc-900">
       <div className="flex items-center gap-2 px-4 py-2 border-b border-zinc-700">
-        <button className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-sm">
-          Split
-        </button>
+        <button className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-sm">Split</button>
       </div>
 
-      <div className={cn(
-        "relative h-16 bg-zinc-800 rounded",
-        isSelected && "ring-2 ring-cyan-500"
-      )}>
+      <div
+        className={cn('relative h-16 bg-zinc-800 rounded', isSelected && 'ring-2 ring-cyan-500')}
+      >
         {/* Clip content */}
       </div>
     </div>
@@ -531,6 +544,7 @@ export function Timeline() {
 ```
 
 **cn() Utility:**
+
 ```typescript
 // src/renderer/utils/cn.util.ts
 import { clsx, type ClassValue } from 'clsx'
@@ -553,12 +567,12 @@ const outputPath = path.join(userSelectedDir, 'output.mp4')
 
 // ✅ ALWAYS store absolute paths in state
 interface Clip {
-  sourceFile: string  // "/Users/andrew/Desktop/video.mp4"
+  sourceFile: string // "/Users/andrew/Desktop/video.mp4"
 }
 
 // ❌ NEVER use string concatenation or relative paths
-const badPath = tmpDir + '/recordings'  // WRONG
-const badPath2 = './recordings'  // WRONG
+const badPath = tmpDir + '/recordings' // WRONG
+const badPath2 = './recordings' // WRONG
 ```
 
 ### ERROR HANDLING PATTERNS
@@ -590,17 +604,19 @@ try {
 ```
 
 **Error Codes:**
+
 ```typescript
 export const ERROR_CODES = {
   EXPORT_FAILED: 'EXPORT_FAILED',
   IMPORT_FAILED: 'IMPORT_FAILED',
   RECORDING_FAILED: 'RECORDING_FAILED',
   UNSUPPORTED_FORMAT: 'UNSUPPORTED_FORMAT',
-  PERMISSION_DENIED: 'PERMISSION_DENIED',
+  PERMISSION_DENIED: 'PERMISSION_DENIED'
 } as const
 ```
 
 **User-Friendly Messages:**
+
 ```typescript
 // ✅ CORRECT - actionable and clear
 'Export failed. Please try again.'
@@ -657,6 +673,7 @@ import { formatTime } from '@/utils/timeFormat.util'
 ### IMPORT PATH PATTERNS
 
 **Configure aliases (tsconfig.json):**
+
 ```json
 {
   "compilerOptions": {
@@ -674,6 +691,7 @@ import { formatTime } from '@/utils/timeFormat.util'
 ```
 
 **Always use aliases:**
+
 ```typescript
 // ✅ CORRECT
 import { Timeline } from '@/components/Timeline'
@@ -687,6 +705,7 @@ import { Timeline } from '../../../components/Timeline'
 ### EXPORT PATTERNS
 
 **Every folder MUST have index.ts:**
+
 ```typescript
 // src/renderer/components/Timeline/index.ts
 export { Timeline } from './Timeline'
@@ -711,19 +730,19 @@ interface Track {
 }
 
 interface Clip {
-  id: string                // UUID
-  sourceFile: string        // Absolute path to video file
-  startTime: number         // Position on timeline (seconds)
-  duration: number          // Original clip duration (seconds)
-  trimIn: number            // Trim start offset (seconds)
-  trimOut: number           // Trim end offset (seconds)
-  trackId: number           // Which track (1 or 2)
+  id: string // UUID
+  sourceFile: string // Absolute path to video file
+  startTime: number // Position on timeline (seconds)
+  duration: number // Original clip duration (seconds)
+  trimIn: number // Trim start offset (seconds)
+  trimOut: number // Trim end offset (seconds)
+  trackId: number // Which track (1 or 2)
 }
 
 interface TimelineState {
-  tracks: Track[]           // Max 2 tracks for PiP
-  playheadPosition: number  // Current position (seconds)
-  totalDuration: number     // Computed from clips
+  tracks: Track[] // Max 2 tracks for PiP
+  playheadPosition: number // Current position (seconds)
+  totalDuration: number // Computed from clips
   selectedClipId: string | null
 
   // Actions
@@ -741,17 +760,17 @@ interface TimelineState {
 // Stored in mediaStore.ts
 
 interface MediaFile {
-  id: string                // UUID
-  filePath: string          // Absolute path
-  fileName: string          // Display name
-  duration: number          // Duration in seconds
+  id: string // UUID
+  filePath: string // Absolute path
+  fileName: string // Display name
+  duration: number // Duration in seconds
   resolution: {
     width: number
     height: number
   }
   format: 'mp4' | 'mov' | 'webm'
-  fileSize: number          // Bytes
-  thumbnail: string | null  // Data URL or path
+  fileSize: number // Bytes
+  thumbnail: string | null // Data URL or path
   importedAt: Date
 }
 
@@ -778,8 +797,8 @@ interface RecordingState {
   mode: RecordingMode | null
   selectedScreen: string | null
   selectedWebcam: string | null
-  recordingDuration: number     // Seconds elapsed
-  outputFiles: string[]         // Paths to recorded files
+  recordingDuration: number // Seconds elapsed
+  outputFiles: string[] // Paths to recorded files
 
   // Actions
   startRecording: (mode: RecordingMode) => void
@@ -796,6 +815,7 @@ interface RecordingState {
 ### IPC Commands (Renderer → Main)
 
 **Export:**
+
 ```typescript
 // Channel: 'start-export'
 interface ExportOptions {
@@ -808,6 +828,7 @@ Response: IPCResponse<{ outputPath: string }>
 ```
 
 **Import:**
+
 ```typescript
 // Channel: 'import-file'
 Request: { filePath: string }
@@ -819,6 +840,7 @@ Response: IPCResponse<{ filePaths: string[] }>
 ```
 
 **Recording:**
+
 ```typescript
 // Channel: 'get-sources'
 Request: void
@@ -838,9 +860,12 @@ Response: IPCResponse<{ filePaths: string[] }>
 ```
 
 **Thumbnails:**
+
 ```typescript
 // Channel: 'generate-thumbnail'
-Request: { filePath: string }
+Request: {
+  filePath: string
+}
 Response: IPCResponse<{ thumbnail: string }> // Data URL
 ```
 
@@ -867,6 +892,7 @@ Response: IPCResponse<{ thumbnail: string }> // Data URL
 ### IPC Security
 
 **Preload Script (ONLY exposed API):**
+
 ```typescript
 // src/main/preload.ts
 import { contextBridge, ipcRenderer } from 'electron'
@@ -878,7 +904,7 @@ contextBridge.exposeInMainWorld('electron', {
       const validChannels = [
         'start-export',
         'import-file',
-        'start-recording',
+        'start-recording'
         // ... etc
       ]
       if (validChannels.includes(channel)) {
@@ -891,12 +917,13 @@ contextBridge.exposeInMainWorld('electron', {
       if (validChannels.includes(channel)) {
         ipcRenderer.on(channel, (event, ...args) => func(...args))
       }
-    },
-  },
+    }
+  }
 })
 ```
 
 **Renderer Context:**
+
 - No direct Node.js API access
 - No direct file system access
 - All operations via IPC bridge
@@ -926,24 +953,28 @@ ipcMain.handle('start-export', async (event, options) => {
 ## Performance Considerations
 
 ### Timeline Rendering
+
 - Render only visible clips (virtual scrolling if >50 clips)
 - Use CSS transforms for playhead movement (GPU accelerated)
 - Debounce zoom operations (300ms)
 - Lazy load thumbnails
 
 ### Video Preview
+
 - HTML5 video for main track (hardware accelerated)
 - Canvas compositing only for multi-track (PiP)
 - RequestAnimationFrame for smooth playhead updates
 - Maintain 30fps minimum requirement
 
 ### FFmpeg Export
+
 - Run in main process to prevent UI blocking
 - Stream progress updates every 100ms
 - Use FFmpeg's fast presets for 72-hour timeline
 - No quality optimization (pragmatic over perfect)
 
 ### Memory Management
+
 - Limit thumbnail cache to 100 items
 - Clear unused video elements from DOM
 - Clean up temp files on app quit
@@ -984,6 +1015,7 @@ release/build/chop-shop-1.0.0.dmg
 ```
 
 ### Distribution
+
 - macOS only for 72-hour sprint
 - Local distribution (.dmg file)
 - No code signing (defer to post-launch)
@@ -1045,60 +1077,70 @@ npm run package
 ## Architecture Decision Records (ADRs)
 
 ### ADR-001: Zustand for State Management
+
 **Decision:** Use Zustand 5.0.8 for global state management
 **Context:** Need simple, fast state management for 72-hour timeline
 **Rationale:** Minimal boilerplate, excellent TypeScript support, no Redux complexity
 **Alternatives Considered:** Redux (too much boilerplate), Context API (performance concerns)
 
 ### ADR-002: FFmpeg in Main Process
+
 **Decision:** Execute FFmpeg operations in Electron main process
 **Context:** Need video export and processing capabilities
 **Rationale:** Security best practice, prevents UI blocking, access to Node.js APIs
 **Alternatives Considered:** Renderer process (security risk), Web Workers (no FFmpeg access)
 
 ### ADR-003: Tailwind CSS for Styling
+
 **Decision:** Use Tailwind CSS instead of separate CSS files
 **Context:** Need fast styling approach for 72-hour sprint
 **Rationale:** Co-located styles, fewer files, faster development, excellent for AI agents
 **Alternatives Considered:** CSS Modules (more files), Styled Components (runtime cost)
 
 ### ADR-004: HTML5 Video + Canvas for Preview
+
 **Decision:** Use HTML5 video for single track, Canvas for multi-track compositing
 **Context:** Need 30fps video preview with multi-track support
 **Rationale:** Native performance, hardware accelerated, meets NFR requirements
 **Alternatives Considered:** Full canvas rendering (complex), WebGL (overkill)
 
 ### ADR-005: OS Temp Directory for Recordings
+
 **Decision:** Store recordings in `os.tmpdir()/chop-shop/recordings/`
 **Context:** Need temporary storage for screen/webcam recordings
 **Rationale:** Standard OS location, automatic cleanup, no user config needed
 **Alternatives Considered:** User documents folder (clutters), app directory (permissions)
 
 ### ADR-006: Jest for Testing
+
 **Decision:** Use Jest (from boilerplate) for unit testing
 **Context:** Need testing framework for 72-hour sprint
 **Rationale:** Pre-configured, excellent TypeScript support, fast
 **Alternatives Considered:** Vitest (not in boilerplate), Mocha (less features)
 
 ### ADR-007: No Undo System for MVP
+
 **Decision:** Defer undo/redo to post-launch
 **Context:** 72-hour timeline with hard deadline
 **Rationale:** Explicitly out of scope in PRD, adds significant complexity
 **Alternatives Considered:** Command pattern (too complex for timeline)
 
 ### ADR-008: Manual Testing for Media Operations
+
 **Decision:** Manual testing for recording, playback, export
 **Context:** Automated testing of media operations is complex
 **Rationale:** Pragmatic for 72-hour sprint, automated tests can be added later
 **Alternatives Considered:** E2E tests (too slow), Mock media (not realistic)
 
 ### ADR-009: WebM Recording with FFmpeg Conversion
+
 **Decision:** Record in WebM, convert to MP4 for timeline
 **Context:** MediaRecorder API outputs WebM natively
 **Rationale:** Native browser API, FFmpeg handles conversion seamlessly
 **Alternatives Considered:** Direct MP4 recording (not supported by MediaRecorder)
 
 ### ADR-010: Two-Track Limit for MVP
+
 **Decision:** Maximum 2 timeline tracks (main + overlay)
 **Context:** PiP requirement from PRD
 **Rationale:** Meets all PRD requirements, simpler than unlimited tracks
@@ -1109,6 +1151,7 @@ npm run package
 ## Constraints & Assumptions
 
 ### Technical Constraints
+
 - macOS only (no Windows/Linux for 72-hour sprint)
 - Max 1080p export (no 4K per PRD out-of-scope)
 - MP4, MOV, WebM formats only
@@ -1117,17 +1160,20 @@ npm run package
 - No cloud features (out of scope)
 
 ### Timeline Constraints
+
 - 72-hour development window (Oct 27-29, 2025)
 - MVP checkpoint: Tuesday Oct 28, 10:59 PM CT (Epic 3 complete)
 - Final deadline: Wednesday Oct 29, 10:59 PM CT (Epic 4 complete)
 
 ### Performance Requirements
+
 - Timeline UI: 30+ fps with 10+ clips (NFR001)
 - No crashes during core workflow (NFR002)
 - Preview playback: 30fps minimum (NFR003)
 - App launch: < 5 seconds (FR001)
 
 ### Assumptions
+
 - Developer has macOS development environment
 - FFmpeg operations complete without crashes
 - Screen recording permissions granted by user
@@ -1141,12 +1187,14 @@ npm run package
 ### Quick Reference for Implementation
 
 **Where to implement features:**
+
 - Export functionality → `src/main/services/ffmpeg.service.ts` + `src/renderer/components/Export/`
 - Import functionality → `src/main/services/file.service.ts` + `src/renderer/components/MediaLibrary/`
 - Timeline operations → `src/renderer/components/Timeline/` + `src/renderer/store/timelineStore.ts`
 - Recording → `src/main/services/recording.service.ts` + `src/renderer/components/Recording/`
 
 **Mandatory patterns:**
+
 - ✅ Use Zustand for state management
 - ✅ Use Tailwind for styling (no separate CSS files)
 - ✅ Use path.join for all file paths
@@ -1159,6 +1207,7 @@ npm run package
 - ✅ Store file paths as absolute paths
 
 **File naming:**
+
 - Components: `Timeline.tsx`
 - Services: `ffmpeg.service.ts`
 - Stores: `timelineStore.ts`
@@ -1167,6 +1216,7 @@ npm run package
 - Tests: `Timeline.test.tsx`
 
 **Import aliases:**
+
 ```typescript
 import { Timeline } from '@/components/Timeline'
 import { useTimelineStore } from '@/store/timelineStore'

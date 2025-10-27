@@ -48,6 +48,7 @@ I want an Electron project initialized with React and TypeScript,
 So that I have a solid foundation for building the desktop application.
 
 **Acceptance Criteria:**
+
 1. Electron project created with `electron-builder` for packaging
 2. React + TypeScript configured with hot reload in development
 3. Main process and renderer process communication (IPC) working
@@ -65,6 +66,7 @@ I want a working macOS build and packaging system,
 So that I can create distributable .dmg files throughout development.
 
 **Acceptance Criteria:**
+
 1. `npm run build` creates production build successfully
 2. `npm run package` generates macOS .dmg installer
 3. Packaged app launches without errors on macOS
@@ -82,6 +84,7 @@ I want to see the basic application layout when I launch Chop Shop,
 So that I understand where media, preview, and timeline will appear.
 
 **Acceptance Criteria:**
+
 1. Dark theme UI shell implemented matching CapCut reference
 2. Left sidebar (media library area) renders with placeholder
 3. Center preview area renders with placeholder
@@ -100,6 +103,7 @@ I want FFmpeg binaries bundled and accessible from the Electron app,
 So that I can process video files for export.
 
 **Acceptance Criteria:**
+
 1. FFmpeg binaries bundled with application (using `ffmpeg-static` or similar)
 2. Main process can execute FFmpeg commands successfully
 3. Simple test export (any video → MP4) works to validate integration
@@ -131,6 +135,7 @@ I want to drag video files from my desktop into Chop Shop,
 So that I can quickly add media to my project.
 
 **Acceptance Criteria:**
+
 1. Left sidebar displays drag-and-drop zone with instructions
 2. User can drag MP4, MOV, or WebM files into the import area
 3. Dropped files trigger file validation (format, readability)
@@ -149,6 +154,7 @@ I want to click an Import button to browse for video files,
 So that I can add media without drag-and-drop.
 
 **Acceptance Criteria:**
+
 1. "Import" button visible in left sidebar
 2. Clicking Import opens native file picker dialog (via Electron)
 3. File picker filters to show only MP4, MOV, WebM files
@@ -167,6 +173,7 @@ I want to see all my imported media in a library panel,
 So that I can manage and select clips for my timeline.
 
 **Acceptance Criteria:**
+
 1. Media library shows thumbnail, filename, and duration for each clip
 2. Thumbnails generated from first frame of video
 3. Clicking a clip selects it (visual highlight)
@@ -185,6 +192,7 @@ I want to drag clips from media library to the timeline,
 So that I can arrange my video sequence.
 
 **Acceptance Criteria:**
+
 1. Timeline renders as horizontal track at bottom of screen
 2. User can drag clip from media library to timeline
 3. Dropped clip appears on timeline with thumbnail strip
@@ -204,6 +212,7 @@ I want to play timeline content in the preview window,
 So that I can review my video sequence.
 
 **Acceptance Criteria:**
+
 1. HTML5 video player renders in center preview area
 2. Clicking timeline clip loads it in preview player
 3. Play/pause button controls playback
@@ -237,6 +246,7 @@ I want to set trim points on a clip to remove unwanted sections,
 So that I can include only the desired portions of my footage.
 
 **Acceptance Criteria:**
+
 1. User can select a clip on timeline to enable trim mode
 2. Trim handles appear at clip start and end
 3. Dragging trim handles adjusts in/out points visually
@@ -256,6 +266,7 @@ I want to split a clip at the playhead position,
 So that I can separate sections and remove unwanted parts.
 
 **Acceptance Criteria:**
+
 1. "Split" button available in timeline toolbar
 2. User positions playhead on a clip and clicks Split
 3. Selected clip splits into two separate clips at playhead position
@@ -274,6 +285,7 @@ I want to delete clips I don't need from the timeline,
 So that I can remove mistakes or unwanted footage.
 
 **Acceptance Criteria:**
+
 1. User can select a clip on timeline
 2. Delete button or keyboard shortcut (Delete/Backspace key) removes selected clip
 3. Remaining clips automatically shift left to close gap
@@ -292,6 +304,7 @@ I want to drag clips to reorder them on the timeline,
 So that I can arrange my video sequence in any order.
 
 **Acceptance Criteria:**
+
 1. User can click and drag a timeline clip to a new position
 2. Clips automatically shift to make space during drag operation
 3. Drop clip between other clips to insert at that position
@@ -310,6 +323,7 @@ I want to export my edited timeline as an MP4 file,
 So that I can share my video or upload it to platforms.
 
 **Acceptance Criteria:**
+
 1. Export button in top bar becomes enabled when timeline has clips
 2. Clicking Export opens export dialog with settings:
    - Resolution options: 720p, 1080p, Source quality
@@ -350,6 +364,7 @@ I want to place clips on multiple timeline tracks,
 So that I can create picture-in-picture or overlay effects.
 
 **Acceptance Criteria:**
+
 1. Timeline displays 2 horizontal tracks: Track 1 (main) and Track 2 (overlay)
 2. Users can drag clips from media library to either track
 3. Track 2 clips render on top of Track 1 in preview (overlay/PiP positioning)
@@ -369,6 +384,7 @@ I want to zoom in and out on the timeline,
 So that I can perform precise editing on specific sections.
 
 **Acceptance Criteria:**
+
 1. Zoom controls (+ / - buttons or slider) visible in timeline toolbar
 2. Zoom in increases timeline scale, showing more detail per clip
 3. Zoom out decreases timeline scale, showing more clips in view
@@ -388,6 +404,7 @@ I want to record my screen,
 So that I can capture tutorials and demonstrations.
 
 **Acceptance Criteria:**
+
 1. "Record" button visible in left sidebar
 2. Clicking Record opens recording setup modal
 3. User can select recording mode: "Screen Only"
@@ -407,6 +424,7 @@ I want to record from my webcam,
 So that I can capture talking head videos or reactions.
 
 **Acceptance Criteria:**
+
 1. Recording setup modal includes "Webcam Only" mode option
 2. User can select from available webcam devices
 3. Live webcam preview shown in setup modal
@@ -426,6 +444,7 @@ I want to record screen and webcam simultaneously,
 So that I can create tutorials with my face visible.
 
 **Acceptance Criteria:**
+
 1. Recording setup modal includes "Screen + Webcam (PiP)" mode
 2. User selects screen source (full screen or window) AND webcam device
 3. Webcam preview overlay shows position on screen preview (adjustable corner/size)
@@ -445,6 +464,7 @@ I want my recording to stop cleanly and automatically appear in my timeline,
 So that I can immediately begin editing without manual import.
 
 **Acceptance Criteria:**
+
 1. "Stop Recording" button accessible during any recording mode
 2. Clicking Stop ends recording immediately and saves files
 3. Recording files processed and optimized for editing (codec conversion if needed)
@@ -464,6 +484,7 @@ I want to see my multi-track timeline rendered correctly in preview,
 So that I can verify my picture-in-picture and overlay effects.
 
 **Acceptance Criteria:**
+
 1. Preview player renders Track 2 clips overlaid on Track 1 clips
 2. Webcam/PiP clips display in appropriate corner with correct size
 3. Real-time playback shows composited multi-track result
