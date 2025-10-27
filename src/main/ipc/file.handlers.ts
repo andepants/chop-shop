@@ -8,6 +8,7 @@ import path from 'path'
 import { validateVideoFile } from '../services/file.service'
 import { generateThumbnail } from '../services/thumbnail.service'
 import { IPC_CHANNELS, type IPCResponse, type MediaFile } from '../../shared/types'
+import { SUPPORTED_FORMATS } from '../../shared/constants'
 
 /**
  * Generate unique ID for media file
@@ -112,7 +113,7 @@ ipcMain.handle(
 
       const result = await dialog.showOpenDialog({
         title: 'Import Video Files',
-        filters: [{ name: 'Videos', extensions: ['mp4', 'mov', 'webm'] }],
+        filters: [{ name: 'Videos', extensions: [...SUPPORTED_FORMATS] }],
         properties: ['openFile', 'multiSelections']
       })
 

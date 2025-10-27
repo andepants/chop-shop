@@ -1,6 +1,6 @@
 # Story 2.3: Media Library Display
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -250,7 +250,7 @@ Sidebar
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/stories/2-3-media-library-display.context.xml
 
 ### Agent Model Used
 

@@ -1,0 +1,289 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2</storyId>
+    <title>File Picker Import Dialog</title>
+    <status>approved</status>
+    <generatedAt>2025-10-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-2-file-picker-import-dialog.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a content creator</asA>
+    <iWant>to click an Import button to browse for video files</iWant>
+    <soThat>I can add media without drag-and-drop</soThat>
+    <tasks>
+      <task id="1" ac="1">
+        <title>Add Import button to sidebar</title>
+        <subtasks>
+          <subtask>Update Sidebar.tsx component to include "Import" button</subtask>
+          <subtask>Style with Tailwind: bg-cyan-500 hover:bg-cyan-600 rounded px-4 py-2</subtask>
+          <subtask>Position above or below ImportZone from Story 2.1</subtask>
+          <subtask>Add file icon or label "Import"</subtask>
+        </subtasks>
+      </task>
+      <task id="2" ac="2,3">
+        <title>Implement file picker dialog</title>
+        <subtasks>
+          <subtask>Add open-file-dialog IPC channel in src/main/ipc/file.handlers.ts</subtask>
+          <subtask>Use Electron's dialog.showOpenDialog() API</subtask>
+          <subtask>Configure filters: { name: 'Videos', extensions: ['mp4', 'mov', 'webm'] }</subtask>
+          <subtask>Set properties: ['openFile', 'multiSelections'] for multi-file selection</subtask>
+          <subtask>Return selected file paths array</subtask>
+        </subtasks>
+      </task>
+      <task id="3" ac="2,4">
+        <title>Handle Import button click</title>
+        <subtasks>
+          <subtask>Implement onClick handler in Sidebar component</subtask>
+          <subtask>Call window.electron.ipcRenderer.invoke('open-file-dialog')</subtask>
+          <subtask>Receive array of selected file paths</subtask>
+          <subtask>Iterate and call import-file for each path (reuse from Story 2.1)</subtask>
+          <subtask>Update media library UI as files are imported</subtask>
+        </subtasks>
+      </task>
+      <task id="4" ac="6">
+        <title>Add loading indicator for imports</title>
+        <subtasks>
+          <subtask>Add isImporting state to mediaStore</subtask>
+          <subtask>Set isImporting = true when file picker returns paths</subtask>
+          <subtask>Show loading spinner in ImportZone or Sidebar during import</subtask>
+          <subtask>Set isImporting = false after all files processed</subtask>
+          <subtask>Display count: "Importing 3 files..." during batch import</subtask>
+        </subtasks>
+      </task>
+      <task id="5" ac="4">
+        <title>Reuse file validation from Story 2.1</title>
+        <subtasks>
+          <subtask>Use existing import-file IPC channel for validation</subtask>
+          <subtask>Use existing file.service.ts for metadata extraction</subtask>
+          <subtask>Use existing thumbnail.service.ts for thumbnail generation</subtask>
+          <subtask>Add to mediaStore with same flow as drag-and-drop</subtask>
+        </subtasks>
+      </task>
+      <task id="6" ac="4">
+        <title>Handle import errors gracefully</title>
+        <subtasks>
+          <subtask>If any file fails validation, show error for that file only</subtask>
+          <subtask>Continue processing remaining files in batch</subtask>
+          <subtask>Display summary: "Imported 2 of 3 files. 1 failed."</subtask>
+          <subtask>Log individual errors with file names</subtask>
+        </subtasks>
+      </task>
+      <task id="7" ac="3">
+        <title>Update shared constants</title>
+        <subtasks>
+          <subtask>Add SUPPORTED_FORMATS constant to src/shared/constants.ts</subtask>
+          <subtask>Export: ['mp4', 'mov', 'webm']</subtask>
+          <subtask>Use in file picker filter and validation logic</subtask>
+          <subtask>Use in error messages for consistency</subtask>
+        </subtasks>
+      </task>
+      <task id="8" ac="all">
+        <title>Write unit tests</title>
+        <subtasks>
+          <subtask>Test Import button renders in Sidebar</subtask>
+          <subtask>Test button click triggers open-file-dialog IPC call</subtask>
+          <subtask>Test isImporting state updates during batch import</subtask>
+          <subtask>Test multiple files imported successfully</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">"Import" button visible in left sidebar</criterion>
+    <criterion id="2">Clicking Import opens native file picker dialog (via Electron)</criterion>
+    <criterion id="3">File picker filters to show only MP4, MOV, WebM files</criterion>
+    <criterion id="4">Selected files appear in media library with thumbnails</criterion>
+    <criterion id="5">User can select multiple files in single file picker operation</criterion>
+    <criterion id="6">Import process shows loading indicator for large files</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Functional Requirements - FR003</section>
+        <snippet>FR003: Application shall provide a file picker dialog for video import. This requirement mandates native file picker integration via Electron for importing MP4, MOV, and WebM formats.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Decision Architecture</title>
+        <section>IPC Patterns</section>
+        <snippet>IPC channel naming uses kebab-case (e.g., 'open-file-dialog'). All handlers return IPCResponse format with success/error structure. Main process handles all file system operations via IPC for security.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Decision Architecture</title>
+        <section>Error Handling Patterns</section>
+        <snippet>User-friendly error messages: 'Export failed. Please try again.' Technical errors logged with context prefix [Main] or [Renderer]. All operations use try-catch with IPCResponse error format.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Story 2.2</section>
+        <snippet>File picker dialog must filter to MP4, MOV, WebM only. Multi-file selection enabled with properties: ['openFile', 'multiSelections']. Loading indicator required for batch imports.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/2-1-drag-and-drop-video-import.md</path>
+        <title>Story 2.1 - Drag-and-Drop Video Import</title>
+        <section>Dev Notes - Technical Implementation</section>
+        <snippet>Existing import-file IPC channel validates files using file.service.ts with FFprobe metadata extraction. Thumbnail generation via thumbnail.service.ts. mediaStore manages imported files state.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/renderer/src/components/Layout/Sidebar.tsx</path>
+        <kind>component</kind>
+        <symbol>Sidebar</symbol>
+        <lines>1-93</lines>
+        <reason>Contains Import button implementation with handleImportClick handler. Already implements file picker dialog integration with loading state management.</reason>
+      </artifact>
+      <artifact>
+        <path>src/main/ipc/file.handlers.ts</path>
+        <kind>service</kind>
+        <symbol>OPEN_FILE_DIALOG handler</symbol>
+        <lines>103-142</lines>
+        <reason>IPC handler for open-file-dialog channel. Uses Electron dialog.showOpenDialog with video file filters and multi-selection support.</reason>
+      </artifact>
+      <artifact>
+        <path>src/main/ipc/file.handlers.ts</path>
+        <kind>service</kind>
+        <symbol>IMPORT_FILE handler</symbol>
+        <lines>23-70</lines>
+        <reason>Reusable IPC handler for validating and importing individual video files. Called by file picker for each selected file.</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/store/mediaStore.ts</path>
+        <kind>store</kind>
+        <symbol>useMediaStore</symbol>
+        <lines>1-59</lines>
+        <reason>Zustand store with isImporting state, addFiles batch action, and file management. Used by Sidebar for import progress indication.</reason>
+      </artifact>
+      <artifact>
+        <path>src/main/services/file.service.ts</path>
+        <kind>service</kind>
+        <symbol>validateVideoFile</symbol>
+        <lines>all</lines>
+        <reason>Video file validation service using FFprobe. Extracts metadata (duration, resolution, format) for imported files.</reason>
+      </artifact>
+      <artifact>
+        <path>src/main/services/thumbnail.service.ts</path>
+        <kind>service</kind>
+        <symbol>generateThumbnail</symbol>
+        <lines>all</lines>
+        <reason>FFmpeg-based thumbnail generation service. Extracts video frames for media library display.</reason>
+      </artifact>
+      <artifact>
+        <path>src/shared/types.ts</path>
+        <kind>types</kind>
+        <symbol>IPC_CHANNELS, MediaFile, IPCResponse</symbol>
+        <lines>1-64</lines>
+        <reason>Shared type definitions and IPC channel constants. Defines OPEN_FILE_DIALOG channel and MediaFile interface.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <runtime>
+        <package name="electron" version="^38.1.2">Desktop app framework - provides dialog API for native file picker</package>
+        <package name="react" version="^19.1.1">UI framework for renderer components</package>
+        <package name="typescript" version="^5.9.2">Type safety across codebase</package>
+        <package name="zustand" version="^5.0.8">State management for mediaStore</package>
+      </runtime>
+      <main_process>
+        <package name="ffmpeg-static" version="^5.2.0">FFmpeg binaries for video validation and thumbnail generation</package>
+        <package name="@electron-toolkit/utils" version="^4.0.0">Electron utilities</package>
+      </main_process>
+      <renderer>
+        <package name="react-dom" version="^19.1.1">React DOM rendering</package>
+        <package name="tailwindcss" version="^4.1.16">Utility-first CSS framework</package>
+        <package name="clsx" version="^2.1.1">Conditional className utility</package>
+        <package name="tailwind-merge" version="^3.3.1">Tailwind class merging for cn() utility</package>
+      </renderer>
+      <testing>
+        <package name="vitest" version="^4.0.4">Test runner (replaces Jest)</package>
+        <package name="@testing-library/react" version="^16.3.0">React component testing</package>
+        <package name="@testing-library/jest-dom" version="^6.9.1">DOM matchers</package>
+        <package name="@testing-library/user-event" version="^14.6.1">User interaction simulation</package>
+        <package name="happy-dom" version="^20.0.8">DOM environment for tests</package>
+      </testing>
+      <build>
+        <package name="electron-vite" version="^4.0.1">Build tool</package>
+        <package name="electron-builder" version="^25.1.8">macOS packaging (.dmg)</package>
+        <package name="vite" version="^7.1.6">Fast bundler</package>
+      </build>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>All file operations must occur in main process via IPC for security (Electron security best practice)</constraint>
+    <constraint>Use Zustand for state management - no Redux or Context API (Architecture Decision ADR-001)</constraint>
+    <constraint>Use Tailwind CSS for styling - no separate CSS files (Architecture Decision ADR-003)</constraint>
+    <constraint>All IPC handlers must return IPCResponse format with success/error structure</constraint>
+    <constraint>IPC channel names use kebab-case convention (e.g., 'open-file-dialog')</constraint>
+    <constraint>Store file paths as absolute paths only - never relative paths</constraint>
+    <constraint>Supported video formats: MP4, MOV, WebM only (FR003)</constraint>
+    <constraint>Log all operations with context prefix: [Main] or [Renderer]</constraint>
+    <constraint>User-friendly error messages - hide technical details from user</constraint>
+    <constraint>Components must follow PascalCase naming, services use camelCase.service.ts</constraint>
+    <constraint>72-hour sprint timeline - pragmatic solutions over perfect architecture</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>open-file-dialog IPC Channel</name>
+      <kind>IPC Handler</kind>
+      <signature>ipcMain.handle('open-file-dialog', async (): Promise&lt;IPCResponse&lt;string[]&gt;&gt;)</signature>
+      <path>src/main/ipc/file.handlers.ts</path>
+      <description>Opens Electron dialog.showOpenDialog with video filters ['mp4', 'mov', 'webm'] and multiSelections property. Returns array of selected file paths or empty array if cancelled.</description>
+    </interface>
+    <interface>
+      <name>import-file IPC Channel</name>
+      <kind>IPC Handler</kind>
+      <signature>ipcMain.handle('import-file', async (_, {filePath}): Promise&lt;IPCResponse&lt;MediaFile&gt;&gt;)</signature>
+      <path>src/main/ipc/file.handlers.ts</path>
+      <description>Validates video file using file.service.ts, generates thumbnail via thumbnail.service.ts, returns MediaFile object with metadata. Reused by both drag-and-drop and file picker imports.</description>
+    </interface>
+    <interface>
+      <name>window.api.openFileDialog</name>
+      <kind>Preload API</kind>
+      <signature>openFileDialog(): Promise&lt;IPCResponse&lt;string[]&gt;&gt;</signature>
+      <path>src/preload/index.ts</path>
+      <description>Renderer-exposed API for triggering file picker dialog. Calls open-file-dialog IPC channel.</description>
+    </interface>
+    <interface>
+      <name>mediaStore.setIsImporting</name>
+      <kind>Zustand Store Action</kind>
+      <signature>setIsImporting(isImporting: boolean): void</signature>
+      <path>src/renderer/src/store/mediaStore.ts</path>
+      <description>Controls import loading state. Set to true when file picker returns paths, false when all imports complete.</description>
+    </interface>
+    <interface>
+      <name>mediaStore.addFiles</name>
+      <kind>Zustand Store Action</kind>
+      <signature>addFiles(files: MediaFile[]): void</signature>
+      <path>src/renderer/src/store/mediaStore.ts</path>
+      <description>Batch adds multiple MediaFile objects to store. Used after file picker imports complete.</description>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Vitest test runner with @testing-library/react for component testing. Mock window.api for IPC calls using vi.fn(). Reset Zustand stores in beforeEach using store.setState(). Test files colocated in __tests__ folders. Name pattern: ComponentName.test.tsx. Reference acceptance criteria in test descriptions (e.g., 'AC: #1'). Use waitFor for async operations. Mock MediaFile objects for predictable test data.</standards>
+    <locations>
+      <location>src/renderer/src/components/Layout/__tests__/Sidebar-FilePicker.test.tsx</location>
+      <location>src/renderer/src/components/Layout/__tests__/Sidebar.test.tsx</location>
+      <location>src/renderer/src/store/__tests__/mediaStore.test.ts</location>
+      <location>src/main/ipc/__tests__/file.handlers.test.ts (if created for IPC handlers)</location>
+    </locations>
+    <ideas>
+      <test ac="1">Verify Import button renders in Sidebar with correct text and styling</test>
+      <test ac="2">Test button click triggers window.api.openFileDialog IPC call</test>
+      <test ac="3">Verify file picker filters applied (MP4, MOV, WebM extensions only)</test>
+      <test ac="4">Test successful import adds files to mediaStore with thumbnails</test>
+      <test ac="5">Test multi-file selection - multiple files imported in single operation</test>
+      <test ac="6">Verify isImporting state updates during batch import with loading indicator</test>
+      <test ac="all">Test error handling when file picker fails or returns invalid files</test>
+      <test ac="all">Test cancelled file picker (user dismisses dialog) - no error shown</test>
+    </ideas>
+  </tests>
+</story-context>
