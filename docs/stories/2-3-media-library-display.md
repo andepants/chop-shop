@@ -1,6 +1,6 @@
 # Story 2.3: Media Library Display
 
-Status: review
+Status: done
 
 ## Story
 

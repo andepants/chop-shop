@@ -8,6 +8,7 @@
 import { TopBar } from './TopBar'
 import { Sidebar } from './Sidebar'
 import { Timeline } from '@/components/Timeline'
+import { PreviewPlayer } from '@/components/Preview'
 
 /**
  * Main layout container for the application
@@ -27,8 +28,8 @@ export function MainLayout(): React.JSX.Element {
         {/* Center Content (Preview + Timeline) */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Preview Area (60% height) */}
-          <div className="flex-[3] bg-zinc-900 border-b border-zinc-700 flex items-center justify-center">
-            <div className="text-zinc-400 text-lg">Preview</div>
+          <div className="flex-[3] bg-zinc-900 border-b border-zinc-700">
+            <PreviewPlayer />
           </div>
 
           {/* Timeline Area (40% height) */}

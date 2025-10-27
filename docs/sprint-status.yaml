@@ -49,9 +49,10 @@ development_status:
   epic-2: backlog
   2-1-drag-and-drop-video-import: done
   2-2-file-picker-import-dialog: done
-  2-3-media-library-display: dev-ready
-  2-4-timeline-clip-placement-and-display: review
-  2-5-video-preview-player-and-playback-controls: in-progress
+  2-3-media-library-display: done
+  2-4-timeline-clip-placement-and-display: done
+  2-5-video-preview-player-and-playback-controls: done
+  2-6-ui-component-library-setup: ready-for-dev
   epic-2-retrospective: optional
 
   epic-3: backlog

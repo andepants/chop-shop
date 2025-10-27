@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMediaStore } from '@/store/mediaStore'
 import { useTimelineStore } from '@/store/timelineStore'
+import { usePlaybackStore } from '@/store/playbackStore'
 import { TimelineRuler } from './TimelineRuler'
 import { TimelineTrack } from './TimelineTrack'
 import { Playhead } from './Playhead'
@@ -148,9 +149,44 @@ export function Timeline(): React.JSX.Element {
 
   /**
    * Handle clip selection
+   * Loads clip in preview player (AC #2)
    */
   function handleClipClick(clipId: string): void {
     selectClip(clipId)
+    usePlaybackStore.getState().loadClip(clipId)
+  }
+
+  /**
+   * Handle timeline seeking (AC #6)
+   * Finds clip at clicked time and seeks to offset within clip
+   */
+  function handleTimelineSeek(clickedTime: number): void {
+    const allClips = tracks
+      .flatMap((track) => track.clips)
+      .sort((a, b) => a.startTime - b.startTime)
+
+    // Find clip at this timeline position
+    const clip = allClips.find((c) => {
+      const clipEndTime = c.startTime + c.duration
+      return clickedTime >= c.startTime && clickedTime < clipEndTime
+    })
+
+    if (clip) {
+      const playbackStore = usePlaybackStore.getState()
+
+      // Load clip if different from current
+      if (playbackStore.currentClipId !== clip.id) {
+        playbackStore.loadClip(clip.id)
+      }
+
+      // Calculate offset within clip and seek
+      const offsetInClip = clickedTime - clip.startTime
+      const seekTime = clip.trimIn + offsetInClip
+      playbackStore.seek(seekTime)
+
+      // Update playhead position
+      useTimelineStore.getState().setPlayhead(clickedTime)
+    }
   }
 
   return (
@@ -179,6 +215,7 @@ export function Timeline(): React.JSX.Element {
             zoomLevel={zoomLevel}
             selectedClipId={selectedClipId}
             onClipClick={handleClipClick}
+            onTrackClick={handleTimelineSeek}
           />
         ))}
       </div>

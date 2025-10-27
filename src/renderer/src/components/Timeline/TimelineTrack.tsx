@@ -18,6 +18,8 @@ interface TimelineTrackProps {
   selectedClipId: string | null
   /** Click handler for clip selection */
   onClipClick: (clipId: string) => void
+  /** Click handler for timeline seeking */
+  onTrackClick?: (time: number) => void
 }
 
 /**
@@ -38,8 +40,25 @@ export function TimelineTrack({
   track,
   zoomLevel,
   selectedClipId,
-  onClipClick
+  onClipClick,
+  onTrackClick
 }: TimelineTrackProps): React.JSX.Element {
+  /**
+   * Handle track click for timeline seeking (AC #6)
+   * Calculates clicked time based on mouse X position and zoom level
+   */
+  function handleTrackClick(e: React.MouseEvent<HTMLDivElement>): void {
+    // Only handle clicks on the track background, not on clips
+    if (e.target !== e.currentTarget) return
+
+    if (onTrackClick) {
+      const rect = e.currentTarget.getBoundingClientRect()
+      const clickX = e.clientX - rect.left
+      const clickedTime = clickX / zoomLevel
+      onTrackClick(clickedTime)
+    }
+  }
+
   return (
     <div className="flex border-b border-zinc-700">
       {/* Track label */}
@@ -48,7 +67,10 @@ export function TimelineTrack({
       </div>
 
       {/* Track content area with clips */}
-      <div className="flex-1 h-20 bg-zinc-800 relative">
+      <div
+        className="flex-1 h-20 bg-zinc-800 relative cursor-pointer"
+        onClick={handleTrackClick}
+      >
         {track.clips.map((clip) => (
           <TimelineClip
             key={clip.id}

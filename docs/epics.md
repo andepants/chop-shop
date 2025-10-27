@@ -225,6 +225,26 @@ So that I can review my video sequence.
 
 ---
 
+**Story 2.6: UI Component Library Setup**
+
+As a developer,
+I want shadcn/ui integrated with our Tailwind setup,
+So that Epic 3 features have professional, accessible UI components.
+
+**Acceptance Criteria:**
+
+1. shadcn/ui initialized in the project with Radix UI primitives
+2. Core components installed: Button, Dialog, Progress, Slider, Select, Tabs
+3. Existing Button component migrated to shadcn/ui pattern
+4. Component theming configured for dark mode consistency
+5. Components properly typed with TypeScript
+6. All components documented in components/ui folder
+7. No existing functionality broken by migration
+
+**Prerequisites:** Story 2.5
+
+---
+
 ## Epic 3: Editing & Export (MVP Checkpoint)
 
 **Expanded Goal:**

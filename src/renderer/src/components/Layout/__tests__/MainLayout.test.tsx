@@ -15,8 +15,8 @@ describe('MainLayout', () => {
     // Sidebar should be rendered
     expect(screen.getByText('Media')).toBeInTheDocument()
 
-    // Preview area should be rendered
-    expect(screen.getByText('Preview')).toBeInTheDocument()
+    // Preview area should be rendered (PreviewPlayer shows "No clip selected" initially)
+    expect(screen.getByText('No clip selected')).toBeInTheDocument()
 
     // Timeline area should be rendered (with Track 1 label)
     expect(screen.getByText('Track 1')).toBeInTheDocument()

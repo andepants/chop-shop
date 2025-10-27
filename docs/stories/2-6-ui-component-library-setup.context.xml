@@ -1,0 +1,310 @@
+<story-context id="2-6-ui-component-library-setup" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2.6</storyId>
+    <title>UI Component Library Setup</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-6-ui-component-library-setup.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>shadcn/ui integrated with our Tailwind setup</iWant>
+    <soThat>Epic 3 features have professional, accessible UI components</soThat>
+    <tasks>
+      <task id="1" ac="1">
+        <title>Initialize shadcn/ui configuration</title>
+        <subtasks>
+          <subtask>Run `npx shadcn@latest init` to bootstrap shadcn/ui</subtask>
+          <subtask>Configure components.json for React + Tailwind setup</subtask>
+          <subtask>Verify Radix UI primitives installed (@radix-ui/react-*)</subtask>
+          <subtask>Test installation by running `npx shadcn@latest add button`</subtask>
+          <subtask>Verify components/ui folder created with proper structure</subtask>
+        </subtasks>
+      </task>
+      <task id="2" ac="2">
+        <title>Install core UI components</title>
+        <subtasks>
+          <subtask>Install Button: `npx shadcn@latest add button`</subtask>
+          <subtask>Install Dialog: `npx shadcn@latest add dialog`</subtask>
+          <subtask>Install Progress: `npx shadcn@latest add progress`</subtask>
+          <subtask>Install Slider: `npx shadcn@latest add slider`</subtask>
+          <subtask>Install Select: `npx shadcn@latest add select`</subtask>
+          <subtask>Install Tabs: `npx shadcn@latest add tabs`</subtask>
+          <subtask>Verify all components render correctly in isolation</subtask>
+        </subtasks>
+      </task>
+      <task id="3" ac="4">
+        <title>Configure dark mode theming</title>
+        <subtasks>
+          <subtask>Update tailwind.config.js with shadcn color tokens</subtask>
+          <subtask>Configure CSS variables in globals.css for dark theme</subtask>
+          <subtask>Set darkMode: 'class' in Tailwind config</subtask>
+          <subtask>Test component rendering in dark mode</subtask>
+          <subtask>Ensure consistency with existing dark theme (#18181b background)</subtask>
+        </subtasks>
+      </task>
+      <task id="4" ac="3,7">
+        <title>Migrate existing Button component</title>
+        <subtasks>
+          <subtask>Identify all usages of existing Button in codebase</subtask>
+          <subtask>Replace shared/Button.tsx with shadcn Button import</subtask>
+          <subtask>Update import paths: `from '@/components/ui/button'`</subtask>
+          <subtask>Preserve existing className and onClick behavior</subtask>
+          <subtask>Test PlaybackControls play/pause button still works</subtask>
+          <subtask>Test TopBar Export button still renders correctly</subtask>
+          <subtask>Run all existing tests to verify no regressions</subtask>
+        </subtasks>
+      </task>
+      <task id="5" ac="5,6">
+        <title>Add TypeScript types and documentation</title>
+        <subtasks>
+          <subtask>Verify all ui components export proper TypeScript types</subtask>
+          <subtask>Create components/ui/README.md with usage examples</subtask>
+          <subtask>Document Button variants: default, destructive, outline, ghost</subtask>
+          <subtask>Document Dialog usage pattern for modals</subtask>
+          <subtask>Document Progress for export progress indicators</subtask>
+          <subtask>Document Slider for timeline zoom controls</subtask>
+          <subtask>Add JSDoc comments to each ui component</subtask>
+        </subtasks>
+      </task>
+      <task id="6" ac="6">
+        <title>Create example storybook/demo page</title>
+        <subtasks>
+          <subtask>Create components/ui/demo.tsx (dev-only component)</subtask>
+          <subtask>Show all installed components with variants</subtask>
+          <subtask>Include dark mode toggle for testing</subtask>
+          <subtask>Document accessibility features (keyboard nav, ARIA)</subtask>
+        </subtasks>
+      </task>
+      <task id="7" ac="7">
+        <title>Write unit tests for ui components</title>
+        <subtasks>
+          <subtask>Test Button renders with all variants</subtask>
+          <subtask>Test Dialog opens/closes correctly</subtask>
+          <subtask>Test Progress updates value prop</subtask>
+          <subtask>Test Slider onChange callback</subtask>
+          <subtask>Test Select options rendering</subtask>
+          <subtask>Test Tabs switching between panels</subtask>
+          <subtask>Verify all tests pass with existing test suite</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">shadcn/ui initialized in the project with Radix UI primitives</criterion>
+    <criterion id="2">Core components installed: Button, Dialog, Progress, Slider, Select, Tabs</criterion>
+    <criterion id="3">Existing Button component migrated to shadcn/ui pattern</criterion>
+    <criterion id="4">Component theming configured for dark mode consistency</criterion>
+    <criterion id="5">Components properly typed with TypeScript</criterion>
+    <criterion id="6">All components documented in components/ui folder</criterion>
+    <criterion id="7">No existing functionality broken by migration</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>UI Design Principles</section>
+        <snippet>Dark theme for video editing context. High contrast for playhead and selected clips. Accent color (cyan/teal) for primary actions (Export button).</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>User Interface Design Goals</section>
+        <snippet>CapCut-inspired interface (simplified). Clean 3-panel layout (media/preview/timeline) with minimal toolbar. Focus on speed over polish.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Decision Architecture</title>
+        <section>Technology Stack Details - Styling</section>
+        <snippet>Tailwind CSS 3.x - Utility-first CSS framework. PostCSS + Autoprefixer - CSS processing. ADR-003: Use Tailwind CSS instead of separate CSS files for co-located styles and faster development.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Decision Architecture</title>
+        <section>Styling Patterns (Tailwind)</section>
+        <snippet>Tailwind configured in tailwind.config.js for src/renderer/**/*.{tsx,ts}. Dark theme CSS variables in globals.css. Use cn() utility from clsx + tailwind-merge for conditional class merging.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Decision Architecture</title>
+        <section>Component Structure (Mandatory Order)</section>
+        <snippet>Component files must follow: 1. Imports (grouped), 2. Types/Interfaces, 3. Component definition (hooks, handlers, effects, render). PascalCase for components, functional programming patterns only.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Decision Architecture</title>
+        <section>Testing</section>
+        <snippet>Jest (from boilerplate) - Unit testing framework. React Testing Library (from boilerplate) - Component testing. Tests in __tests__ folders adjacent to components.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Story 2.6: UI Component Library Setup</section>
+        <snippet>As a developer, I want shadcn/ui integrated with our Tailwind setup, so that Epic 3 features have professional, accessible UI components. Prerequisites: Story 2.5</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>src/renderer/src/components/shared/Button.tsx</path>
+        <kind>component</kind>
+        <symbol>Button</symbol>
+        <lines>1-57</lines>
+        <reason>Existing Button component that needs to be migrated to shadcn/ui pattern. Uses cn() utility, supports variants (primary, secondary, ghost) and sizes (sm, md, lg).</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/components/Layout/TopBar.tsx</path>
+        <kind>component</kind>
+        <symbol>TopBar</symbol>
+        <lines>5,15</lines>
+        <reason>Current usage of Button component. Import from '../shared' and uses variant="primary" size="sm". Must continue working after migration.</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/utils/cn.util.ts</path>
+        <kind>utility</kind>
+        <symbol>cn</symbol>
+        <lines>1-7</lines>
+        <reason>Class name utility using clsx + tailwind-merge. Already available for shadcn/ui components (shadcn uses same pattern).</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/styles/globals.css</path>
+        <kind>styles</kind>
+        <symbol>CSS variables</symbol>
+        <lines>9-14</lines>
+        <reason>Existing dark theme CSS variables (--bg-primary, --bg-secondary, etc.). Must be preserved and extended with shadcn color tokens.</reason>
+      </artifact>
+      <artifact>
+        <path>tailwind.config.js</path>
+        <kind>config</kind>
+        <symbol>Tailwind config</symbol>
+        <lines>1-17</lines>
+        <reason>Current Tailwind configuration with accent color. Needs to be extended with shadcn color tokens and darkMode: 'class' setting.</reason>
+      </artifact>
+      <artifact>
+        <path>vitest.config.ts</path>
+        <kind>config</kind>
+        <symbol>Vitest config</symbol>
+        <lines>1-27</lines>
+        <reason>Testing configuration using Vitest + happy-dom + React Testing Library. Tests use @/ alias for imports. Setup file at src/renderer/src/__tests__/setup.ts</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/components/shared/__tests__/Button.test.tsx</path>
+        <kind>test</kind>
+        <symbol>Button tests</symbol>
+        <lines>1-end</lines>
+        <reason>Existing Button tests that should continue passing after migration. Provides test pattern reference for new shadcn component tests.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <npm>
+        <package name="react" version="^19.1.1" />
+        <package name="react-dom" version="^19.1.1" />
+        <package name="typescript" version="^5.9.2" />
+        <package name="tailwindcss" version="^4.1.16" />
+        <package name="clsx" version="^2.1.1" />
+        <package name="tailwind-merge" version="^3.3.1" />
+        <package name="vitest" version="^4.0.4" />
+        <package name="@testing-library/react" version="^16.3.0" />
+        <package name="@testing-library/jest-dom" version="^6.9.1" />
+        <package name="@testing-library/user-event" version="^14.6.1" />
+      </npm>
+      <to-be-added>
+        <package name="@radix-ui/react-dialog" note="Added by shadcn/ui dialog component" />
+        <package name="@radix-ui/react-progress" note="Added by shadcn/ui progress component" />
+        <package name="@radix-ui/react-select" note="Added by shadcn/ui select component" />
+        <package name="@radix-ui/react-slider" note="Added by shadcn/ui slider component" />
+        <package name="@radix-ui/react-tabs" note="Added by shadcn/ui tabs component" />
+        <package name="class-variance-authority" note="Used by shadcn/ui for variant management" />
+      </to-be-added>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>All components must follow functional programming patterns - no classes allowed per architecture.md</constraint>
+    <constraint>Components must be under 500 lines per file (CLAUDE.md modular codebase requirement)</constraint>
+    <constraint>Dark mode is mandatory - all shadcn components must render correctly with existing dark theme (#18181b background)</constraint>
+    <constraint>TypeScript strict mode must be maintained - all components fully typed</constraint>
+    <constraint>Existing Button functionality must be preserved - TopBar Export button and any other usages must continue working</constraint>
+    <constraint>Use @/ path aliases for imports per vitest.config.ts and tsconfig.json configuration</constraint>
+    <constraint>All components must have JSDoc comments per CLAUDE.md documentation requirements</constraint>
+    <constraint>File naming: PascalCase.tsx for components, camelCase.util.ts for utilities</constraint>
+    <constraint>shadcn/ui components go in src/renderer/src/components/ui/ per architecture project structure</constraint>
+    <constraint>CSS variables must use HSL color space for shadcn theming (hsl(var(--primary)))</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>ButtonProps (existing)</name>
+      <kind>React component props</kind>
+      <signature>
+interface ButtonProps extends React.ButtonHTMLAttributes&lt;HTMLButtonElement&gt; {
+  variant?: 'primary' | 'secondary' | 'ghost'
+  size?: 'sm' | 'md' | 'lg'
+}
+      </signature>
+      <path>src/renderer/src/components/shared/Button.tsx</path>
+      <note>Current Button interface - shadcn Button uses different variants (default, destructive, outline, ghost, secondary) so migration mapping needed</note>
+    </interface>
+    <interface>
+      <name>cn() utility</name>
+      <kind>Function utility</kind>
+      <signature>function cn(...inputs: ClassValue[]): string</signature>
+      <path>src/renderer/src/utils/cn.util.ts</path>
+      <note>Already available - shadcn/ui uses same clsx + tailwind-merge pattern. No changes needed.</note>
+    </interface>
+    <interface>
+      <name>shadcn/ui configuration</name>
+      <kind>Configuration file</kind>
+      <signature>
+{
+  "style": "default",
+  "rsc": false,
+  "tailwind": {
+    "config": "tailwind.config.js",
+    "css": "src/renderer/src/styles/globals.css",
+    "baseColor": "zinc",
+    "cssVariables": true
+  },
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/utils"
+  }
+}
+      </signature>
+      <path>components.json (will be created)</path>
+      <note>Created by `npx shadcn@latest init` - configure to use existing @/ alias and src/renderer paths</note>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+Chop Shop uses Vitest as the test runner with React Testing Library for component testing. Tests use happy-dom environment for lightweight DOM simulation. All tests have @testing-library/jest-dom matchers available via setup.ts. Tests are colocated in __tests__ folders adjacent to components. Import alias @/ is configured for cleaner imports. Test files follow [ComponentName].test.tsx naming convention. All component tests should verify rendering, user interactions, prop variations, and accessibility. Use userEvent from @testing-library/user-event for simulating user interactions. Tests must pass TypeScript strict mode checks.
+    </standards>
+    <locations>
+      <location>src/renderer/src/components/**/__tests__/*.test.tsx</location>
+      <location>src/renderer/src/components/ui/__tests__/*.test.tsx (new location for shadcn component tests)</location>
+      <location>src/renderer/src/__tests__/setup.ts (test setup and global config)</location>
+    </locations>
+    <ideas>
+      <idea ac="1,2">Test shadcn/ui installation: verify Button component can be imported from @/components/ui/button and renders with "default" variant</idea>
+      <idea ac="2">Test all 6 core components render: Button, Dialog, Progress, Slider, Select, Tabs - each should render without errors in isolation</idea>
+      <idea ac="3">Test Button migration: verify existing Button usages (TopBar Export button) still render and work after migration</idea>
+      <idea ac="4">Test dark mode theming: verify shadcn components render correctly with dark background and proper contrast</idea>
+      <idea ac="5">Test TypeScript types: verify all shadcn components export proper types and can be typed in test files</idea>
+      <idea ac="7">Regression tests: run full test suite (npm run test) and verify no existing tests fail after shadcn installation</idea>
+      <idea ac="2">Test Button variants: verify shadcn Button renders with default, outline, ghost, destructive variants</idea>
+      <idea ac="2">Test Dialog functionality: verify Dialog opens on trigger click, closes on X button, and renders content correctly</idea>
+      <idea ac="2">Test Progress updates: verify Progress component accepts value prop and updates visual progress bar</idea>
+      <idea ac="2">Test Slider interaction: verify Slider calls onValueChange callback when user drags handle</idea>
+      <idea ac="2">Test Select options: verify Select renders options list and calls onValueChange on selection</idea>
+      <idea ac="2">Test Tabs switching: verify clicking TabsTrigger switches visible TabsContent panel</idea>
+    </ideas>
+  </tests>
+</story-context>

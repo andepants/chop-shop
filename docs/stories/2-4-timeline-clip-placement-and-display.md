@@ -1,6 +1,6 @@
 # Story 2.4: Timeline Clip Placement and Display
 
-Status: review
+Status: done
 
 ## Story
 

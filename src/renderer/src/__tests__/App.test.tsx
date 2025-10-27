@@ -25,7 +25,8 @@ describe('App Component', () => {
 
   it('renders Preview area', () => {
     render(<App />)
-    expect(screen.getByText('Preview')).toBeInTheDocument()
+    // PreviewPlayer shows "No clip selected" when no clip is loaded
+    expect(screen.getByText('No clip selected')).toBeInTheDocument()
   })
 
   it('renders Timeline area', () => {
