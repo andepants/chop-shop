@@ -55,6 +55,7 @@ so that I can create distributable .dmg files throughout development.
 ### Build System Architecture
 
 **electron-react-boilerplate Build System:**
+
 - Uses electron-builder for packaging (pre-configured)
 - Two-package.json structure (production/development)
 - Webpack for module bundling
@@ -62,22 +63,26 @@ so that I can create distributable .dmg files throughout development.
 - Output directory: `release/build/`
 
 **Critical Files:**
+
 - `package.json` - Build configuration and metadata
 - `.erb/configs/webpack.config.*.js` - Webpack configurations
 - `assets/icon.icns` - macOS app icon
 
 **Build Process Flow:**
+
 1. `npm run build` → Webpack production build → `release/app/`
 2. `npm run package` → electron-builder → `release/build/chop-shop-1.0.0.dmg`
 
 ### Project Structure Notes
 
 **Alignment with architecture.md:**
+
 - Build output: `release/build/chop-shop-1.0.0.dmg`
 - App packaging follows deployment architecture (Section: Deployment Architecture)
 - Configuration matches packaging config in architecture.md (lines 1003-1015)
 
 **Key Paths:**
+
 - Assets: `assets/icon.icns`
 - Build output: `release/app/` (pre-packaging)
 - Distribution: `release/build/` (final .dmg)
@@ -94,6 +99,7 @@ so that I can create distributable .dmg files throughout development.
 ### Context Reference
 
 <!-- Path(s) to story context XML will be added here by context workflow -->
+
 No context file used - proceeded with story file only
 
 ### Agent Model Used
@@ -103,11 +109,13 @@ claude-sonnet-4-5-20250929 (Marcus - Electron Video Developer)
 ### Debug Log References
 
 **Build System Discovery:**
+
 - Project uses electron-vite (not electron-react-boilerplate as story notes suggested)
 - Build output directory: `out/` (not `release/app/`)
 - Package output directory: `dist/` (not `release/build/`)
 
 **Performance Metrics:**
+
 - Build time: ~2.5 seconds (including typecheck)
 - Full package time: ~2:38 minutes
 - Both well under 5-minute requirement
@@ -115,6 +123,7 @@ claude-sonnet-4-5-20250929 (Marcus - Electron Video Developer)
 ### Completion Notes List
 
 **Implementation Summary:**
+
 - Configured electron-vite production build with automatic minification and optimization
 - Updated electron-builder.yml with correct app metadata (appId: com.chopshop.app, productName: Chop Shop)
 - Added `npm run package` script for DMG generation
@@ -123,6 +132,7 @@ claude-sonnet-4-5-20250929 (Marcus - Electron Video Developer)
 - All tests pass (26/26)
 
 **Key Technical Decisions:**
+
 - Used electron-vite's built-in production optimizations (minification, tree-shaking)
 - Icon configuration uses existing build/icon.icns via buildResources directory
 - Packaging creates both DMG and ZIP for distribution flexibility
@@ -131,15 +141,18 @@ claude-sonnet-4-5-20250929 (Marcus - Electron Video Developer)
 ### File List
 
 **Modified:**
+
 - package.json (added 'package' script, added yaml dev dependency)
 - electron-builder.yml (updated appId and productName)
 
 **Created:**
-- src/shared/__tests__/build-config.test.ts (13 tests for build validation)
+
+- src/shared/**tests**/build-config.test.ts (13 tests for build validation)
 
 **Generated (not tracked):**
-- out/* (build output directory)
-- dist/* (packaged output: chop-shop-1.0.0.dmg, Chop Shop.app)
+
+- out/\* (build output directory)
+- dist/\* (packaged output: chop-shop-1.0.0.dmg, Chop Shop.app)
 
 ## Change Log
 
@@ -164,6 +177,7 @@ The implementation correctly uses electron-vite (not electron-react-boilerplate 
 #### Medium Severity
 
 **M1: Story notes mention incorrect build system**
+
 - **Location:** Story Dev Notes section, lines 55-72
 - **Issue:** Notes reference "electron-react-boilerplate" but project uses "electron-vite"
 - **Impact:** Future developers may be confused by inaccurate documentation
@@ -171,6 +185,7 @@ The implementation correctly uses electron-vite (not electron-react-boilerplate 
 - **Related:** Dev Agent Record correctly identifies the discrepancy (lines 105-109)
 
 **M2: No story context file used**
+
 - **Location:** Dev Agent Record → Context Reference (line 97)
 - **Issue:** Implementation proceeded without story context XML, increasing drift risk
 - **Impact:** Missing architectural constraints and patterns that context would provide
@@ -180,6 +195,7 @@ The implementation correctly uses electron-vite (not electron-react-boilerplate 
 #### Low Severity
 
 **L1: CLAUDE.md file header guidance not followed**
+
 - **Location:** electron-builder.yml
 - **Issue:** No descriptive header comment explaining file purpose
 - **Impact:** Reduces navigability for AI agents (per CLAUDE.md principle)
@@ -187,6 +203,7 @@ The implementation correctly uses electron-vite (not electron-react-boilerplate 
 - **Related:** CLAUDE.md lines: "All files should have descriptive names, an explanation of their contents at the top"
 
 **L2: Code style deviation - enum usage**
+
 - **Location:** src/main/services/ffmpeg.service.ts:12-18
 - **Issue:** Uses `enum FFmpegErrorCode` despite CLAUDE.md stating "Avoid enums; use maps instead"
 - **Impact:** Minor style inconsistency, no functional impact
@@ -194,7 +211,8 @@ The implementation correctly uses electron-vite (not electron-react-boilerplate 
 - **Related:** CLAUDE.md Code Style section
 
 **L3: Test coverage gap for packaged app metadata**
-- **Location:** src/shared/__tests__/build-config.test.ts
+
+- **Location:** src/shared/**tests**/build-config.test.ts
 - **Issue:** Tests validate configuration files but not actual DMG metadata (AC#4 requires verification)
 - **Impact:** Manual verification required for "name, version" in About dialog
 - **Recommendation:** Consider adding E2E test that launches packaged app and verifies metadata
@@ -203,29 +221,34 @@ The implementation correctly uses electron-vite (not electron-react-boilerplate 
 ### Acceptance Criteria Coverage
 
 ✅ **AC#1: `npm run build` creates production build successfully**
+
 - Verified: package.json:19 defines build script
 - Verified: Build output exists in out/ directory (main, preload, renderer)
 - Test: build-config.test.ts:108-111 validates output directories
 - Performance: ~2.5s build time (including typecheck)
 
 ✅ **AC#2: `npm run package` generates macOS .dmg installer**
+
 - Verified: package.json:25 defines package script
 - Verified: dist/chop-shop-1.0.0.dmg created (111,398,836 bytes)
 - Test: build-config.test.ts:32-39 validates package script exists
 - Performance: ~2:38 package time
 
 ✅ **AC#3: Packaged app launches without errors on macOS**
+
 - Verified: Dev Agent Record Completion Notes states "Validated packaged app structure, metadata, and code signing"
 - Verified: Dist directory contains "Chop Shop.app" and DMG
 - Note: Manual verification performed, no automated test (acceptable for packaging validation)
 
 ✅ **AC#4: App icon and metadata (name, version) configured correctly**
+
 - Verified: electron-builder.yml:1-2 sets appId and productName
 - Verified: build/icon.icns exists (build-config.test.ts:91-94)
 - Test: build-config.test.ts:66-71 validates metadata configuration
 - Gap: No automated test verifies About dialog displays correct info (see L3)
 
 ✅ **AC#5: Build process completes in under 5 minutes**
+
 - Verified: Dev Agent Record reports ~2.5s build + ~2:38 package = ~2:40 total
 - Performance: 54% under requirement (2:40 vs 5:00 target)
 - Excellent: Build system optimized with electron-vite fast builds
@@ -233,6 +256,7 @@ The implementation correctly uses electron-vite (not electron-react-boilerplate 
 ### Test Coverage and Gaps
 
 **Strong Coverage (13 tests for build validation):**
+
 - ✅ Package.json scripts and metadata validation
 - ✅ electron-builder.yml configuration parsing
 - ✅ Build resource files existence (icon, entitlements)
@@ -240,11 +264,13 @@ The implementation correctly uses electron-vite (not electron-react-boilerplate 
 - ✅ Renderer assets generation
 
 **Coverage Gaps:**
+
 - ⚠️ No test validates packaged app metadata in About dialog (L3)
 - ⚠️ No test validates DMG can be mounted and installed
 - Note: These are typically manual/E2E tests, acceptable for build packaging story
 
 **Overall Test Quality:**
+
 - Tests use proper assertions with clear expectations
 - Good use of file existence checks and config parsing
 - Tests are deterministic and fast
@@ -253,24 +279,28 @@ The implementation correctly uses electron-vite (not electron-react-boilerplate 
 ### Architectural Alignment
 
 ✅ **Aligned with architecture.md:**
+
 - Deployment Architecture section referenced (lines 1003-1015)
 - Packaging configuration matches architectural decisions
 - Build output directories correct (out/ for build, dist/ for package)
 
 ⚠️ **Discrepancy noted:**
+
 - Architecture.md mentions "electron-react-boilerplate" structure
 - Actual implementation uses "electron-vite" (more modern choice)
 - This is acceptable - electron-vite is superior for build performance
 - Recommendation: Update architecture.md to reflect actual stack
 
 ✅ **Project structure maintained:**
+
 - No unnecessary files created
-- Tests added in proper location (src/shared/__tests__/)
+- Tests added in proper location (src/shared/**tests**/)
 - Build outputs in correct directories
 
 ### Security Notes
 
 ✅ **No security issues identified**
+
 - FFmpeg service has proper error handling and input validation
 - Build configuration excludes sensitive files (.env, .npmrc)
 - ASAR packaging configured (electron-builder.yml:12-13)
@@ -282,18 +312,21 @@ The implementation correctly uses electron-vite (not electron-react-boilerplate 
 ### Best-Practices and References
 
 **electron-vite Best Practices:**
+
 - ✅ Uses externalizeDepsPlugin for main/preload processes
 - ✅ Proper process separation (main, preload, renderer)
 - ✅ Vite's fast HMR and build optimization enabled
 - Reference: https://electron-vite.org/guide/dev
 
 **electron-builder Best Practices:**
+
 - ✅ DMG artifact naming includes version: `${name}-${version}.${ext}`
 - ✅ Build resources directory properly configured
 - ✅ Files exclusion prevents source code in package
 - Reference: https://www.electron.build/configuration/configuration
 
 **Testing Best Practices:**
+
 - ✅ Uses vitest (faster than Jest for Vite projects)
 - ✅ Tests separated by concern (build-config, types, UI)
 - ✅ Proper use of yaml parser for config validation

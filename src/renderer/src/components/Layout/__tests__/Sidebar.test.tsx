@@ -1,19 +1,30 @@
 /**
  * Sidebar Component Tests
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { Sidebar } from '../Sidebar'
 
+// Mock window.api to prevent errors
+vi.stubGlobal('api', {
+  openFileDialog: vi.fn(),
+  importFile: vi.fn()
+})
+
 describe('Sidebar', () => {
-  it('renders Media Library heading', () => {
+  it('renders Media heading', () => {
     render(<Sidebar />)
-    expect(screen.getByText('Media Library')).toBeInTheDocument()
+    expect(screen.getByText('Media')).toBeInTheDocument()
   })
 
-  it('renders placeholder text', () => {
+  it('renders ImportZone component', () => {
     render(<Sidebar />)
-    expect(screen.getByText(/drop files here/i)).toBeInTheDocument()
+    expect(screen.getByText(/Drag video files here/i)).toBeInTheDocument()
+  })
+
+  it('renders Import button', () => {
+    render(<Sidebar />)
+    expect(screen.getByRole('button', { name: /import/i })).toBeInTheDocument()
   })
 
   it('applies correct styling classes', () => {

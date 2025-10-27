@@ -1,0 +1,209 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>3</storyId>
+    <title>Media Library Display</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-3-media-library-display.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a content creator</asA>
+    <iWant>to see all my imported media in a library panel</iWant>
+    <soThat>I can manage and select clips for my timeline</soThat>
+    <tasks>
+      <task id="1" acs="1,5">
+        <name>Create MediaLibrary container component</name>
+        <subtasks>
+          <subtask>Create `MediaLibrary.tsx` in `src/renderer/components/MediaLibrary/`</subtask>
+          <subtask>Subscribe to `mediaStore.files` for list of imported files</subtask>
+          <subtask>Render scrollable container with overflow-y-auto</subtask>
+          <subtask>Map over files array to render individual MediaItem components</subtask>
+          <subtask>Style with Tailwind: dark background, full height</subtask>
+        </subtasks>
+      </task>
+      <task id="2" acs="1,2,6">
+        <name>Create MediaItem component</name>
+        <subtasks>
+          <subtask>Create `MediaItem.tsx` in `src/renderer/components/MediaLibrary/`</subtask>
+          <subtask>Display thumbnail image (from `MediaFile.thumbnail`)</subtask>
+          <subtask>Display filename (truncate if too long)</subtask>
+          <subtask>Display duration using `formatTime()` utility</subtask>
+          <subtask>Display resolution (e.g., "1920x1080") and file size (e.g., "45.2 MB")</subtask>
+          <subtask>Style with Tailwind: card layout, padding, hover state</subtask>
+        </subtasks>
+      </task>
+      <task id="3" acs="3">
+        <name>Implement clip selection</name>
+        <subtasks>
+          <subtask>Add `selectedFileId` state to `mediaStore`</subtask>
+          <subtask>Add `selectFile(id: string)` action to `mediaStore`</subtask>
+          <subtask>Handle click on MediaItem → call `selectFile(item.id)`</subtask>
+          <subtask>Apply visual highlight with `ring-2 ring-cyan-500` when selected</subtask>
+          <subtask>Clicking background deselects (sets `selectedFileId = null`)</subtask>
+        </subtasks>
+      </task>
+      <task id="4" acs="4">
+        <name>Enable drag from library to timeline</name>
+        <subtasks>
+          <subtask>Add `draggable="true"` to MediaItem component</subtask>
+          <subtask>Implement `onDragStart` handler → set `DataTransfer` with file metadata</subtask>
+          <subtask>Store dragged file ID in `event.dataTransfer.setData('fileId', id)`</subtask>
+          <subtask>Add ghost image during drag (optional, use default browser behavior)</subtask>
+          <subtask>Will integrate with Timeline drop handler in Story 2.4</subtask>
+        </subtasks>
+      </task>
+      <task id="5" acs="6">
+        <name>Format file size for display</name>
+        <subtasks>
+          <subtask>Create `formatFileSize()` utility in `src/renderer/utils/`</subtask>
+          <subtask>Convert bytes to KB, MB, GB with appropriate precision</subtask>
+          <subtask>Example: `45234567 → "43.1 MB"`</subtask>
+          <subtask>Export from utils/index.ts</subtask>
+        </subtasks>
+      </task>
+      <task id="6" acs="1">
+        <name>Handle empty library state</name>
+        <subtasks>
+          <subtask>When `mediaStore.files` is empty, show placeholder message</subtask>
+          <subtask>Display: "No media imported yet. Drag files or click Import to begin."</subtask>
+          <subtask>Center message in library panel</subtask>
+          <subtask>Style with muted text color</subtask>
+        </subtasks>
+      </task>
+      <task id="7" acs="1,5">
+        <name>Integrate MediaLibrary into Sidebar</name>
+        <subtasks>
+          <subtask>Update `Sidebar.tsx` to include `<MediaLibrary />` component</subtask>
+          <subtask>Position below ImportZone and Import button</subtask>
+          <subtask>Allocate remaining vertical space (flex-grow)</subtask>
+          <subtask>Ensure scrolling works when many items present</subtask>
+        </subtasks>
+      </task>
+      <task id="8" acs="all">
+        <name>Write unit tests</name>
+        <subtasks>
+          <subtask>Test MediaLibrary renders list of files from store</subtask>
+          <subtask>Test MediaItem displays all metadata correctly</subtask>
+          <subtask>Test clip selection updates state and visual highlight</subtask>
+          <subtask>Test formatFileSize utility with various input sizes</subtask>
+          <subtask>Test empty state displays placeholder message</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Media library shows thumbnail, filename, and duration for each clip</criterion>
+    <criterion id="2">Thumbnails generated from first frame of video</criterion>
+    <criterion id="3">Clicking a clip selects it (visual highlight)</criterion>
+    <criterion id="4">Selected clip can be dragged to timeline</criterion>
+    <criterion id="5">Media library scrolls if content exceeds visible area</criterion>
+    <criterion id="6">Clips display file size and resolution metadata</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Functional Requirements</section>
+        <snippet>FR004: Application shall display imported video clips in a media library panel with thumbnail previews</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Document</title>
+        <section>Component Structure</section>
+        <snippet>MediaLibrary component structure defined under Epic 2. Components follow PascalCase.tsx naming. Zustand stores use camelCase.ts pattern.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Document</title>
+        <section>State Management</section>
+        <snippet>Zustand 5.0.8 for global state management. Minimal boilerplate, excellent TypeScript support. mediaStore manages imported media library.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Document</title>
+        <section>Styling Patterns</section>
+        <snippet>Use Tailwind for styling (no separate CSS files). cn() utility available for conditional class merging.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Story 2.3</section>
+        <snippet>Media Library Display - User can see all imported media in library panel with thumbnails, metadata, selection, and drag capability.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/shared/types.ts</path>
+        <kind>interface</kind>
+        <symbol>MediaFile</symbol>
+        <lines>34-47</lines>
+        <reason>Core type definition for media files with id, path, name, duration, resolution, size, and thumbnail fields</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/store/mediaStore.ts</path>
+        <kind>store</kind>
+        <symbol>useMediaStore</symbol>
+        <lines>1-59</lines>
+        <reason>Existing Zustand store managing media files. Needs extension with selectedFileId state and selectFile action for Task 3</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/components/Layout/Sidebar.tsx</path>
+        <kind>component</kind>
+        <symbol>Sidebar</symbol>
+        <lines>all</lines>
+        <reason>Integration point where MediaLibrary component will be added below Import controls (Task 7)</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/utils/cn.util.ts</path>
+        <kind>utility</kind>
+        <symbol>cn</symbol>
+        <lines>all</lines>
+        <reason>Existing utility for conditional class merging with Tailwind, used for selection highlighting in MediaItem</reason>
+      </artifact>
+      <artifact>
+        <path>src/main/services/thumbnail.service.ts</path>
+        <kind>service</kind>
+        <symbol>ThumbnailService</symbol>
+        <lines>all</lines>
+        <reason>Generates thumbnails from video first frame (Story 2.1). MediaFile.thumbnail field populated by this service</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/components/shared/index.ts</path>
+        <kind>utility-barrel</kind>
+        <symbol>exports</symbol>
+        <lines>all</lines>
+        <reason>Pattern for exporting shared utilities. formatFileSize should be exported from utils/index.ts following same pattern</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <react>19.1.1</react>
+        <react-dom>19.1.1</react-dom>
+        <zustand>5.0.8</zustand>
+        <clsx>2.1.1</clsx>
+        <tailwind-merge>3.3.1</tailwind-merge>
+      </node>
+      <devDependencies>
+        <vitest>4.0.4</vitest>
+        <testing-library-react>16.3.0</testing-library-react>
+        <testing-library-user-event>14.6.1</testing-library-user-event>
+        <testing-library-jest-dom>6.9.1</testing-library-jest-dom>
+        <happy-dom>20.0.8</happy-dom>
+      </devDependencies>
+    </dependencies>
+  </artifacts>
+
+  <constraints></constraints>
+  <interfaces></interfaces>
+  <tests>
+    <standards></standards>
+    <locations></locations>
+    <ideas></ideas>
+  </tests>
+</story-context>

@@ -84,6 +84,7 @@ so that I understand where media, preview, and timeline will appear.
 ### UI Architecture
 
 **Layout Structure:**
+
 ```
 ┌────────────────────────────────────────────┐
 │ TopBar (fixed, full-width)                 │
@@ -99,6 +100,7 @@ so that I understand where media, preview, and timeline will appear.
 ```
 
 **Tailwind Dark Theme Palette:**
+
 - Primary background: `bg-zinc-900` (#18181b)
 - Secondary background: `bg-zinc-800` (#27272a)
 - Border: `border-zinc-700`
@@ -107,6 +109,7 @@ so that I understand where media, preview, and timeline will appear.
 - Accent (Export button): `text-cyan-500` (#06b6d4)
 
 **Component Organization:**
+
 - All layout components in `src/renderer/components/Layout/`
 - Shared UI components in `src/renderer/components/shared/`
 - Follows architecture naming conventions (PascalCase.tsx)
@@ -114,6 +117,7 @@ so that I understand where media, preview, and timeline will appear.
 ### Project Structure Notes
 
 **New Directories Created:**
+
 ```
 src/renderer/
 ├── components/
@@ -134,6 +138,7 @@ src/renderer/
 ```
 
 **Key Configuration Files:**
+
 - `tailwind.config.js` - Tailwind configuration with content paths
 - `postcss.config.js` - PostCSS configuration (auto-generated)
 - `src/renderer/styles/globals.css` - Global styles and CSS variables
@@ -147,7 +152,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        accent: '#06b6d4'  // cyan for primary actions
+        accent: '#06b6d4' // cyan for primary actions
       }
     }
   },
@@ -193,11 +198,13 @@ claude-sonnet-4-5-20250929 (Marcus - Electron Video Developer)
 ### Debug Log References
 
 **Tailwind CSS v4 Migration:**
+
 - Tailwind CSS v4 requires @tailwindcss/postcss plugin (not legacy tailwindcss plugin)
 - Updated postcss.config.js to use '@tailwindcss/postcss'
 - Dev server restarted successfully after fix
 
 **Layout Implementation:**
+
 - Used Flexbox for responsive 3-panel layout
 - Preview area: flex-[3] (60% height ratio)
 - Timeline area: flex-[2] (40% height ratio)
@@ -206,6 +213,7 @@ claude-sonnet-4-5-20250929 (Marcus - Electron Video Developer)
 ### Completion Notes List
 
 **Implementation Summary:**
+
 - Installed and configured Tailwind CSS v4 with PostCSS
 - Created reusable Button component with variants (primary, secondary, ghost)
 - Implemented 3-panel layout: TopBar, Sidebar, Preview, Timeline
@@ -215,6 +223,7 @@ claude-sonnet-4-5-20250929 (Marcus - Electron Video Developer)
 - All tests passing (45/45)
 
 **Key Technical Decisions:**
+
 - Used Tailwind CSS v4 with @tailwindcss/postcss plugin
 - Created cn() utility for Tailwind class merging (clsx + tailwind-merge)
 - Button component supports 3 variants and 3 sizes
@@ -224,6 +233,7 @@ claude-sonnet-4-5-20250929 (Marcus - Electron Video Developer)
 ### File List
 
 **Created:**
+
 - tailwind.config.js
 - postcss.config.js
 - src/renderer/src/styles/globals.css
@@ -235,16 +245,17 @@ claude-sonnet-4-5-20250929 (Marcus - Electron Video Developer)
 - src/renderer/src/components/Layout/index.ts
 - src/renderer/src/components/shared/Button.tsx
 - src/renderer/src/components/shared/index.ts
-- src/renderer/src/components/Layout/__tests__/MainLayout.test.tsx
-- src/renderer/src/components/Layout/__tests__/TopBar.test.tsx
-- src/renderer/src/components/Layout/__tests__/Sidebar.test.tsx
-- src/renderer/src/components/shared/__tests__/Button.test.tsx
+- src/renderer/src/components/Layout/**tests**/MainLayout.test.tsx
+- src/renderer/src/components/Layout/**tests**/TopBar.test.tsx
+- src/renderer/src/components/Layout/**tests**/Sidebar.test.tsx
+- src/renderer/src/components/shared/**tests**/Button.test.tsx
 
 **Modified:**
+
 - package.json (added Tailwind dependencies: tailwindcss, @tailwindcss/postcss, postcss, autoprefixer, clsx, tailwind-merge)
 - src/renderer/src/main.tsx (added globals.css import)
 - src/renderer/src/App.tsx (replaced "Hello Chop Shop" with MainLayout)
-- src/renderer/src/__tests__/App.test.tsx (updated tests for new layout)
+- src/renderer/src/**tests**/App.test.tsx (updated tests for new layout)
 
 ## Change Log
 
@@ -271,6 +282,7 @@ Minor optimization opportunities identified (CSS variable redundancy, no visual 
 #### Low Severity
 
 **L1: CSS custom properties defined but unused**
+
 - **Location:** src/renderer/src/styles/globals.css:9-14
 - **Issue:** CSS variables (--bg-primary, --bg-secondary, etc.) defined but components use Tailwind classes directly (bg-zinc-900)
 - **Impact:** Slight redundancy, no functional impact
@@ -278,13 +290,15 @@ Minor optimization opportunities identified (CSS variable redundancy, no visual 
 - **Related:** Maintainability, DRY principle
 
 **L2: No visual regression testing**
-- **Location:** Component tests (Layout/__tests__/*)
+
+- **Location:** Component tests (Layout/**tests**/\*)
 - **Issue:** Tests validate structure/DOM but not visual appearance matching CapCut reference (AC#1)
 - **Impact:** Visual regressions could go undetected
 - **Recommendation:** Consider Playwright visual regression tests for critical UI (future enhancement)
 - **Related:** AC#1, Testing best practices
 
 **L3: README files in component directories**
+
 - **Location:** src/renderer/src/components/Layout/README.md, shared/README.md
 - **Issue:** While helpful, adds extra files that may reduce AI navigation speed
 - **Impact:** Minor - READMEs are useful but CLAUDE.md emphasizes file minimization
@@ -294,6 +308,7 @@ Minor optimization opportunities identified (CSS variable redundancy, no visual 
 ### Acceptance Criteria Coverage
 
 ✅ **AC#1: Dark theme UI shell implemented matching CapCut reference**
+
 - Verified: Dark palette using Tailwind zinc colors (zinc-900, zinc-800, zinc-700)
 - Verified: Cyan accent color (#06b6d4) for primary actions
 - Verified: globals.css:9-14 defines theme CSS variables
@@ -301,30 +316,35 @@ Minor optimization opportunities identified (CSS variable redundancy, no visual 
 - Note: No automated visual comparison to CapCut reference (see L2)
 
 ✅ **AC#2: Left sidebar (media library area) renders with placeholder**
+
 - Verified: Sidebar.tsx:12-17 renders "Media Library" text
 - Verified: Fixed width 280px (Sidebar.tsx:13)
 - Verified: Dark background bg-zinc-800 with border-right
 - Test: Sidebar.test.tsx:9-13 validates rendering and styling
 
 ✅ **AC#3: Center preview area renders with placeholder**
+
 - Verified: MainLayout.tsx:29-31 renders "Preview" placeholder
 - Verified: flex-[3] gives 60% height ratio
 - Verified: Dark background bg-zinc-900
 - Test: MainLayout.test.tsx:19 validates preview area rendering
 
 ✅ **AC#4: Bottom timeline area renders with placeholder**
+
 - Verified: MainLayout.tsx:34-36 renders "Timeline" placeholder
 - Verified: flex-[2] gives 40% height ratio (3:2 ratio = 60:40)
 - Verified: Dark background bg-zinc-800
 - Test: MainLayout.test.tsx:22 validates timeline area rendering
 
 ✅ **AC#5: Top bar with "Chop Shop" title and Export button (disabled) renders**
+
 - Verified: TopBar.tsx:13 renders title "Chop Shop"
 - Verified: TopBar.tsx:15-17 renders Export button with disabled prop
 - Verified: Cyan accent color via Button primary variant
 - Test: TopBar.test.tsx:9-17 validates all elements and disabled state
 
 ✅ **AC#6: Layout is responsive and maintains proportions when window resizes**
+
 - Verified: Flexbox layout (MainLayout.tsx:17, 22, 27)
 - Verified: h-screen w-screen ensures full viewport usage
 - Verified: flex-1, flex-[3], flex-[2] maintain proportions
@@ -334,6 +354,7 @@ Minor optimization opportunities identified (CSS variable redundancy, no visual 
 ### Test Coverage and Gaps
 
 **Excellent Coverage (19 new tests for UI components):**
+
 - ✅ MainLayout structure and child component rendering (4 tests)
 - ✅ TopBar title, Export button, and styling (4 tests)
 - ✅ Sidebar rendering and width (3 tests)
@@ -341,11 +362,13 @@ Minor optimization opportunities identified (CSS variable redundancy, no visual 
 - ✅ App integration with MainLayout (6 tests updated)
 
 **Coverage Gaps:**
+
 - ⚠️ No visual regression tests comparing to CapCut reference (L2)
 - ⚠️ No responsive behavior tests (e.g., window resize simulation)
 - ⚠️ No cn() utility unit tests (though it's a simple function)
 
 **Overall Test Quality:**
+
 - Tests use proper React Testing Library queries (getByText, toBeInTheDocument)
 - Good separation of concerns (structure vs content vs styling)
 - Tests are fast and deterministic (all 45 passing)
@@ -354,12 +377,14 @@ Minor optimization opportunities identified (CSS variable redundancy, no visual 
 ### Architectural Alignment
 
 ✅ **Excellent alignment with architecture.md:**
+
 - Component structure matches architecture:56-162 specification
 - Layout directory follows recommended structure
 - Shared components in proper location
 - Tailwind setup matches architecture:27-34 guidance
 
 ✅ **CLAUDE.md compliance:**
+
 - ✅ All files have descriptive header comments (tailwind.config.js:1-3, etc.)
 - ✅ Functions decorated with TSDoc (Button.tsx:12-19, cn.util.ts:8-12)
 - ✅ Descriptive variable names (variant, size, className)
@@ -368,14 +393,16 @@ Minor optimization opportunities identified (CSS variable redundancy, no visual 
 - ✅ No enums used (Button uses union types for variant/size)
 
 ✅ **Project structure:**
+
 - Component organization follows architecture specifications
 - Barrel exports (index.ts) for clean imports
-- Test files co-located with components (__tests__ directories)
+- Test files co-located with components (**tests** directories)
 - README files document component purposes (though see L3)
 
 ### Security Notes
 
 ✅ **No security concerns identified**
+
 - No user input handling in this story
 - No network requests or data storage
 - Button component properly handles disabled state
@@ -386,6 +413,7 @@ Minor optimization opportunities identified (CSS variable redundancy, no visual 
 ### Best-Practices and References
 
 **Tailwind CSS v4 Best Practices:**
+
 - ✅ Uses @tailwindcss/postcss plugin (postcss.config.js:7)
 - ✅ Proper content configuration for tree-shaking
 - ✅ Extended theme with custom accent color
@@ -393,6 +421,7 @@ Minor optimization opportunities identified (CSS variable redundancy, no visual 
 - Reference: Story notes correctly document v4 migration (lines 195-198)
 
 **React Best Practices:**
+
 - ✅ Functional components with proper TypeScript types
 - ✅ Component composition (MainLayout uses TopBar, Sidebar)
 - ✅ Props interfaces with proper typing (ButtonProps)
@@ -400,12 +429,14 @@ Minor optimization opportunities identified (CSS variable redundancy, no visual 
 - ✅ JSDoc comments on all exported functions
 
 **Component Design Patterns:**
+
 - ✅ cn() utility for Tailwind class merging (prevents class conflicts)
 - ✅ Button variants using discriminated union types
 - ✅ Consistent naming (PascalCase for components, camelCase for utilities)
 - ✅ Proper accessibility (button semantic HTML, focus rings)
 
 **Testing Best Practices:**
+
 - ✅ Uses @testing-library/react (user-centric testing)
 - ✅ Tests user-visible behavior, not implementation details
 - ✅ Proper use of toBeInTheDocument, toHaveClass matchers

@@ -3,6 +3,7 @@
  * Central registration point for all IPC handlers
  */
 import { registerFFmpegHandlers } from './ffmpeg.handlers'
+import './file.handlers' // File import/export handlers (self-registering)
 
 /**
  * Register all IPC handlers

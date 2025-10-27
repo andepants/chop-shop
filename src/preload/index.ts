@@ -23,7 +23,29 @@ const api = {
     inputPath: string,
     outputPath: string
   ): Promise<IPCResponse<{ outputPath: string }>> =>
-    ipcRenderer.invoke('test-export', inputPath, outputPath)
+    ipcRenderer.invoke('test-export', inputPath, outputPath),
+
+  /**
+   * Import a video file and extract metadata
+   * @param filePath - Absolute path to video file
+   * @returns Promise with media file metadata
+   */
+  importFile: (filePath: string) => ipcRenderer.invoke(IPC_CHANNELS.IMPORT_FILE, { filePath }),
+
+  /**
+   * Generate thumbnail from video file
+   * @param filePath - Absolute path to video file
+   * @param timestamp - Time in seconds (default: 0)
+   * @returns Promise with thumbnail data URL
+   */
+  generateThumbnail: (filePath: string, timestamp?: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.GENERATE_THUMBNAIL, { filePath, timestamp }),
+
+  /**
+   * Open native file picker dialog for video selection
+   * @returns Promise with array of selected file paths
+   */
+  openFileDialog: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_FILE_DIALOG)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

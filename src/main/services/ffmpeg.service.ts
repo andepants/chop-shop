@@ -34,12 +34,7 @@ export class FFmpegError extends Error {
  * Progress callback interface
  */
 export interface ProgressCallback {
-  (progress: {
-    percent: number
-    frame: number
-    fps: number
-    time: string
-  }): void
+  (progress: { percent: number; frame: number; fps: number; time: string }): void
 }
 
 /**

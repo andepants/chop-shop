@@ -18,9 +18,9 @@ describe('App Component', () => {
     expect(screen.getByText('Chop Shop')).toBeInTheDocument()
   })
 
-  it('renders Sidebar with Media Library', () => {
+  it('renders Sidebar with Media', () => {
     render(<App />)
-    expect(screen.getByText('Media Library')).toBeInTheDocument()
+    expect(screen.getByText('Media')).toBeInTheDocument()
   })
 
   it('renders Preview area', () => {

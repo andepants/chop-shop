@@ -13,7 +13,7 @@ describe('MainLayout', () => {
     expect(screen.getByText('Chop Shop')).toBeInTheDocument()
 
     // Sidebar should be rendered
-    expect(screen.getByText('Media Library')).toBeInTheDocument()
+    expect(screen.getByText('Media')).toBeInTheDocument()
 
     // Preview area should be rendered
     expect(screen.getByText('Preview')).toBeInTheDocument()
@@ -38,7 +38,7 @@ describe('MainLayout', () => {
 
   it('renders Sidebar on the left', () => {
     render(<MainLayout />)
-    const sidebar = screen.getByText('Media Library').closest('aside')
+    const sidebar = screen.getByText('Media').closest('aside')
     expect(sidebar).toBeInTheDocument()
     expect(sidebar).toHaveClass('w-[280px]')
   })

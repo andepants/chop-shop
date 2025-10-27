@@ -11,7 +11,9 @@
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
-    "test": "vitest run",
+    "test": "npm run test:renderer && npm run test:main",
+    "test:renderer": "vitest run",
+    "test:main": "vitest run --config vitest.main.config.ts",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "start": "electron-vite preview",
@@ -27,7 +29,8 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
-    "ffmpeg-static": "^5.2.0"
+    "ffmpeg-static": "^5.2.0",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",

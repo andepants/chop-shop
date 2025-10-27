@@ -43,15 +43,15 @@ development_status:
   1-1-electron-project-setup: done
   1-2-build-and-packaging-system: done
   1-3-ui-shell-with-3-panel-layout: done
-  1-4-ffmpeg-integration-setup: in-progress
+  1-4-ffmpeg-integration-setup: done
   epic-1-retrospective: optional
 
   epic-2: backlog
-  2-1-drag-and-drop-video-import: backlog
-  2-2-file-picker-import-dialog: backlog
-  2-3-media-library-display: backlog
-  2-4-timeline-clip-placement-and-display: backlog
-  2-5-video-preview-player-and-playback-controls: backlog
+  2-1-drag-and-drop-video-import: review
+  2-2-file-picker-import-dialog: in-progress
+  2-3-media-library-display: drafted
+  2-4-timeline-clip-placement-and-display: drafted
+  2-5-video-preview-player-and-playback-controls: drafted
   epic-2-retrospective: optional
 
   epic-3: backlog

@@ -1,5 +1,5 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
-import { IPCResponse } from '../shared/types'
+import { IPCResponse, MediaFile } from '../shared/types'
 
 /**
  * Custom API interface exposed to renderer process
@@ -10,6 +10,9 @@ export interface API {
     inputPath: string,
     outputPath: string
   ) => Promise<IPCResponse<{ outputPath: string }>>
+  importFile: (filePath: string) => Promise<IPCResponse<MediaFile>>
+  generateThumbnail: (filePath: string, timestamp?: number) => Promise<IPCResponse<string>>
+  openFileDialog: () => Promise<IPCResponse<string[]>>
 }
 
 declare global {
