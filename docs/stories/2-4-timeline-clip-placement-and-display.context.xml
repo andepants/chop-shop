@@ -1,0 +1,337 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>4</storyId>
+    <title>Timeline Clip Placement and Display</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-4-timeline-clip-placement-and-display.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>content creator</asA>
+    <iWant>to drag clips from media library to the timeline</iWant>
+    <soThat>I can arrange my video sequence</soThat>
+    <tasks>
+- Task 1: Create Timeline container component (AC: #1)
+  - Create Timeline.tsx in src/renderer/components/Timeline/
+  - Render as fixed-height horizontal strip at bottom of layout
+  - Style with Tailwind: dark background, border-top
+  - Subscribe to timelineStore.clips and timelineStore.tracks
+  - Integrate into MainLayout component
+
+- Task 2: Create timeline data store (AC: #5, #7)
+  - Create timelineStore.ts in src/renderer/store/
+  - Define Clip and Track interfaces (see Data Model below)
+  - Implement actions: addClip, removeClip, updateClip, setPlayhead
+  - Initialize with single track (Track 1) and playhead at 0
+  - Export store hook: useTimelineStore
+
+- Task 3: Implement drop zone for timeline (AC: #2)
+  - Add onDragOver and onDrop handlers to Timeline component
+  - Extract file ID from event.dataTransfer.getData('fileId')
+  - Look up full MediaFile from mediaStore using file ID
+  - Calculate drop position on timeline based on mouse X coordinate
+  - Call timelineStore.addClip() with clip data
+
+- Task 4: Create TimelineClip component (AC: #3, #4)
+  - Create TimelineClip.tsx in src/renderer/components/Timeline/
+  - Display clip thumbnail strip (multiple frames or single thumbnail)
+  - Display clip duration using formatTime() utility
+  - Position based on clip.startTime (pixels from left)
+  - Width based on clip.duration scaled by zoom level
+  - Style with Tailwind: rounded, border, hover effect
+
+- Task 5: Create timeline ruler with time markers (AC: #4)
+  - Create TimelineRuler.tsx component
+  - Render horizontal ruler above track with time labels
+  - Display markers at regular intervals (0:00, 0:10, 0:20, etc.)
+  - Sync ruler scale with timeline zoom level
+  - Style with monospace font for time labels
+
+- Task 6: Create Playhead component (AC: #7)
+  - Create Playhead.tsx component
+  - Render vertical line indicator at timelineStore.playheadPosition
+  - Position using CSS transform based on playhead time and zoom
+  - Style with distinct color (cyan or red) and full-height
+  - Initially positioned at 0:00 (left edge)
+
+- Task 7: Implement auto-zoom to fit clips (AC: #6)
+  - Calculate total timeline duration from all clips
+  - Compute zoom scale: timelineWidth / totalDuration
+  - Apply zoom to clip widths and ruler scale
+  - Ensure minimum zoom level (clips not too narrow)
+  - Will be refined in Story 4.2 (manual zoom controls)
+
+- Task 8: Handle sequential clip placement (AC: #5)
+  - When adding clip, calculate next available position
+  - If timeline empty, place at 0:00
+  - If clips exist, place after last clip (end of last clip's duration)
+  - Update clip.startTime to sequential position
+  - Prevent clip overlap (will be relaxed in multi-track Story 4.1)
+
+- Task 9: Create TimelineTrack component (AC: #1)
+  - Create TimelineTrack.tsx component
+  - Render track container with clips positioned inside
+  - Handle track-specific drop events
+  - Display track label ("Track 1") on left side
+  - Style with border, fixed height (e.g., 80px)
+
+- Task 10: Write unit tests
+  - Test Timeline component renders tracks and clips
+  - Test timelineStore.addClip() updates state correctly
+  - Test clip positioning based on startTime and duration
+  - Test auto-zoom calculation with various clip counts
+  - Test sequential placement logic prevents overlap
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+1. Timeline renders as horizontal track at bottom of screen
+2. User can drag clip from media library to timeline
+3. Dropped clip appears on timeline with thumbnail strip
+4. Clip shows duration and position on timeline ruler (time markers)
+5. Multiple clips can be placed sequentially on timeline
+6. Timeline automatically adjusts zoom to fit all clips initially
+7. Playhead indicator visible at timeline start (position 0:00)
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Functional Requirements - Timeline & Preview</section>
+        <snippet>FR005: Application shall provide a visual timeline interface showing imported clips with playhead/scrubber. FR007: Synchronize playhead position between timeline and preview player. Timeline UI shall maintain 30+ fps responsiveness with 10 or more clips loaded (NFR001).</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Design Direction - Layout</section>
+        <snippet>Bottom: Timeline with playhead, zoom controls, and basic editing tools (split, trim, delete). High contrast for playhead and selected clips. Simple, functional UI that can be built within 72-hour sprint.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Documentation</title>
+        <section>State Management</section>
+        <snippet>Zustand 5.0.8 for global state management. Minimal boilerplate, excellent TypeScript support, perfect for 72-hour timeline. Store creation pattern: create with clips, tracks, playheadPosition state.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Documentation</title>
+        <section>Data Architecture - Timeline Data Model</section>
+        <snippet>Track contains clips array. Clip interface: id (UUID), sourceFile (absolute path), startTime (position in seconds), duration (seconds), trimIn/trimOut offsets, trackId. TimelineState manages tracks array, playheadPosition, totalDuration (computed), zoomLevel (pixels per second), selectedClipId.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Documentation</title>
+        <section>Project Structure - Components</section>
+        <snippet>Timeline component folder structure: Timeline.tsx (main container), TimelineTrack.tsx (individual track), TimelineClip.tsx (clip display), Playhead.tsx (playhead indicator), ZoomControls.tsx, timeline.types.ts. Store at src/renderer/store/timelineStore.ts.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Documentation</title>
+        <section>Performance Considerations - Timeline Rendering</section>
+        <snippet>Render only visible clips (virtual scrolling if greater than 50 clips). Use CSS transforms for playhead movement (GPU accelerated). Store time as seconds (number), file paths as absolute paths.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Epic 2: Media Import & Timeline Foundation</section>
+        <snippet>Goal: Enable video import and create functional timeline with playback controls. Deliverable: User can import videos, see them in media library, drag to timeline, and play in preview. Story 2.4 builds on Story 2.3 (media library with drag source).</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/2-3-media-library-display.md</path>
+        <title>Story 2.3: Media Library Display</title>
+        <section>Tasks - Enable drag from library</section>
+        <snippet>MediaItem has draggable="true". onDragStart handler stores file ID in event.dataTransfer.setData('fileId', id). Integrates with Timeline drop handler in Story 2.4.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/shared/types.ts</path>
+        <kind>types</kind>
+        <symbol>MediaFile</symbol>
+        <lines>35-48</lines>
+        <reason>Core MediaFile interface used by mediaStore. Timeline needs to reference MediaFile.path, MediaFile.duration, MediaFile.id when creating clips from drag-drop.</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/store/mediaStore.ts</path>
+        <kind>store</kind>
+        <symbol>useMediaStore</symbol>
+        <lines>30-66</lines>
+        <reason>Zustand store managing media files. Timeline drop handler will query mediaStore.files to look up full MediaFile by ID from drag event.</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/components/Layout/MainLayout.tsx</path>
+        <kind>component</kind>
+        <symbol>MainLayout</symbol>
+        <lines>14-40</lines>
+        <reason>Main layout where Timeline will be integrated. Timeline placeholder at lines 29-32 needs to be replaced with actual Timeline component.</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/components/MediaLibrary/MediaItem.tsx</path>
+        <kind>component</kind>
+        <symbol>handleDragStart</symbol>
+        <lines>23-26</lines>
+        <reason>MediaItem sets fileId in dataTransfer during drag. Timeline drop handler retrieves this using event.dataTransfer.getData('fileId').</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/utils/formatTime.util.ts</path>
+        <kind>utility</kind>
+        <symbol>formatTime</symbol>
+        <lines>11-23</lines>
+        <reason>Time formatting utility for displaying clip durations and timeline markers. Timeline components will use this to format seconds as MM:SS or HH:MM:SS strings.</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/utils/cn.util.ts</path>
+        <kind>utility</kind>
+        <symbol>cn</symbol>
+        <lines>1-10</lines>
+        <reason>Tailwind className utility for conditional styling (used throughout existing components). Timeline components should use this for hover states and selection.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="node" manifest="package.json">
+        <runtime>
+          <package name="zustand" version="^5.0.8" relevance="State management for timelineStore - core dependency for this story"/>
+          <package name="@electron-toolkit/utils" version="^4.0.0" relevance="Electron utility helpers"/>
+          <package name="@electron-toolkit/preload" version="^3.0.2" relevance="Preload script utilities"/>
+          <package name="ffmpeg-static" version="^5.2.0" relevance="FFmpeg binaries (not directly used in this story)"/>
+        </runtime>
+        <development>
+          <package name="react" version="^19.1.1" relevance="UI framework for Timeline components"/>
+          <package name="react-dom" version="^19.1.1" relevance="React DOM rendering"/>
+          <package name="typescript" version="^5.9.2" relevance="Type system for type-safe Timeline interfaces"/>
+          <package name="tailwindcss" version="^4.1.16" relevance="CSS framework for Timeline component styling"/>
+          <package name="clsx" version="^2.1.1" relevance="Conditional className utility"/>
+          <package name="tailwind-merge" version="^3.3.1" relevance="Tailwind class merging (used via cn utility)"/>
+          <package name="electron" version="^38.1.2" relevance="Desktop application framework"/>
+          <package name="vite" version="^7.1.6" relevance="Build tool and dev server"/>
+          <package name="vitest" version="^4.0.4" relevance="Testing framework for Timeline tests"/>
+          <package name="@testing-library/react" version="^16.3.0" relevance="React component testing utilities"/>
+        </development>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Must use Zustand for state management - create timelineStore.ts following same pattern as mediaStore.ts (lines 30-66)</constraint>
+    <constraint>Must use Tailwind for all styling - no separate CSS files (per architecture.md)</constraint>
+    <constraint>Must use path aliases: @/components, @/store, @/utils (per architecture.md)</constraint>
+    <constraint>Must return JSX with React.JSX.Element type annotation (per existing component pattern)</constraint>
+    <constraint>Time values stored as seconds (number type), not milliseconds</constraint>
+    <constraint>File paths stored as absolute paths (string type) matching MediaFile.path format</constraint>
+    <constraint>Component file naming: PascalCase.tsx (Timeline.tsx, TimelineClip.tsx)</constraint>
+    <constraint>Store file naming: camelCase.ts (timelineStore.ts)</constraint>
+    <constraint>All components must have JSDoc block comments describing purpose</constraint>
+    <constraint>Maximum file size: 500 lines per file (per CLAUDE.md)</constraint>
+    <constraint>Functional programming pattern - use function keyword for pure functions, avoid classes</constraint>
+    <constraint>Dark theme color scheme: zinc-900 background, zinc-700/800 borders, cyan-500 accents</constraint>
+    <constraint>Timeline must maintain 30+ fps responsiveness per NFR001</constraint>
+    <constraint>Single track for MVP (trackId: 1) - multi-track deferred to Story 4.1</constraint>
+    <constraint>Clips positioned using CSS left/width with zoom scaling, not canvas rendering</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>MediaFile</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface MediaFile { id: string; path: string; name: string; format: string; duration: number; resolution: { width: number; height: number }; size: number; thumbnail?: string; createdAt: number }</signature>
+      <path>src/shared/types.ts</path>
+    </interface>
+    <interface>
+      <name>useMediaStore</name>
+      <kind>Zustand store hook</kind>
+      <signature>useMediaStore(): { files: MediaFile[]; isImporting: boolean; selectedFileId: string | null; addFile(file: MediaFile): void; selectFile(id: string | null): void; ... }</signature>
+      <path>src/renderer/src/store/mediaStore.ts</path>
+    </interface>
+    <interface>
+      <name>formatTime</name>
+      <kind>Utility function</kind>
+      <signature>function formatTime(seconds: number): string</signature>
+      <path>src/renderer/src/utils/formatTime.util.ts</path>
+    </interface>
+    <interface>
+      <name>cn</name>
+      <kind>Utility function</kind>
+      <signature>function cn(...inputs: ClassValue[]): string</signature>
+      <path>src/renderer/src/utils/cn.util.ts</path>
+    </interface>
+    <interface>
+      <name>DragEvent.dataTransfer</name>
+      <kind>HTML5 Drag and Drop API</kind>
+      <signature>event.dataTransfer.getData('fileId'): string - retrieves MediaFile.id set by MediaItem during drag start</signature>
+      <path>Browser API (used in MediaItem.tsx:24)</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+The project uses Vitest 4.0.4 as the testing framework with React Testing Library 16.3.0 for component testing. Test setup is configured in src/renderer/src/__tests__/setup.ts which mocks window.api and window.electron for IPC communication tests. Testing patterns observed:
+
+**Store Tests (Zustand):**
+- Use describe/it/expect from Vitest
+- Reset store state with useStore.setState() in beforeEach
+- Test state initialization, actions, and state mutations
+- Reference acceptance criteria in test descriptions (e.g., "AC: #4")
+- Use getState() to access current store state directly
+
+**Component Tests (React):**
+- Use render() from @testing-library/react
+- Use screen queries (getByText, getByRole) for element selection
+- Test rendering, props, user interactions, and layout structure
+- Verify Tailwind classes applied correctly
+- Use toBeInTheDocument() and class matchers
+
+**File Naming:** [FileName].test.tsx for components, [storeName].test.ts for stores, placed in __tests__ subdirectory adjacent to source files.
+
+**Coverage Focus:** Unit tests for logic and state management. Manual testing for media operations per ADR-008.
+    </standards>
+    <locations>
+      <location>src/renderer/src/store/__tests__/timelineStore.test.ts</location>
+      <location>src/renderer/src/components/Timeline/__tests__/Timeline.test.tsx</location>
+      <location>src/renderer/src/components/Timeline/__tests__/TimelineClip.test.tsx</location>
+      <location>src/renderer/src/components/Timeline/__tests__/TimelineTrack.test.tsx</location>
+      <location>src/renderer/src/components/Timeline/__tests__/Playhead.test.tsx</location>
+      <location>src/renderer/src/components/Timeline/__tests__/TimelineRuler.test.tsx</location>
+    </locations>
+    <ideas>
+      <test id="AC1" criteria="Timeline renders as horizontal track at bottom of screen">
+        <description>Test Timeline component renders with correct layout structure and positioning</description>
+        <approach>Render Timeline, verify flex/positioning classes, check track container exists</approach>
+      </test>
+      <test id="AC2" criteria="User can drag clip from media library to timeline">
+        <description>Test drop handler extracts fileId from dataTransfer and adds clip to store</description>
+        <approach>Mock drag event with dataTransfer.getData, verify timelineStore.addClip called with correct data</approach>
+      </test>
+      <test id="AC3" criteria="Dropped clip appears on timeline with thumbnail strip">
+        <description>Test TimelineClip component renders with thumbnail and correct styling</description>
+        <approach>Render TimelineClip with mock clip data, verify thumbnail img element and Tailwind classes</approach>
+      </test>
+      <test id="AC4" criteria="Clip shows duration and position on timeline ruler">
+        <description>Test TimelineClip displays formatted duration and TimelineRuler shows time markers</description>
+        <approach>Verify formatTime() called for duration, check ruler renders time labels at intervals</approach>
+      </test>
+      <test id="AC5" criteria="Multiple clips can be placed sequentially on timeline">
+        <description>Test sequential clip placement logic calculates correct startTime positions</description>
+        <approach>Add multiple clips to store, verify each clip.startTime equals previous clip end position</approach>
+      </test>
+      <test id="AC6" criteria="Timeline automatically adjusts zoom to fit all clips initially">
+        <description>Test auto-zoom calculation computes correct zoom level based on container width and total duration</description>
+        <approach>Test calculateAutoZoom function with various clip counts and durations, verify MIN/MAX zoom bounds</approach>
+      </test>
+      <test id="AC7" criteria="Playhead indicator visible at timeline start (position 0:00)">
+        <description>Test Playhead component renders at position 0 initially</description>
+        <approach>Render Playhead with playheadPosition=0, verify CSS transform or left positioning at timeline start</approach>
+      </test>
+      <test id="STORE" criteria="timelineStore actions update state correctly">
+        <description>Test all timelineStore actions: addClip, removeClip, updateClip, setPlayhead</description>
+        <approach>Follow mediaStore.test.ts pattern - test initialization, each action, state mutations</approach>
+      </test>
+      <test id="POSITIONING" criteria="Clip positioning based on startTime and duration">
+        <description>Test TimelineClip CSS positioning calculations with zoom scaling</description>
+        <approach>Verify style.left = startTime * zoomLevel, style.width = duration * zoomLevel</approach>
+      </test>
+    </ideas>
+  </tests>
+</story-context>

@@ -5,8 +5,14 @@
 
 import { exec } from 'child_process'
 import { promisify } from 'util'
+import ffmpegStatic from 'ffmpeg-static'
 
 const execAsync = promisify(exec)
+
+/**
+ * Path to bundled ffmpeg binary
+ */
+const ffmpegPath = ffmpegStatic as string
 
 /**
  * Generate thumbnail from video at specified timestamp
@@ -18,7 +24,7 @@ const execAsync = promisify(exec)
 export async function generateThumbnail(filePath: string, timestamp: number = 0): Promise<string> {
   try {
     // Use FFmpeg to extract frame as PNG to stdout, then convert to base64
-    const command = `ffmpeg -ss ${timestamp} -i "${filePath}" -vframes 1 -f image2pipe -vcodec png - | base64`
+    const command = `"${ffmpegPath}" -ss ${timestamp} -i "${filePath}" -vframes 1 -f image2pipe -vcodec png - | base64`
     const { stdout } = await execAsync(command, {
       encoding: 'utf-8',
       maxBuffer: 10 * 1024 * 1024 // 10MB buffer for large thumbnails

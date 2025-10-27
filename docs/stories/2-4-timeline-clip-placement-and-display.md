@@ -1,6 +1,6 @@
 # Story 2.4: Timeline Clip Placement and Display
 
-Status: drafted
+Status: review
 
 ## Story
 
@@ -20,76 +20,76 @@ So that I can arrange my video sequence.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create Timeline container component (AC: #1)
-  - [ ] Create `Timeline.tsx` in `src/renderer/components/Timeline/`
-  - [ ] Render as fixed-height horizontal strip at bottom of layout
-  - [ ] Style with Tailwind: dark background, border-top
-  - [ ] Subscribe to `timelineStore.clips` and `timelineStore.tracks`
-  - [ ] Integrate into MainLayout component
+- [x] Task 1: Create Timeline container component (AC: #1)
+  - [x] Create `Timeline.tsx` in `src/renderer/components/Timeline/`
+  - [x] Render as fixed-height horizontal strip at bottom of layout
+  - [x] Style with Tailwind: dark background, border-top
+  - [x] Subscribe to `timelineStore.clips` and `timelineStore.tracks`
+  - [x] Integrate into MainLayout component
 
-- [ ] Task 2: Create timeline data store (AC: #5, #7)
-  - [ ] Create `timelineStore.ts` in `src/renderer/store/`
-  - [ ] Define `Clip` and `Track` interfaces (see Data Model below)
-  - [ ] Implement actions: `addClip`, `removeClip`, `updateClip`, `setPlayhead`
-  - [ ] Initialize with single track (Track 1) and playhead at 0
-  - [ ] Export store hook: `useTimelineStore`
+- [x] Task 2: Create timeline data store (AC: #5, #7)
+  - [x] Create `timelineStore.ts` in `src/renderer/store/`
+  - [x] Define `Clip` and `Track` interfaces (see Data Model below)
+  - [x] Implement actions: `addClip`, `removeClip`, `updateClip`, `setPlayhead`
+  - [x] Initialize with single track (Track 1) and playhead at 0
+  - [x] Export store hook: `useTimelineStore`
 
-- [ ] Task 3: Implement drop zone for timeline (AC: #2)
-  - [ ] Add `onDragOver` and `onDrop` handlers to Timeline component
-  - [ ] Extract file ID from `event.dataTransfer.getData('fileId')`
-  - [ ] Look up full `MediaFile` from `mediaStore` using file ID
-  - [ ] Calculate drop position on timeline based on mouse X coordinate
-  - [ ] Call `timelineStore.addClip()` with clip data
+- [x] Task 3: Implement drop zone for timeline (AC: #2)
+  - [x] Add `onDragOver` and `onDrop` handlers to Timeline component
+  - [x] Extract file ID from `event.dataTransfer.getData('fileId')`
+  - [x] Look up full `MediaFile` from `mediaStore` using file ID
+  - [x] Calculate drop position on timeline based on mouse X coordinate
+  - [x] Call `timelineStore.addClip()` with clip data
 
-- [ ] Task 4: Create TimelineClip component (AC: #3, #4)
-  - [ ] Create `TimelineClip.tsx` in `src/renderer/components/Timeline/`
-  - [ ] Display clip thumbnail strip (multiple frames or single thumbnail)
-  - [ ] Display clip duration using `formatTime()` utility
-  - [ ] Position based on `clip.startTime` (pixels from left)
-  - [ ] Width based on `clip.duration` scaled by zoom level
-  - [ ] Style with Tailwind: rounded, border, hover effect
+- [x] Task 4: Create TimelineClip component (AC: #3, #4)
+  - [x] Create `TimelineClip.tsx` in `src/renderer/components/Timeline/`
+  - [x] Display clip thumbnail strip (multiple frames or single thumbnail)
+  - [x] Display clip duration using `formatTime()` utility
+  - [x] Position based on `clip.startTime` (pixels from left)
+  - [x] Width based on `clip.duration` scaled by zoom level
+  - [x] Style with Tailwind: rounded, border, hover effect
 
-- [ ] Task 5: Create timeline ruler with time markers (AC: #4)
-  - [ ] Create `TimelineRuler.tsx` component
-  - [ ] Render horizontal ruler above track with time labels
-  - [ ] Display markers at regular intervals (0:00, 0:10, 0:20, etc.)
-  - [ ] Sync ruler scale with timeline zoom level
-  - [ ] Style with monospace font for time labels
+- [x] Task 5: Create timeline ruler with time markers (AC: #4)
+  - [x] Create `TimelineRuler.tsx` component
+  - [x] Render horizontal ruler above track with time labels
+  - [x] Display markers at regular intervals (0:00, 0:10, 0:20, etc.)
+  - [x] Sync ruler scale with timeline zoom level
+  - [x] Style with monospace font for time labels
 
-- [ ] Task 6: Create Playhead component (AC: #7)
-  - [ ] Create `Playhead.tsx` component
-  - [ ] Render vertical line indicator at `timelineStore.playheadPosition`
-  - [ ] Position using CSS transform based on playhead time and zoom
-  - [ ] Style with distinct color (cyan or red) and full-height
-  - [ ] Initially positioned at 0:00 (left edge)
+- [x] Task 6: Create Playhead component (AC: #7)
+  - [x] Create `Playhead.tsx` component
+  - [x] Render vertical line indicator at `timelineStore.playheadPosition`
+  - [x] Position using CSS transform based on playhead time and zoom
+  - [x] Style with distinct color (cyan or red) and full-height
+  - [x] Initially positioned at 0:00 (left edge)
 
-- [ ] Task 7: Implement auto-zoom to fit clips (AC: #6)
-  - [ ] Calculate total timeline duration from all clips
-  - [ ] Compute zoom scale: `timelineWidth / totalDuration`
-  - [ ] Apply zoom to clip widths and ruler scale
-  - [ ] Ensure minimum zoom level (clips not too narrow)
-  - [ ] Will be refined in Story 4.2 (manual zoom controls)
+- [x] Task 7: Implement auto-zoom to fit clips (AC: #6)
+  - [x] Calculate total timeline duration from all clips
+  - [x] Compute zoom scale: `timelineWidth / totalDuration`
+  - [x] Apply zoom to clip widths and ruler scale
+  - [x] Ensure minimum zoom level (clips not too narrow)
+  - [x] Will be refined in Story 4.2 (manual zoom controls)
 
-- [ ] Task 8: Handle sequential clip placement (AC: #5)
-  - [ ] When adding clip, calculate next available position
-  - [ ] If timeline empty, place at 0:00
-  - [ ] If clips exist, place after last clip (end of last clip's duration)
-  - [ ] Update `clip.startTime` to sequential position
-  - [ ] Prevent clip overlap (will be relaxed in multi-track Story 4.1)
+- [x] Task 8: Handle sequential clip placement (AC: #5)
+  - [x] When adding clip, calculate next available position
+  - [x] If timeline empty, place at 0:00
+  - [x] If clips exist, place after last clip (end of last clip's duration)
+  - [x] Update `clip.startTime` to sequential position
+  - [x] Prevent clip overlap (will be relaxed in multi-track Story 4.1)
 
-- [ ] Task 9: Create TimelineTrack component (AC: #1)
-  - [ ] Create `TimelineTrack.tsx` component
-  - [ ] Render track container with clips positioned inside
-  - [ ] Handle track-specific drop events
-  - [ ] Display track label ("Track 1") on left side
-  - [ ] Style with border, fixed height (e.g., 80px)
+- [x] Task 9: Create TimelineTrack component (AC: #1)
+  - [x] Create `TimelineTrack.tsx` component
+  - [x] Render track container with clips positioned inside
+  - [x] Handle track-specific drop events
+  - [x] Display track label ("Track 1") on left side
+  - [x] Style with border, fixed height (e.g., 80px)
 
-- [ ] Task 10: Write unit tests
-  - [ ] Test Timeline component renders tracks and clips
-  - [ ] Test timelineStore.addClip() updates state correctly
-  - [ ] Test clip positioning based on startTime and duration
-  - [ ] Test auto-zoom calculation with various clip counts
-  - [ ] Test sequential placement logic prevents overlap
+- [x] Task 10: Write unit tests
+  - [x] Test Timeline component renders tracks and clips
+  - [x] Test timelineStore.addClip() updates state correctly
+  - [x] Test clip positioning based on startTime and duration
+  - [x] Test auto-zoom calculation with various clip counts
+  - [x] Test sequential placement logic prevents overlap
 
 ## Dev Notes
 
@@ -268,14 +268,84 @@ Timeline
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- `docs/stories/2-4-timeline-clip-placement-and-display.context.xml` (Generated: 2025-10-27)
 
 ### Agent Model Used
 
 Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 
+### Debug Log
+
+**Implementation Plan (2025-10-27):**
+Logical task order to minimize dependencies:
+1. Create timeline.types.ts + timelineStore.ts (foundation - Task 2)
+2. Create sub-components: TimelineClip, TimelineRuler, Playhead, TimelineTrack (Tasks 4,5,6,9)
+3. Create Timeline container + integrate into MainLayout (Task 1)
+4. Add drop zone, sequential placement, auto-zoom logic (Tasks 3,8,7)
+5. Write comprehensive unit tests (Task 10)
+
 ### Debug Log References
 
 ### Completion Notes List
 
+**2025-10-27 - Story Implementation Complete**
+
+Successfully implemented full timeline clip placement and display functionality covering all 7 acceptance criteria:
+
+**Components Created:**
+- `Timeline.tsx` - Main container with drag-drop, auto-zoom, and sequential placement
+- `TimelineClip.tsx` - Clip display with positioning and duration labels
+- `TimelineRuler.tsx` - Time markers with dynamic interval calculation
+- `Playhead.tsx` - Playhead indicator using GPU-accelerated CSS transforms
+- `TimelineTrack.tsx` - Track container with clip management
+- `timeline.types.ts` - Type definitions for Clip, Track, and TimelineState
+- `index.ts` - Component exports
+
+**State Management:**
+- `timelineStore.ts` - Zustand store with addClip, removeClip, updateClip, setPlayhead, selectClip actions
+- Auto-zoom implementation with MIN/MAX bounds (10-100 px/s)
+- Total duration calculation from clip positions
+- Sequential clip placement logic
+
+**Testing:**
+- 15 tests for timelineStore covering all actions
+- 51 tests for Timeline components (Timeline, Clip, Ruler, Playhead, Track)
+- All 174 renderer tests + 31 main tests passing (205 total)
+
+**Integration:**
+- Timeline integrated into MainLayout replacing placeholder
+- Path alias `@/` configured in vitest.config.ts and electron.vite.config.ts
+- Fixed existing App.test.tsx and MainLayout.test.tsx to expect Timeline component
+
+**Technical Approach:**
+- Used CSS positioning (left/width) with zoom scaling per architecture
+- Functional programming pattern throughout (no classes)
+- GPU-accelerated playhead movement via CSS transform
+- ResizeObserver for responsive auto-zoom
+
+All acceptance criteria met, all tests passing, ready for review.
+
 ### File List
+
+**New Files:**
+- `src/renderer/src/components/Timeline/Timeline.tsx`
+- `src/renderer/src/components/Timeline/TimelineClip.tsx`
+- `src/renderer/src/components/Timeline/TimelineRuler.tsx`
+- `src/renderer/src/components/Timeline/Playhead.tsx`
+- `src/renderer/src/components/Timeline/TimelineTrack.tsx`
+- `src/renderer/src/components/Timeline/timeline.types.ts`
+- `src/renderer/src/components/Timeline/index.ts`
+- `src/renderer/src/store/timelineStore.ts`
+- `src/renderer/src/store/__tests__/timelineStore.test.ts`
+- `src/renderer/src/components/Timeline/__tests__/Timeline.test.tsx`
+- `src/renderer/src/components/Timeline/__tests__/TimelineClip.test.tsx`
+- `src/renderer/src/components/Timeline/__tests__/TimelineRuler.test.tsx`
+- `src/renderer/src/components/Timeline/__tests__/Playhead.test.tsx`
+- `src/renderer/src/components/Timeline/__tests__/TimelineTrack.test.tsx`
+
+**Modified Files:**
+- `src/renderer/src/components/Layout/MainLayout.tsx` - Integrated Timeline component
+- `vitest.config.ts` - Added `@/` path alias for tests
+- `electron.vite.config.ts` - Added `@/` path alias for runtime
+- `src/renderer/src/__tests__/App.test.tsx` - Updated to expect Timeline component
+- `src/renderer/src/components/Layout/__tests__/MainLayout.test.tsx` - Updated to expect Timeline component

@@ -18,8 +18,8 @@ describe('MainLayout', () => {
     // Preview area should be rendered
     expect(screen.getByText('Preview')).toBeInTheDocument()
 
-    // Timeline area should be rendered
-    expect(screen.getByText('Timeline')).toBeInTheDocument()
+    // Timeline area should be rendered (with Track 1 label)
+    expect(screen.getByText('Track 1')).toBeInTheDocument()
   })
 
   it('applies correct layout structure', () => {

@@ -9,6 +9,7 @@ import type { MediaFile } from '../../../shared/types'
 interface MediaStoreState {
   files: MediaFile[]
   isImporting: boolean
+  selectedFileId: string | null
 }
 
 interface MediaStoreActions {
@@ -17,6 +18,7 @@ interface MediaStoreActions {
   removeFile: (id: string) => void
   clearFiles: () => void
   setIsImporting: (isImporting: boolean) => void
+  selectFile: (id: string | null) => void
 }
 
 type MediaStore = MediaStoreState & MediaStoreActions
@@ -29,6 +31,7 @@ export const useMediaStore = create<MediaStore>((set) => ({
   // State
   files: [],
   isImporting: false,
+  selectedFileId: null,
 
   // Actions
   addFile: (file) =>
@@ -54,5 +57,10 @@ export const useMediaStore = create<MediaStore>((set) => ({
   setIsImporting: (isImporting) =>
     set({
       isImporting
+    }),
+
+  selectFile: (id) =>
+    set({
+      selectedFileId: id
     })
 }))

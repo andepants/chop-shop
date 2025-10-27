@@ -7,6 +7,7 @@
  */
 import { TopBar } from './TopBar'
 import { Sidebar } from './Sidebar'
+import { Timeline } from '@/components/Timeline'
 
 /**
  * Main layout container for the application
@@ -31,8 +32,8 @@ export function MainLayout(): React.JSX.Element {
           </div>
 
           {/* Timeline Area (40% height) */}
-          <div className="flex-[2] bg-zinc-800 flex items-center justify-center">
-            <div className="text-zinc-400 text-lg">Timeline</div>
+          <div className="flex-[2] overflow-hidden">
+            <Timeline />
           </div>
         </div>
       </div>

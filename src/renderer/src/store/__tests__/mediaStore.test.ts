@@ -10,7 +10,7 @@ import type { MediaFile } from '../../../../shared/types'
 describe('mediaStore', () => {
   beforeEach(() => {
     // Reset store state before each test
-    useMediaStore.setState({ files: [], isImporting: false })
+    useMediaStore.setState({ files: [], isImporting: false, selectedFileId: null })
   })
 
   const mockMediaFile: MediaFile = {
@@ -28,6 +28,7 @@ describe('mediaStore', () => {
     const state = useMediaStore.getState()
     expect(state.files).toEqual([])
     expect(state.isImporting).toBe(false)
+    expect(state.selectedFileId).toBe(null)
   })
 
   it('adds a file to the store (AC: #4)', () => {
@@ -115,5 +116,24 @@ describe('mediaStore', () => {
     expect(stored.resolution.height).toBe(2160)
     expect(stored.size).toBe(5242880)
     expect(stored.thumbnail).toBe('data:image/png;base64,abc123')
+  })
+
+  it('selects a file by id (AC: #3)', () => {
+    const { selectFile } = useMediaStore.getState()
+
+    selectFile('123')
+
+    const state = useMediaStore.getState()
+    expect(state.selectedFileId).toBe('123')
+  })
+
+  it('deselects file when null is passed (AC: #3)', () => {
+    const { selectFile } = useMediaStore.getState()
+
+    selectFile('123')
+    expect(useMediaStore.getState().selectedFileId).toBe('123')
+
+    selectFile(null)
+    expect(useMediaStore.getState().selectedFileId).toBe(null)
   })
 })

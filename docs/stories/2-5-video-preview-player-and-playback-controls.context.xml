@@ -1,0 +1,238 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>5</storyId>
+    <title>Video Preview Player and Playback Controls</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-5-video-preview-player-and-playback-controls.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a content creator</asA>
+    <iWant>to play timeline content in the preview window</iWant>
+    <soThat>I can review my video sequence</soThat>
+    <tasks>
+      - Task 1: Create PreviewPlayer component (AC: #1)
+        - Create `PreviewPlayer.tsx` in `src/renderer/components/Preview/`
+        - Render HTML5 `<video>` element in center preview area
+        - Style with Tailwind: full width/height of container, black background
+        - Subscribe to `playbackStore` for current clip and playhead state
+        - Integrate into MainLayout component
+
+      - Task 2: Create playback state store (AC: #2, #3, #4)
+        - Create `playbackStore.ts` in `src/renderer/store/`
+        - Track: `currentClipId`, `isPlaying`, `currentTime`, `duration`
+        - Implement actions: `play()`, `pause()`, `seek(time)`, `loadClip(clipId)`
+        - Sync with `timelineStore.playheadPosition` on time updates
+        - Export store hook: `usePlaybackStore`
+
+      - Task 3: Implement clip loading on timeline click (AC: #2)
+        - Add click handler to `TimelineClip` component
+        - Call `playbackStore.loadClip(clip.id)` on click
+        - Look up clip source file from `timelineStore`
+        - Set video element `src` to file path using `file://` protocol
+        - Set initial `currentTime` based on clip's `trimIn` offset
+
+      - Task 4: Create PlaybackControls component (AC: #3, #5)
+        - Create `PlaybackControls.tsx` in `src/renderer/components/Preview/`
+        - Render play/pause button (toggle icon based on `isPlaying`)
+        - Display current time: `formatTime(currentTime)`
+        - Display total duration: `formatTime(duration)`
+        - Style with Tailwind: centered below video, dark toolbar
+        - Position at bottom of preview area
+
+      - Task 5: Implement play/pause functionality (AC: #3, #7)
+        - Handle play button click → call `playbackStore.play()`
+        - In store action: call `videoElement.play()` and set `isPlaying = true`
+        - Handle pause button click → call `playbackStore.pause()`
+        - In store action: call `videoElement.pause()` and set `isPlaying = false`
+        - Ensure audio plays with video (HTML5 default behavior)
+
+      - Task 6: Synchronize playhead with video playback (AC: #4)
+        - Listen to video element's `timeupdate` event
+        - Update `playbackStore.currentTime` from `video.currentTime`
+        - Update `timelineStore.playheadPosition` based on current clip position
+        - Calculate: `playheadPosition = clip.startTime + (currentTime - trimIn)`
+        - Use `requestAnimationFrame` for smooth playhead movement
+
+      - Task 7: Implement timeline seeking (AC: #6)
+        - Add click handler to `TimelineTrack` component
+        - Calculate clicked time based on mouse X position and zoom level
+        - Call `playbackStore.seek(clickedTime)`
+        - Find clip at that timeline position
+        - Load clip if different from current, seek to offset within clip
+        - Update video element: `video.currentTime = offset`
+
+      - Task 8: Handle playback across multiple clips (AC: #4)
+        - When current clip ends, check for next clip on timeline
+        - If next clip exists, load it and continue playback
+        - If no next clip, stop playback and reset playhead
+        - Listen to video `ended` event to trigger transition
+
+      - Task 9: Handle video loading states (AC: #1)
+        - Show loading spinner while video loads
+        - Listen to `loadedmetadata` event to hide spinner
+        - Handle `error` event with user-friendly message
+        - Display "No clip selected" when timeline is empty
+
+      - Task 10: Write unit tests
+        - Test PreviewPlayer renders video element
+        - Test playbackStore.play() and pause() update state
+        - Test playhead synchronization logic
+        - Test seek functionality calculates correct time and clip
+        - Test multi-clip playback transitions
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. HTML5 video player renders in center preview area
+    2. Clicking timeline clip loads it in preview player
+    3. Play/pause button controls playback
+    4. Playhead moves along timeline synchronized with playback
+    5. Preview displays current time and total duration
+    6. Seeking on timeline updates preview to that timestamp
+    7. Audio plays synchronized with video during playback
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Functional Requirements - Video Preview and Playback</section>
+        <snippet>FR006: Application shall display video preview with HTML5 video player supporting play/pause controls. FR007: Application shall synchronize playhead position between timeline and preview player. FR008: Application shall support timeline scrubbing with real-time preview updates.</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Non-Functional Requirements - NFR003</section>
+        <snippet>NFR003 Usability: Preview playback shall maintain smooth 30fps minimum frame rate with synchronized audio</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Document</title>
+        <section>Technology Stack - HTML5 Video API</section>
+        <snippet>HTML5 video for main track (hardware accelerated), Canvas compositing only for multi-track (PiP), RequestAnimationFrame for smooth playhead updates</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Document</title>
+        <section>ADR-004: HTML5 Video + Canvas for Preview</section>
+        <snippet>Decision: Use HTML5 video for single track, Canvas for multi-track compositing. Rationale: Native performance, hardware accelerated, meets NFR requirements for 30fps playback</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/2-4-timeline-clip-placement-and-display.md</path>
+        <title>Related Story - Timeline Integration</title>
+        <section>Timeline Store and Playhead Management</section>
+        <snippet>Timeline renders horizontal track with clips, playhead indicator, and timeline ruler. TimelineStore manages clips, tracks, and playhead position using Zustand.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/renderer/src/store/mediaStore.ts</path>
+        <kind>store</kind>
+        <symbol>useMediaStore, MediaStoreState, MediaStoreActions</symbol>
+        <lines>1-67</lines>
+        <reason>Demonstrates Zustand store pattern to follow for playbackStore. Provides MediaFile interface for looking up clip source files.</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/components/Layout/MainLayout.tsx</path>
+        <kind>component</kind>
+        <symbol>MainLayout</symbol>
+        <lines>29-30</lines>
+        <reason>Preview component integration point - replace placeholder div at line 29-30 with PreviewPlayer component</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/utils/formatTime.util.ts</path>
+        <kind>utility</kind>
+        <symbol>formatTime</symbol>
+        <lines>11-23</lines>
+        <reason>Utility function for displaying playback time and duration in PlaybackControls component</reason>
+      </artifact>
+      <artifact>
+        <path>src/shared/types.ts</path>
+        <kind>types</kind>
+        <symbol>MediaFile</symbol>
+        <lines>35-48</lines>
+        <reason>Defines MediaFile interface with path, duration, resolution fields needed for video playback</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="zustand" version="^4.x">State management - existing pattern used in mediaStore</package>
+        <package name="react" version="^18.x">Core framework</package>
+        <package name="typescript" version="^5.x">Type safety</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Must use Zustand for playbackStore (consistent with existing mediaStore pattern)
+    - Must use HTML5 video element for playback (ADR-004, hardware accelerated)
+    - Must maintain 30fps playback performance (NFR003)
+    - Must use Tailwind CSS for all styling (project standard)
+    - Must use TypeScript with proper type definitions
+    - Must follow existing project structure: components in src/renderer/src/components/, stores in src/renderer/src/store/
+    - File paths must use file:// protocol for local video files in Electron
+    - Video element should leverage hardware acceleration (HTML5 default)
+    - State updates should be minimal to avoid performance overhead
+    - Must integrate with MainLayout at line 29-30 (Preview area placeholder)
+    - Must follow functional component pattern (no classes)
+    - Functions must have JSDoc/TSDoc comments
+    - Files should not exceed 500 lines
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>PlaybackStore (to be created)</name>
+      <kind>Zustand store</kind>
+      <signature>interface PlaybackState { currentClipId: string | null; isPlaying: boolean; currentTime: number; duration: number; videoElement: HTMLVideoElement | null }</signature>
+      <path>src/renderer/src/store/playbackStore.ts</path>
+    </interface>
+    <interface>
+      <name>PreviewPlayer Component (to be created)</name>
+      <kind>React functional component</kind>
+      <signature>export function PreviewPlayer(): React.JSX.Element</signature>
+      <path>src/renderer/src/components/Preview/PreviewPlayer.tsx</path>
+    </interface>
+    <interface>
+      <name>PlaybackControls Component (to be created)</name>
+      <kind>React functional component</kind>
+      <signature>export function PlaybackControls(): React.JSX.Element</signature>
+      <path>src/renderer/src/components/Preview/PlaybackControls.tsx</path>
+    </interface>
+    <interface>
+      <name>formatTime utility (existing)</name>
+      <kind>Utility function</kind>
+      <signature>function formatTime(seconds: number): string</signature>
+      <path>src/renderer/src/utils/formatTime.util.ts</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Project uses Vitest (not Jest) for unit testing. Store tests use direct state access via getState() and setState() for setup/assertions. Component tests use React Testing Library. All tests reference acceptance criteria with "(AC: #n)" in descriptions. Test files are co-located in __tests__ directories alongside source code. Tests follow describe/it structure with clear test names and mock data patterns.
+    </standards>
+    <locations>
+      - src/renderer/src/store/__tests__/ (store tests)
+      - src/renderer/src/components/Preview/__tests__/ (new component tests)
+      - src/renderer/src/utils/__tests__/ (utility tests, if needed)
+    </locations>
+    <ideas>
+      <test ac="1">Test PreviewPlayer renders HTML5 video element with correct className and attributes</test>
+      <test ac="1">Test PreviewPlayer displays loading state when video is loading</test>
+      <test ac="1">Test PreviewPlayer displays "No clip selected" message when no clip loaded</test>
+      <test ac="2">Test playbackStore.loadClip() updates currentClipId and sets video src to file:// path</test>
+      <test ac="3">Test playbackStore.play() sets isPlaying to true</test>
+      <test ac="3">Test playbackStore.pause() sets isPlaying to false</test>
+      <test ac="3">Test PlaybackControls renders play button when paused, pause button when playing</test>
+      <test ac="4">Test playhead synchronization: currentTime update triggers playheadPosition calculation</test>
+      <test ac="4">Test playhead calculation: playheadPosition = clip.startTime + (currentTime - trimIn)</test>
+      <test ac="5">Test PlaybackControls displays formatted currentTime and duration using formatTime()</test>
+      <test ac="6">Test seek() calculates correct clip and offset from timeline position</test>
+      <test ac="6">Test seek() updates video.currentTime to correct offset within clip</test>
+      <test ac="7">Test multi-clip transition: when current clip ends, next clip loads and plays</test>
+      <test ac="7">Test end-of-timeline behavior: last clip ends, playback stops, playhead resets</test>
+    </ideas>
+  </tests>
+</story-context>

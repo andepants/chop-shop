@@ -8,9 +8,16 @@ import { promisify } from 'util'
 import { access, stat } from 'fs/promises'
 import { constants } from 'fs'
 import path from 'path'
+import ffprobeStatic from 'ffprobe-static'
 import type { VideoMetadata } from '../../shared/types'
+import { MAX_FILE_SIZE } from '../../shared/constants'
 
 const execAsync = promisify(exec)
+
+/**
+ * Path to bundled ffprobe binary
+ */
+const ffprobePath = ffprobeStatic.path
 
 /**
  * Validate video file and extract metadata using FFprobe
@@ -30,9 +37,18 @@ export async function validateVideoFile(filePath: string): Promise<VideoMetadata
   const stats = await stat(filePath)
   const size = stats.size
 
+  // Check file size limit (2GB)
+  if (size > MAX_FILE_SIZE) {
+    const sizeMB = Math.round(size / (1024 * 1024))
+    const maxSizeMB = Math.round(MAX_FILE_SIZE / (1024 * 1024))
+    throw new Error(
+      `File too large (${sizeMB}MB). Maximum supported size is ${maxSizeMB}MB.`
+    )
+  }
+
   // Use FFprobe to extract video metadata
   try {
-    const command = `ffprobe -v quiet -print_format json -show_format -show_streams "${filePath}"`
+    const command = `"${ffprobePath}" -v quiet -print_format json -show_format -show_streams "${filePath}"`
     const { stdout } = await execAsync(command)
     const data = JSON.parse(stdout)
 

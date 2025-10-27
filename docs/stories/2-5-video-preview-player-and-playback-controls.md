@@ -1,6 +1,6 @@
 # Story 2.5: Video Preview Player and Playback Controls
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -322,7 +322,7 @@ PreviewPlayer
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/stories/2-5-video-preview-player-and-playback-controls.context.xml
 
 ### Agent Model Used
 

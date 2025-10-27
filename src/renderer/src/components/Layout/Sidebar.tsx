@@ -3,7 +3,7 @@
  * Left sidebar panel for media library
  */
 
-import { ImportZone } from '../MediaLibrary'
+import { ImportZone, MediaLibrary } from '../MediaLibrary'
 import { useMediaStore } from '../../store/mediaStore'
 import { useUIStore } from '../../store/uiStore'
 
@@ -87,6 +87,7 @@ export function Sidebar(): React.JSX.Element {
         </div>
         <ImportZone />
       </div>
+      <MediaLibrary />
     </aside>
   )
 }

@@ -30,7 +30,8 @@ describe('App Component', () => {
 
   it('renders Timeline area', () => {
     render(<App />)
-    expect(screen.getByText('Timeline')).toBeInTheDocument()
+    // Timeline component renders with Track 1 label
+    expect(screen.getByText('Track 1')).toBeInTheDocument()
   })
 
   it('renders Export button', () => {

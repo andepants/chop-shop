@@ -1,6 +1,6 @@
 # Story 2.3: Media Library Display
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -19,59 +19,59 @@ So that I can manage and select clips for my timeline.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create MediaLibrary container component (AC: #1, #5)
-  - [ ] Create `MediaLibrary.tsx` in `src/renderer/components/MediaLibrary/`
-  - [ ] Subscribe to `mediaStore.files` for list of imported files
-  - [ ] Render scrollable container with overflow-y-auto
-  - [ ] Map over files array to render individual MediaItem components
-  - [ ] Style with Tailwind: dark background, full height
+- [x] Task 1: Create MediaLibrary container component (AC: #1, #5)
+  - [x] Create `MediaLibrary.tsx` in `src/renderer/components/MediaLibrary/`
+  - [x] Subscribe to `mediaStore.files` for list of imported files
+  - [x] Render scrollable container with overflow-y-auto
+  - [x] Map over files array to render individual MediaItem components
+  - [x] Style with Tailwind: dark background, full height
 
-- [ ] Task 2: Create MediaItem component (AC: #1, #2, #6)
-  - [ ] Create `MediaItem.tsx` in `src/renderer/components/MediaLibrary/`
-  - [ ] Display thumbnail image (from `MediaFile.thumbnail`)
-  - [ ] Display filename (truncate if too long)
-  - [ ] Display duration using `formatTime()` utility
-  - [ ] Display resolution (e.g., "1920x1080") and file size (e.g., "45.2 MB")
-  - [ ] Style with Tailwind: card layout, padding, hover state
+- [x] Task 2: Create MediaItem component (AC: #1, #2, #6)
+  - [x] Create `MediaItem.tsx` in `src/renderer/components/MediaLibrary/`
+  - [x] Display thumbnail image (from `MediaFile.thumbnail`)
+  - [x] Display filename (truncate if too long)
+  - [x] Display duration using `formatTime()` utility
+  - [x] Display resolution (e.g., "1920x1080") and file size (e.g., "45.2 MB")
+  - [x] Style with Tailwind: card layout, padding, hover state
 
-- [ ] Task 3: Implement clip selection (AC: #3)
-  - [ ] Add `selectedFileId` state to `mediaStore`
-  - [ ] Add `selectFile(id: string)` action to `mediaStore`
-  - [ ] Handle click on MediaItem → call `selectFile(item.id)`
-  - [ ] Apply visual highlight with `ring-2 ring-cyan-500` when selected
-  - [ ] Clicking background deselects (sets `selectedFileId = null`)
+- [x] Task 3: Implement clip selection (AC: #3)
+  - [x] Add `selectedFileId` state to `mediaStore`
+  - [x] Add `selectFile(id: string)` action to `mediaStore`
+  - [x] Handle click on MediaItem → call `selectFile(item.id)`
+  - [x] Apply visual highlight with `ring-2 ring-cyan-500` when selected
+  - [x] Clicking background deselects (sets `selectedFileId = null`)
 
-- [ ] Task 4: Enable drag from library to timeline (AC: #4)
-  - [ ] Add `draggable="true"` to MediaItem component
-  - [ ] Implement `onDragStart` handler → set `DataTransfer` with file metadata
-  - [ ] Store dragged file ID in `event.dataTransfer.setData('fileId', id)`
-  - [ ] Add ghost image during drag (optional, use default browser behavior)
-  - [ ] Will integrate with Timeline drop handler in Story 2.4
+- [x] Task 4: Enable drag from library to timeline (AC: #4)
+  - [x] Add `draggable="true"` to MediaItem component
+  - [x] Implement `onDragStart` handler → set `DataTransfer` with file metadata
+  - [x] Store dragged file ID in `event.dataTransfer.setData('fileId', id)`
+  - [x] Add ghost image during drag (optional, use default browser behavior)
+  - [x] Will integrate with Timeline drop handler in Story 2.4
 
-- [ ] Task 5: Format file size for display (AC: #6)
-  - [ ] Create `formatFileSize()` utility in `src/renderer/utils/`
-  - [ ] Convert bytes to KB, MB, GB with appropriate precision
-  - [ ] Example: `45234567 → "43.1 MB"`
-  - [ ] Export from utils/index.ts
+- [x] Task 5: Format file size for display (AC: #6)
+  - [x] Create `formatFileSize()` utility in `src/renderer/utils/`
+  - [x] Convert bytes to KB, MB, GB with appropriate precision
+  - [x] Example: `45234567 → "43.1 MB"`
+  - [x] Export from utils/index.ts
 
-- [ ] Task 6: Handle empty library state (AC: #1)
-  - [ ] When `mediaStore.files` is empty, show placeholder message
-  - [ ] Display: "No media imported yet. Drag files or click Import to begin."
-  - [ ] Center message in library panel
-  - [ ] Style with muted text color
+- [x] Task 6: Handle empty library state (AC: #1)
+  - [x] When `mediaStore.files` is empty, show placeholder message
+  - [x] Display: "No media imported yet. Drag files or click Import to begin."
+  - [x] Center message in library panel
+  - [x] Style with muted text color
 
-- [ ] Task 7: Integrate MediaLibrary into Sidebar (AC: #1, #5)
-  - [ ] Update `Sidebar.tsx` to include `<MediaLibrary />` component
-  - [ ] Position below ImportZone and Import button
-  - [ ] Allocate remaining vertical space (flex-grow)
-  - [ ] Ensure scrolling works when many items present
+- [x] Task 7: Integrate MediaLibrary into Sidebar (AC: #1, #5)
+  - [x] Update `Sidebar.tsx` to include `<MediaLibrary />` component
+  - [x] Position below ImportZone and Import button
+  - [x] Allocate remaining vertical space (flex-grow)
+  - [x] Ensure scrolling works when many items present
 
-- [ ] Task 8: Write unit tests
-  - [ ] Test MediaLibrary renders list of files from store
-  - [ ] Test MediaItem displays all metadata correctly
-  - [ ] Test clip selection updates state and visual highlight
-  - [ ] Test formatFileSize utility with various input sizes
-  - [ ] Test empty state displays placeholder message
+- [x] Task 8: Write unit tests
+  - [x] Test MediaLibrary renders list of files from store
+  - [x] Test MediaItem displays all metadata correctly
+  - [x] Test clip selection updates state and visual highlight
+  - [x] Test formatFileSize utility with various input sizes
+  - [x] Test empty state displays placeholder message
 
 ## Dev Notes
 
@@ -260,4 +260,51 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 
 ### Completion Notes List
 
+**2025-10-27: Story completed successfully**
+
+Implemented all media library display components with comprehensive testing:
+
+1. **Component Architecture**: Created modular MediaLibrary system with separate MediaLibrary container, MediaItem display component, and EmptyState placeholder following functional programming patterns (no classes)
+
+2. **State Management**: Extended mediaStore with `selectedFileId` state and `selectFile` action for clip selection, maintaining single source of truth in Zustand store
+
+3. **Utilities**: Created `formatFileSize` (bytes → KB/MB/GB) and `formatTime` (seconds → MM:SS/HH:MM:SS) utilities with comprehensive unit test coverage
+
+4. **User Interaction**: Implemented click-to-select with visual highlight (cyan ring), background click deselection, and HTML5 drag-and-drop for timeline integration
+
+5. **Testing**: Achieved 100% test pass rate (108/108 renderer tests, 22/22 main tests) with comprehensive coverage:
+   - MediaLibrary: empty state, file listing, scrolling behavior
+   - MediaItem: metadata display (thumbnail, filename, duration, resolution, size), selection highlighting, drag capability
+   - EmptyState: placeholder message and styling
+   - Utilities: formatFileSize (B/KB/MB/GB), formatTime (negative/seconds/minutes/hours)
+   - Store: selection state management
+
+6. **Technical Decisions**:
+   - Used `overflow-y-auto` with `scroll-smooth` for optimal scrolling UX
+   - Background click deselection prevents accidental selections
+   - DataTransfer stores fileId for timeline drop handling
+   - All components use Tailwind CSS (no separate CSS files)
+   - Maintained <500 line file size limit for AI compatibility
+
+All 6 acceptance criteria satisfied and validated with passing tests.
+
 ### File List
+
+**New Files:**
+- src/renderer/src/components/MediaLibrary/MediaLibrary.tsx
+- src/renderer/src/components/MediaLibrary/MediaItem.tsx
+- src/renderer/src/components/MediaLibrary/EmptyState.tsx
+- src/renderer/src/utils/formatFileSize.util.ts
+- src/renderer/src/utils/formatTime.util.ts
+- src/renderer/src/utils/index.ts
+- src/renderer/src/components/MediaLibrary/__tests__/MediaLibrary.test.tsx
+- src/renderer/src/components/MediaLibrary/__tests__/MediaItem.test.tsx
+- src/renderer/src/components/MediaLibrary/__tests__/EmptyState.test.tsx
+- src/renderer/src/utils/__tests__/formatFileSize.test.ts
+- src/renderer/src/utils/__tests__/formatTime.test.ts
+
+**Modified Files:**
+- src/renderer/src/store/mediaStore.ts (added selectedFileId state, selectFile action)
+- src/renderer/src/components/Layout/Sidebar.tsx (integrated MediaLibrary component)
+- src/renderer/src/components/MediaLibrary/index.ts (added barrel exports)
+- src/renderer/src/store/__tests__/mediaStore.test.ts (added selection tests)
