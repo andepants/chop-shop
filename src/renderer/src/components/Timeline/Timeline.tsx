@@ -11,6 +11,7 @@ import { useMediaStore } from '@/store/mediaStore'
 import { useTimelineStore } from '@/store/timelineStore'
 import { usePlaybackStore } from '@/store/playbackStore'
 import { useToolStore } from '@/store/toolStore'
+import { useUIStore } from '@/store/uiStore'
 import { TimelineRuler } from './TimelineRuler'
 import { TimelineTrack } from './TimelineTrack'
 import { Playhead } from './Playhead'
@@ -78,6 +79,7 @@ function calculateNextPosition(clips: Array<{ startTime: number; duration: numbe
 export function Timeline(): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(DEFAULT_WIDTH)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
   const { files } = useMediaStore()
   const {
@@ -87,7 +89,9 @@ export function Timeline(): React.JSX.Element {
     zoomLevel,
     selectedClipId,
     addClip,
-    selectClip
+    selectClip,
+    removeClip,
+    reorderClips
   } = useTimelineStore()
 
   // Measure container width for auto-zoom
@@ -113,20 +117,88 @@ export function Timeline(): React.JSX.Element {
   }, [totalDuration, containerWidth])
 
   /**
-   * Handle drag over - allow drop
+   * Handle drag over - allow drop and show drop indicator
    */
   function handleDragOver(e: React.DragEvent): void {
     e.preventDefault()
-    e.dataTransfer.dropEffect = 'copy'
+
+    // Check if this is a clip reorder drag (has clipIndex) or library drag (has fileId)
+    // Note: dataTransfer.types lowercases the keys
+    const isClipReorder = e.dataTransfer.types.includes('clipindex')
+
+    if (isClipReorder) {
+      // Clip reorder: calculate drop position
+      e.dataTransfer.dropEffect = 'move'
+      const dropIndex = calculateDropIndex(e)
+      setDragOverIndex(dropIndex)
+    } else {
+      // Library drag: use copy effect
+      e.dataTransfer.dropEffect = 'copy'
+      setDragOverIndex(null)
+    }
   }
 
   /**
-   * Handle drop - add clip to timeline
-   * Implements AC #2, #3, #5
+   * Handle drag leave - clear drop indicator
+   */
+  function handleDragLeave(): void {
+    setDragOverIndex(null)
+  }
+
+  /**
+   * Calculate drop index based on mouse position
+   */
+  function calculateDropIndex(e: React.DragEvent): number {
+    if (!containerRef.current) return 0
+
+    const rect = containerRef.current.getBoundingClientRect()
+    const relativeX = e.clientX - rect.left
+    const clickedTime = relativeX / zoomLevel
+
+    const clips = tracks[0]?.clips || []
+    if (clips.length === 0) return 0
+
+    // Find insertion point based on clicked time
+    for (let i = 0; i < clips.length; i++) {
+      const clip = clips[i]
+      const clipMidpoint = clip.startTime + (clip.duration - clip.trimIn - clip.trimOut) / 2
+
+      if (clickedTime < clipMidpoint) {
+        return i
+      }
+    }
+
+    // Default to end of timeline
+    return clips.length
+  }
+
+  /**
+   * Handle drop - add clip to timeline or reorder existing clip
+   * Implements AC #2, #3, #5 (library drag) and AC #3 (clip reorder)
    */
   function handleDrop(e: React.DragEvent): void {
     e.preventDefault()
 
+    // Check for clip reorder (Story 3.4)
+    const clipIndexStr = e.dataTransfer.getData('clipIndex')
+    if (clipIndexStr && clipIndexStr !== '') {
+      const sourceIndex = parseInt(clipIndexStr, 10)
+      const destIndex = dragOverIndex !== null ? dragOverIndex : sourceIndex
+
+      // Clear drag state
+      setDragOverIndex(null)
+
+      // Only reorder if indices differ
+      if (sourceIndex !== destIndex && !isNaN(sourceIndex)) {
+        reorderClips(sourceIndex, destIndex)
+      }
+      return
+    }
+
+    // Clear drag state for library drops
+    setDragOverIndex(null)
+
+    // Fallback to library drag (Story 2.4)
     const fileId = e.dataTransfer.getData('fileId')
     if (!fileId) return
 
@@ -169,6 +241,11 @@ export function Timeline(): React.JSX.Element {
         splitClip(clipId, playheadPosition)
         console.log(`[Timeline] Split clip ${clipId} at ${playheadPosition}s`)
       } else {
+        // Show user feedback when split fails
+        useUIStore.getState().showError(
+          'Position the playhead within the clip to split it.',
+          'Cannot Split Clip'
+        )
         console.warn('[Timeline] Playhead not within clip bounds for split operation')
       }
     } else {
@@ -180,7 +257,7 @@ export function Timeline(): React.JSX.Element {
 
   /**
    * Handle keyboard shortcuts
-   * - Delete/Backspace: Clear selection (Story 3.1)
+   * - Delete/Backspace: Delete selected clip (Story 3.3)
    * - Escape: Deselect clip (Story 3.1)
    * - V/B/C: Tool selection (Tool Selection System)
    */
@@ -199,17 +276,18 @@ export function Timeline(): React.JSX.Element {
         return
       }
 
-      // Clip selection shortcuts
+      // Clip manipulation shortcuts
       if (e.key === 'Escape') {
         selectClip(null)
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedClipId) {
-        selectClip(null)
+        e.preventDefault() // Prevent browser back navigation on Backspace
+        removeClip(selectedClipId)
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedClipId, selectClip])
+  }, [selectedClipId, selectClip, removeClip])
 
   /**
    * Handle timeline seeking (AC #6)
@@ -252,6 +330,7 @@ export function Timeline(): React.JSX.Element {
         borderColor: 'var(--border-subtle)'
       }}
       onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       {/* Ruler - AC #4 */}
@@ -268,6 +347,26 @@ export function Timeline(): React.JSX.Element {
       >
         {/* Playhead - AC #7 */}
         <Playhead position={playheadPosition} zoomLevel={zoomLevel} />
+
+        {/* Drop indicator - shows where clip will be inserted during drag */}
+        {dragOverIndex !== null && tracks[0]?.clips && (
+          <div
+            className="absolute h-full w-1 pointer-events-none z-10"
+            style={{
+              left: `${
+                dragOverIndex === 0
+                  ? 0
+                  : (tracks[0].clips[dragOverIndex - 1]?.startTime || 0) * zoomLevel +
+                    (tracks[0].clips[dragOverIndex - 1]?.duration -
+                      tracks[0].clips[dragOverIndex - 1]?.trimIn -
+                      tracks[0].clips[dragOverIndex - 1]?.trimOut || 0) *
+                      zoomLevel
+              }px`,
+              backgroundColor: 'var(--accent)',
+              opacity: 0.8
+            }}
+          />
+        )}
 
         {/* Tracks - AC #1 */}
         {tracks.map((track) => (

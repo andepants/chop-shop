@@ -78,10 +78,11 @@ export function TimelineTrack({
           />
         </div>
 
-        {track.clips.map((clip) => (
+        {track.clips.map((clip, index) => (
           <TimelineClip
             key={clip.id}
             clip={clip}
+            clipIndex={index}
             zoomLevel={zoomLevel}
             isSelected={clip.id === selectedClipId}
             onClick={() => onClipClick(clip.id)}

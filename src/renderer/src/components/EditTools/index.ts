@@ -4,3 +4,4 @@
  */
 
 export { TrimTool } from './TrimTool'
+export { DeleteTool } from './DeleteTool'

@@ -3,8 +3,9 @@
  * Handles video processing using FFmpeg static binaries
  */
 import { spawn, ChildProcess } from 'child_process'
-import { existsSync } from 'fs'
+import { existsSync, unlinkSync } from 'fs'
 import ffmpegStatic from 'ffmpeg-static'
+import type { Clip } from '../../renderer/src/components/Timeline/timeline.types'
 
 /**
  * FFmpeg error codes
@@ -231,6 +232,202 @@ export async function testExport(
     throw new FFmpegError(
       error instanceof Error ? error.message : 'Unknown error',
       FFmpegErrorCode.UNKNOWN_ERROR
+    )
+  }
+}
+
+/**
+ * Export resolution options
+ */
+export type ExportResolution = '720p' | '1080p' | 'source'
+
+/**
+ * Export options for timeline export
+ */
+export interface ExportOptions {
+  clips: Clip[]
+  resolution: ExportResolution
+  outputPath: string
+}
+
+/**
+ * Calculate total duration of all clips accounting for trim values
+ * @param clips - Array of timeline clips
+ * @returns Total duration in seconds
+ */
+function calculateTotalDuration(clips: Clip[]): number {
+  return clips.reduce((total, clip) => {
+    const trimmedDuration = clip.duration - clip.trimIn - clip.trimOut
+    return total + trimmedDuration
+  }, 0)
+}
+
+/**
+ * Build FFmpeg command for timeline export with concat and trim support
+ * @param clips - Array of timeline clips to export
+ * @param resolution - Target resolution (720p, 1080p, or source)
+ * @param outputPath - Absolute path for output MP4 file
+ * @returns FFmpeg command arguments array
+ */
+export function buildFFmpegCommand(
+  clips: Clip[],
+  resolution: ExportResolution,
+  outputPath: string
+): string[] {
+  const args: string[] = []
+
+  // Add input files with trim parameters
+  // Each input needs its own -ss and -t positioned correctly
+  clips.forEach((clip) => {
+    // Validate input file exists
+    if (!existsSync(clip.sourceFile)) {
+      throw new FFmpegError(
+        `Input file not found: ${clip.sourceFile}`,
+        FFmpegErrorCode.FILE_NOT_FOUND
+      )
+    }
+
+    // Apply trim start (seek to position before reading - more efficient)
+    if (clip.trimIn > 0) {
+      args.push('-ss', clip.trimIn.toString())
+    }
+
+    // Add input file
+    args.push('-i', clip.sourceFile)
+
+    // Calculate and apply duration limit after trim
+    const trimmedDuration = clip.duration - clip.trimIn - clip.trimOut
+    if (trimmedDuration > 0 && (clip.trimIn > 0 || clip.trimOut > 0)) {
+      args.push('-t', trimmedDuration.toString())
+    }
+  })
+
+  // Build filter_complex for concatenation if multiple clips
+  if (clips.length > 1) {
+    let filterComplex = ''
+
+    // Build concat inputs [0:v][0:a][1:v][1:a]...
+    for (let i = 0; i < clips.length; i++) {
+      filterComplex += `[${i}:v][${i}:a]`
+    }
+
+    // Add concat filter - output to intermediate label if scaling needed
+    if (resolution === '720p' || resolution === '1080p') {
+      filterComplex += `concat=n=${clips.length}:v=1:a=1[concatv][outa]`
+
+      // Add scaling filter in the same filter_complex chain
+      if (resolution === '720p') {
+        filterComplex += ';[concatv]scale=1280:720[outv]'
+      } else if (resolution === '1080p') {
+        filterComplex += ';[concatv]scale=1920:1080[outv]'
+      }
+    } else {
+      // Source quality - no scaling needed
+      filterComplex += `concat=n=${clips.length}:v=1:a=1[outv][outa]`
+    }
+
+    args.push('-filter_complex', filterComplex)
+    args.push('-map', '[outv]', '-map', '[outa]')
+  } else {
+    // Single clip - use simpler -vf for scaling (no filter_complex needed)
+    if (resolution === '720p') {
+      args.push('-vf', 'scale=1280:720')
+    } else if (resolution === '1080p') {
+      args.push('-vf', 'scale=1920:1080')
+    }
+    // For 'source', no scaling is applied
+  }
+
+  // Video codec settings
+  args.push('-c:v', 'libx264')
+  args.push('-preset', 'fast')
+
+  // Audio codec settings
+  args.push('-c:a', 'aac')
+  args.push('-b:a', '192k')
+
+  // Overwrite output file
+  args.push('-y')
+
+  // Output file
+  args.push(outputPath)
+
+  return args
+}
+
+/**
+ * Execute timeline export to MP4
+ * @param options - Export options including clips, resolution, and output path
+ * @param onProgress - Optional callback for progress updates
+ * @returns Promise resolving with output path on success
+ */
+export async function executeExport(
+  options: ExportOptions,
+  onProgress?: (percent: number) => void
+): Promise<{ outputPath: string }> {
+  const { clips, resolution, outputPath } = options
+
+  console.log('[FFmpeg] Starting timeline export...')
+  console.log('[FFmpeg] Clips:', clips.length)
+  console.log('[FFmpeg] Resolution:', resolution)
+  console.log('[FFmpeg] Output:', outputPath)
+
+  // Validate inputs
+  if (!clips || clips.length === 0) {
+    throw new FFmpegError('No clips to export', FFmpegErrorCode.EXECUTION_FAILED)
+  }
+
+  if (!outputPath) {
+    throw new FFmpegError('Output path is required', FFmpegErrorCode.EXECUTION_FAILED)
+  }
+
+  try {
+    // Build FFmpeg command
+    const args = buildFFmpegCommand(clips, resolution, outputPath)
+    console.log('[FFmpeg] Command:', args.join(' '))
+
+    // Calculate total duration for progress tracking
+    const totalDuration = calculateTotalDuration(clips)
+
+    // Execute FFmpeg with progress callback
+    await executeFFmpegCommand(
+      args,
+      onProgress
+        ? (progress) => {
+            // Convert to simple percent for IPC
+            onProgress(Math.round(progress.percent))
+          }
+        : undefined,
+      totalDuration
+    )
+
+    // Verify output file was created
+    if (!existsSync(outputPath)) {
+      throw new FFmpegError('Output file was not created', FFmpegErrorCode.EXECUTION_FAILED)
+    }
+
+    console.log('[FFmpeg] Export completed successfully')
+    console.log('[FFmpeg] Output file:', outputPath)
+
+    return { outputPath }
+  } catch (error) {
+    // Clean up partial file on error
+    try {
+      if (existsSync(outputPath)) {
+        unlinkSync(outputPath)
+        console.log('[FFmpeg] Cleaned up partial output file')
+      }
+    } catch (cleanupError) {
+      console.error('[FFmpeg] Failed to clean up partial file:', cleanupError)
+    }
+
+    // Re-throw the error
+    if (error instanceof FFmpegError) {
+      throw error
+    }
+    throw new FFmpegError(
+      error instanceof Error ? error.message : 'Export failed',
+      FFmpegErrorCode.EXECUTION_FAILED
     )
   }
 }

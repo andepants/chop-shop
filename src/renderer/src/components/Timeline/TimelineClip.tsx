@@ -6,6 +6,7 @@
  * scaled by the current zoom level (pixels per second).
  */
 
+import { useState } from 'react'
 import { formatTime } from '@/utils'
 import { cn } from '@/utils/cn.util'
 import { TrimTool } from '@/components/EditTools'
@@ -15,6 +16,8 @@ import type { Clip } from './timeline.types'
 interface TimelineClipProps {
   /** Clip data including position, duration, and source file */
   clip: Clip
+  /** Index of clip in track (for drag-to-reorder) */
+  clipIndex: number
   /** Zoom level in pixels per second for positioning calculations */
   zoomLevel: number
   /** Whether this clip is currently selected */
@@ -43,12 +46,16 @@ interface TimelineClipProps {
  */
 export function TimelineClip({
   clip,
+  clipIndex,
   zoomLevel,
   isSelected = false,
   onClick
 }: TimelineClipProps): React.JSX.Element {
   // Get active tool for conditional rendering
   const selectedTool = useToolStore((state) => state.selectedTool)
+
+  // Drag state for visual feedback
+  const [isDragging, setIsDragging] = useState(false)
 
   // Calculate effective duration accounting for trim values (Story 3.1)
   const effectiveDuration = clip.duration - clip.trimIn - clip.trimOut
@@ -59,15 +66,47 @@ export function TimelineClip({
   const width = Math.max(80, calculatedWidth)
 
   // Determine cursor based on active tool
-  const cursorStyle =
-    selectedTool === 'trim' ? 'ew-resize' : selectedTool === 'split' ? 'crosshair' : 'pointer'
+  const cursorStyle = isDragging
+    ? 'grabbing'
+    : selectedTool === 'trim'
+      ? 'ew-resize'
+      : selectedTool === 'split'
+        ? 'crosshair'
+        : 'grab'
+
+  /**
+   * Handle drag start - store clip index for drop handler
+   */
+  function handleDragStart(e: React.DragEvent): void {
+    setIsDragging(true)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('clipIndex', clipIndex.toString())
+
+    // Create semi-transparent drag image
+    if (e.currentTarget instanceof HTMLElement) {
+      const dragImage = e.currentTarget.cloneNode(true) as HTMLElement
+      dragImage.style.opacity = '0.5'
+      document.body.appendChild(dragImage)
+      e.dataTransfer.setDragImage(dragImage, 0, 0)
+      setTimeout(() => document.body.removeChild(dragImage), 0)
+    }
+  }
+
+  /**
+   * Handle drag end - clear dragging state
+   */
+  function handleDragEnd(): void {
+    setIsDragging(false)
+  }
 
   return (
     <div
       className={cn(
-        'absolute rounded transition-opacity',
-        'hover:opacity-80',
-        isSelected && 'ring-1'
+        'absolute rounded',
+        'transition-all duration-200 ease-out',
+        'hover:opacity-90',
+        isSelected && 'ring-1',
+        isDragging && 'opacity-50 scale-105'
       )}
       style={{
         left: `${leftPosition}px`,
@@ -78,6 +117,9 @@ export function TimelineClip({
         borderColor: isSelected ? 'var(--accent)' : 'transparent',
         cursor: cursorStyle
       }}
+      draggable={selectedTool === 'select'}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       onClick={onClick}
       role="button"
       tabIndex={0}

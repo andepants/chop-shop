@@ -44,9 +44,12 @@ import {
   getFfmpegPath,
   executeFFmpegCommand,
   testExport,
+  buildFFmpegCommand,
+  executeExport,
   FFmpegError,
   FFmpegErrorCode
 } from '../ffmpeg.service'
+import type { Clip } from '../../../renderer/src/components/Timeline/timeline.types'
 
 describe('ffmpeg.service', () => {
   beforeEach(() => {
@@ -341,6 +344,397 @@ describe('ffmpeg.service', () => {
       expect(mockProgressCallback).toHaveBeenCalled()
       const progress = mockProgressCallback.mock.calls[0][0]
       expect(progress.percent).toBe(0) // No duration provided, so percent = 0
+    })
+  })
+
+  describe('buildFFmpegCommand (Timeline Export - AC: 3.5#4)', () => {
+    it('builds command for single clip without trim', () => {
+      mockExistsSync.mockReturnValue(true)
+
+      const clips: Clip[] = [
+        {
+          id: '1',
+          sourceFile: '/videos/clip1.mp4',
+          duration: 10,
+          trimIn: 0,
+          trimOut: 0,
+          startTime: 0,
+          trackId: 1
+        }
+      ]
+
+      const args = buildFFmpegCommand(clips, '1080p', '/output.mp4')
+
+      expect(args).toContain('-i')
+      expect(args).toContain('/videos/clip1.mp4')
+      expect(args).toContain('scale=1920:1080')
+      expect(args).toContain('-c:v')
+      expect(args).toContain('libx264')
+      expect(args).toContain('-c:a')
+      expect(args).toContain('aac')
+      expect(args).toContain('/output.mp4')
+    })
+
+    it('applies trim values correctly', () => {
+      mockExistsSync.mockReturnValue(true)
+
+      const clips: Clip[] = [
+        {
+          id: '1',
+          sourceFile: '/videos/clip1.mp4',
+          duration: 10,
+          trimIn: 2,
+          trimOut: 1,
+          startTime: 0,
+          trackId: 1
+        }
+      ]
+
+      const args = buildFFmpegCommand(clips, 'source', '/output.mp4')
+
+      expect(args).toContain('-ss')
+      expect(args).toContain('2') // trimIn
+      expect(args).toContain('-t')
+      expect(args).toContain('7') // duration - trimIn - trimOut (10 - 2 - 1)
+    })
+
+    it('builds concat command for multiple clips', () => {
+      mockExistsSync.mockReturnValue(true)
+
+      const clips: Clip[] = [
+        {
+          id: '1',
+          sourceFile: '/videos/clip1.mp4',
+          duration: 5,
+          trimIn: 0,
+          trimOut: 0,
+          startTime: 0,
+          trackId: 1
+        },
+        {
+          id: '2',
+          sourceFile: '/videos/clip2.mp4',
+          duration: 5,
+          trimIn: 0,
+          trimOut: 0,
+          startTime: 5,
+          trackId: 1
+        }
+      ]
+
+      const args = buildFFmpegCommand(clips, 'source', '/output.mp4')
+
+      const argsString = args.join(' ')
+      expect(argsString).toContain('concat=n=2')
+      expect(argsString).toContain('[0:v][0:a][1:v][1:a]')
+    })
+
+    it('applies 720p resolution scaling', () => {
+      mockExistsSync.mockReturnValue(true)
+
+      const clips: Clip[] = [
+        {
+          id: '1',
+          sourceFile: '/videos/clip1.mp4',
+          duration: 10,
+          trimIn: 0,
+          trimOut: 0,
+          startTime: 0,
+          trackId: 1
+        }
+      ]
+
+      const args = buildFFmpegCommand(clips, '720p', '/output.mp4')
+
+      expect(args).toContain('scale=1280:720')
+    })
+
+    it('applies 1080p resolution scaling', () => {
+      mockExistsSync.mockReturnValue(true)
+
+      const clips: Clip[] = [
+        {
+          id: '1',
+          sourceFile: '/videos/clip1.mp4',
+          duration: 10,
+          trimIn: 0,
+          trimOut: 0,
+          startTime: 0,
+          trackId: 1
+        }
+      ]
+
+      const args = buildFFmpegCommand(clips, '1080p', '/output.mp4')
+
+      expect(args).toContain('scale=1920:1080')
+    })
+
+    it('does not apply scaling for source quality', () => {
+      mockExistsSync.mockReturnValue(true)
+
+      const clips: Clip[] = [
+        {
+          id: '1',
+          sourceFile: '/videos/clip1.mp4',
+          duration: 10,
+          trimIn: 0,
+          trimOut: 0,
+          startTime: 0,
+          trackId: 1
+        }
+      ]
+
+      const args = buildFFmpegCommand(clips, 'source', '/output.mp4')
+
+      expect(args).not.toContain('scale')
+    })
+
+    it('integrates scaling into filter_complex for multiple clips with 1080p', () => {
+      mockExistsSync.mockReturnValue(true)
+
+      const clips: Clip[] = [
+        {
+          id: '1',
+          sourceFile: '/videos/clip1.mp4',
+          duration: 5,
+          trimIn: 0,
+          trimOut: 0,
+          startTime: 0,
+          trackId: 1
+        },
+        {
+          id: '2',
+          sourceFile: '/videos/clip2.mp4',
+          duration: 5,
+          trimIn: 0,
+          trimOut: 0,
+          startTime: 5,
+          trackId: 1
+        }
+      ]
+
+      const args = buildFFmpegCommand(clips, '1080p', '/output.mp4')
+
+      // Find the filter_complex argument
+      const filterComplexIndex = args.indexOf('-filter_complex')
+      expect(filterComplexIndex).toBeGreaterThan(-1)
+
+      const filterComplex = args[filterComplexIndex + 1]
+
+      // Should contain concat
+      expect(filterComplex).toContain('concat=n=2')
+
+      // Should contain scaling in the filter chain (not separate -vf)
+      expect(filterComplex).toContain('scale=1920:1080')
+
+      // Should use intermediate label [concatv] and output [outv]
+      expect(filterComplex).toContain('[concatv]')
+      expect(filterComplex).toContain('[outv]')
+
+      // Should NOT have separate -vf argument (would conflict with filter_complex)
+      expect(args).not.toContain('-vf')
+    })
+
+    it('integrates scaling into filter_complex for multiple clips with 720p', () => {
+      mockExistsSync.mockReturnValue(true)
+
+      const clips: Clip[] = [
+        {
+          id: '1',
+          sourceFile: '/videos/clip1.mp4',
+          duration: 5,
+          trimIn: 0,
+          trimOut: 0,
+          startTime: 0,
+          trackId: 1
+        },
+        {
+          id: '2',
+          sourceFile: '/videos/clip2.mp4',
+          duration: 5,
+          trimIn: 0,
+          trimOut: 0,
+          startTime: 5,
+          trackId: 1
+        }
+      ]
+
+      const args = buildFFmpegCommand(clips, '720p', '/output.mp4')
+
+      const filterComplexIndex = args.indexOf('-filter_complex')
+      const filterComplex = args[filterComplexIndex + 1]
+
+      // Should contain concat and scaling in same filter chain
+      expect(filterComplex).toContain('concat=n=2')
+      expect(filterComplex).toContain('scale=1280:720')
+
+      // Should NOT have separate -vf argument
+      expect(args).not.toContain('-vf')
+    })
+
+    it('throws error if input file does not exist', () => {
+      mockExistsSync.mockReturnValue(false)
+
+      const clips: Clip[] = [
+        {
+          id: '1',
+          sourceFile: '/videos/missing.mp4',
+          duration: 10,
+          trimIn: 0,
+          trimOut: 0,
+          startTime: 0,
+          trackId: 1
+        }
+      ]
+
+      expect(() => buildFFmpegCommand(clips, '1080p', '/output.mp4')).toThrow(FFmpegError)
+      expect(() => buildFFmpegCommand(clips, '1080p', '/output.mp4')).toThrow(
+        'Input file not found'
+      )
+    })
+  })
+
+  describe('executeExport (Timeline Export - AC: 3.5#4,5,6)', () => {
+    it('successfully exports timeline with single clip', async () => {
+      mockExistsSync.mockReturnValue(true)
+
+      const clips: Clip[] = [
+        {
+          id: '1',
+          sourceFile: '/videos/clip1.mp4',
+          duration: 10,
+          trimIn: 0,
+          trimOut: 0,
+          startTime: 0,
+          trackId: 1
+        }
+      ]
+
+      const promise = executeExport({
+        clips,
+        resolution: '1080p',
+        outputPath: '/output/export.mp4'
+      })
+
+      setTimeout(() => {
+        mockProcess.emit('close', 0)
+      }, 10)
+
+      const result = await promise
+      expect(result).toEqual({ outputPath: '/output/export.mp4' })
+    })
+
+    it('successfully exports timeline with multiple clips', async () => {
+      mockExistsSync.mockReturnValue(true)
+
+      const clips: Clip[] = [
+        {
+          id: '1',
+          sourceFile: '/videos/clip1.mp4',
+          duration: 5,
+          trimIn: 0,
+          trimOut: 0,
+          startTime: 0,
+          trackId: 1
+        },
+        {
+          id: '2',
+          sourceFile: '/videos/clip2.mp4',
+          duration: 5,
+          trimIn: 1,
+          trimOut: 1,
+          startTime: 5,
+          trackId: 1
+        }
+      ]
+
+      const promise = executeExport({
+        clips,
+        resolution: '720p',
+        outputPath: '/output/export.mp4'
+      })
+
+      setTimeout(() => {
+        mockProcess.emit('close', 0)
+      }, 10)
+
+      const result = await promise
+      expect(result.outputPath).toBe('/output/export.mp4')
+    })
+
+    it('calls progress callback during export', async () => {
+      mockExistsSync.mockReturnValue(true)
+      const mockProgressCallback = vi.fn()
+
+      const clips: Clip[] = [
+        {
+          id: '1',
+          sourceFile: '/videos/clip1.mp4',
+          duration: 10,
+          trimIn: 0,
+          trimOut: 0,
+          startTime: 0,
+          trackId: 1
+        }
+      ]
+
+      const promise = executeExport(
+        {
+          clips,
+          resolution: '1080p',
+          outputPath: '/output/export.mp4'
+        },
+        mockProgressCallback
+      )
+
+      setTimeout(() => {
+        mockProcess.stderr?.emit(
+          'data',
+          Buffer.from('frame=120 fps=30 time=00:00:04.00 bitrate=1000kbits/s')
+        )
+      }, 10)
+
+      setTimeout(() => {
+        mockProcess.emit('close', 0)
+      }, 20)
+
+      await promise
+
+      expect(mockProgressCallback).toHaveBeenCalled()
+      // Progress callback receives simple percent number
+      expect(typeof mockProgressCallback.mock.calls[0][0]).toBe('number')
+    })
+
+    it('throws error for empty clips array', async () => {
+      await expect(
+        executeExport({
+          clips: [],
+          resolution: '1080p',
+          outputPath: '/output/export.mp4'
+        })
+      ).rejects.toThrow('No clips to export')
+    })
+
+    it('throws error for missing output path', async () => {
+      const clips: Clip[] = [
+        {
+          id: '1',
+          sourceFile: '/videos/clip1.mp4',
+          duration: 10,
+          trimIn: 0,
+          trimOut: 0,
+          startTime: 0,
+          trackId: 1
+        }
+      ]
+
+      await expect(
+        executeExport({
+          clips,
+          resolution: '1080p',
+          outputPath: ''
+        })
+      ).rejects.toThrow('Output path is required')
     })
   })
 })

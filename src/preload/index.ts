@@ -56,7 +56,60 @@ const api = {
    * Open native file picker dialog for video selection
    * @returns Promise with array of selected file paths
    */
-  openFileDialog: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_FILE_DIALOG)
+  openFileDialog: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_FILE_DIALOG),
+
+  /**
+   * Open native save dialog for export location
+   * @param options - Optional save dialog options
+   * @returns Promise with selected file path or null if canceled
+   */
+  saveFileDialog: (options?: { defaultPath?: string }) =>
+    ipcRenderer.invoke('save-file-dialog', options),
+
+  /**
+   * Start timeline export to MP4
+   * @param options - Export options (clips, resolution, outputPath)
+   * @returns Promise with export result
+   */
+  startExport: (options: {
+    clips: unknown[]
+    resolution: '720p' | '1080p' | 'source'
+    outputPath: string
+  }) => ipcRenderer.invoke('start-export', options),
+
+  /**
+   * Subscribe to export progress events
+   * @param callback - Callback function receiving progress updates
+   * @returns Cleanup function to remove the listener
+   */
+  onExportProgress: (callback: (data: { percent: number }) => void) => {
+    const listener = (_event: unknown, data: { percent: number }) => callback(data)
+    ipcRenderer.on('export-progress', listener)
+    return () => ipcRenderer.removeListener('export-progress', listener)
+  },
+
+  /**
+   * Subscribe to export complete events
+   * @param callback - Callback function called when export completes
+   * @returns Cleanup function to remove the listener
+   */
+  onExportComplete: (callback: (data: { success: boolean; outputPath: string }) => void) => {
+    const listener = (_event: unknown, data: { success: boolean; outputPath: string }) =>
+      callback(data)
+    ipcRenderer.on('export-complete', listener)
+    return () => ipcRenderer.removeListener('export-complete', listener)
+  },
+
+  /**
+   * Subscribe to export error events
+   * @param callback - Callback function called when export fails
+   * @returns Cleanup function to remove the listener
+   */
+  onExportError: (callback: (data: { message: string; code: string }) => void) => {
+    const listener = (_event: unknown, data: { message: string; code: string }) => callback(data)
+    ipcRenderer.on('export-error', listener)
+    return () => ipcRenderer.removeListener('export-error', listener)
+  }
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

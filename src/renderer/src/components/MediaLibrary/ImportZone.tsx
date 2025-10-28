@@ -6,6 +6,7 @@
 import { useState } from 'react'
 import { useMediaStore } from '../../store/mediaStore'
 import { useUIStore } from '../../store/uiStore'
+import { cn } from '../../utils'
 
 const SUPPORTED_FORMATS = ['.mp4', '.mov', '.webm']
 const SUPPORTED_FORMATS_STRING = 'MP4, MOV, WebM'
@@ -115,29 +116,28 @@ export function ImportZone(): React.JSX.Element {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="flex flex-col items-center justify-center h-32 rounded border border-dashed transition-colors cursor-pointer"
-      style={{
-        borderColor: isDragOver ? 'var(--accent)' : 'var(--border-subtle)',
-        backgroundColor: isDragOver ? 'rgba(0, 212, 212, 0.05)' : 'transparent',
-        opacity: isImporting ? 0.5 : 1,
-        pointerEvents: isImporting ? 'none' : 'auto'
-      }}
+      className={cn(
+        'flex flex-col items-center justify-center h-32 rounded border-2 border-dashed transition-all cursor-pointer',
+        isDragOver
+          ? 'border-cyan-500 bg-cyan-500/5'
+          : 'border-zinc-700 bg-transparent hover:border-zinc-600',
+        isImporting && 'opacity-50 pointer-events-none'
+      )}
     >
       <div className="text-center">
         {/* Icon */}
         <div className="mb-2 flex justify-center">
           {isImporting ? (
-            <div
-              className="animate-spin rounded-full h-8 w-8 border-b-2"
-              style={{ borderColor: 'var(--accent)' }}
-            ></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div>
           ) : (
             <svg
-              className="w-8 h-8 transition-colors"
+              className={cn(
+                'w-8 h-8 transition-colors',
+                isDragOver ? 'text-cyan-500' : 'text-zinc-400'
+              )}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
-              style={{ color: isDragOver ? 'var(--accent)' : 'var(--text-secondary)' }}
             >
               <path
                 strokeLinecap="round"
@@ -151,14 +151,14 @@ export function ImportZone(): React.JSX.Element {
 
         {/* Text */}
         <p
-          className="text-xs mb-1"
-          style={{ color: isDragOver ? 'var(--accent)' : 'var(--text-primary)' }}
+          className={cn(
+            'text-xs mb-1',
+            isDragOver ? 'text-cyan-500' : 'text-zinc-100'
+          )}
         >
           {isImporting ? 'Importing...' : isDragOver ? 'Drop to import' : 'Drag video files here'}
         </p>
-        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-          {SUPPORTED_FORMATS_STRING}
-        </p>
+        <p className="text-xs text-zinc-400">{SUPPORTED_FORMATS_STRING}</p>
       </div>
     </div>
   )

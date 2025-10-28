@@ -142,4 +142,49 @@ ipcMain.handle(
   }
 )
 
+/**
+ * Handle save-file-dialog IPC request
+ * Opens native save dialog for export location
+ */
+ipcMain.handle(
+  'save-file-dialog',
+  async (
+    _,
+    options?: { defaultPath?: string; filters?: Electron.FileFilter[] }
+  ): Promise<IPCResponse<string | null>> => {
+    try {
+      console.log('[Main] Opening save file dialog')
+
+      const result = await dialog.showSaveDialog({
+        title: 'Export Video',
+        defaultPath: options?.defaultPath,
+        filters: options?.filters || [{ name: 'MP4 Video', extensions: ['mp4'] }],
+        properties: ['createDirectory', 'showOverwriteConfirmation']
+      })
+
+      if (result.canceled || !result.filePath) {
+        return {
+          success: true,
+          data: null
+        }
+      }
+
+      console.log('[Main] Selected save path:', result.filePath)
+
+      return {
+        success: true,
+        data: result.filePath
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      console.error('[Main] Save dialog failed:', errorMessage)
+
+      return {
+        success: false,
+        error: errorMessage
+      }
+    }
+  }
+)
+
 console.log('[Main] File IPC handlers registered')

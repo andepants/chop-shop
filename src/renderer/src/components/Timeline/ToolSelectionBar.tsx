@@ -9,6 +9,7 @@
 import { MousePointer2, Scissors, SeparatorHorizontal } from 'lucide-react'
 import { useToolStore } from '@/store/toolStore'
 import type { Tool } from '@/types/tools.types'
+import { DeleteTool } from '@/components/EditTools'
 
 /**
  * Tool configuration for UI rendering
@@ -112,6 +113,9 @@ export function ToolSelectionBar(): JSX.Element {
           {TOOLS.find((t) => t.id === selectedTool)?.shortcut}
         </span>
       </div>
+
+      {/* Delete Button */}
+      <DeleteTool />
     </div>
   )
 }

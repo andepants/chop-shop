@@ -9,13 +9,13 @@ import { ImportZone } from '../ImportZone'
 import type { IPCResponse, MediaFile } from '../../../../../shared/types'
 
 // Mock window.api
-const mockImportFile = vi.fn()
+const mockImportFileFromObject = vi.fn()
 
 // Setup global window.api mock before tests
 Object.defineProperty(window, 'api', {
   writable: true,
   value: {
-    importFile: mockImportFile
+    importFileFromObject: mockImportFileFromObject
   }
 })
 
@@ -27,7 +27,7 @@ describe('ImportZone', () => {
   it('renders drag-and-drop zone with instructions (AC: #1)', () => {
     render(<ImportZone />)
     expect(screen.getByText(/Drag video files here/i)).toBeInTheDocument()
-    expect(screen.getByText(/Supported formats: MP4, MOV, WebM/i)).toBeInTheDocument()
+    expect(screen.getByText(/MP4, MOV, WebM/i)).toBeInTheDocument()
   })
 
   it('highlights zone on drag over', () => {
@@ -36,8 +36,9 @@ describe('ImportZone', () => {
 
     fireEvent.dragOver(dropZone)
 
+    // Component uses Tailwind classes for drag state
     expect(dropZone.className).toContain('border-cyan-500')
-    expect(dropZone.className).toContain('ring-2')
+    expect(dropZone.className).toContain('bg-cyan-500/5')
   })
 
   it('removes highlight on drag leave', () => {
@@ -47,8 +48,9 @@ describe('ImportZone', () => {
     fireEvent.dragOver(dropZone)
     fireEvent.dragLeave(dropZone)
 
-    expect(dropZone.className).not.toContain('border-cyan-500')
-    expect(dropZone.className).not.toContain('ring-2')
+    // Component uses Tailwind classes for drag state
+    expect(dropZone.className).toContain('border-zinc-700')
+    expect(dropZone.className).toContain('bg-transparent')
   })
 
   it('filters and imports only supported video formats (AC: #2)', async () => {
@@ -63,7 +65,7 @@ describe('ImportZone', () => {
       createdAt: Date.now()
     }
 
-    mockImportFile.mockResolvedValue({
+    mockImportFileFromObject.mockResolvedValue({
       success: true,
       data: mockMediaFile
     } as IPCResponse<MediaFile>)
@@ -86,7 +88,7 @@ describe('ImportZone', () => {
     fireEvent.drop(dropZone, { dataTransfer })
 
     await waitFor(() => {
-      expect(mockImportFile).toHaveBeenCalledTimes(3)
+      expect(mockImportFileFromObject).toHaveBeenCalledTimes(3)
     })
   })
 
@@ -105,7 +107,7 @@ describe('ImportZone', () => {
 
     // ImportZone should not call importFile for unsupported formats
     await waitFor(() => {
-      expect(mockImportFile).not.toHaveBeenCalled()
+      expect(mockImportFileFromObject).not.toHaveBeenCalled()
     })
   })
 
@@ -121,7 +123,7 @@ describe('ImportZone', () => {
       createdAt: Date.now()
     }
 
-    mockImportFile.mockResolvedValue({
+    mockImportFileFromObject.mockResolvedValue({
       success: true,
       data: mockMediaFile
     } as IPCResponse<MediaFile>)
@@ -144,12 +146,12 @@ describe('ImportZone', () => {
     fireEvent.drop(dropZone, { dataTransfer })
 
     await waitFor(() => {
-      expect(mockImportFile).toHaveBeenCalledTimes(3)
+      expect(mockImportFileFromObject).toHaveBeenCalledTimes(3)
     })
   })
 
   it('shows importing state during file processing', async () => {
-    mockImportFile.mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 100)))
+    mockImportFileFromObject.mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 100)))
 
     const { container } = render(<ImportZone />)
     const dropZone = container.firstChild as HTMLElement
@@ -164,12 +166,12 @@ describe('ImportZone', () => {
     fireEvent.drop(dropZone, { dataTransfer })
 
     await waitFor(() => {
-      expect(screen.getByText(/Importing files.../i)).toBeInTheDocument()
+      expect(screen.getByText(/Importing.../i)).toBeInTheDocument()
     })
   })
 
   it('handles import errors gracefully', async () => {
-    mockImportFile.mockResolvedValue({
+    mockImportFileFromObject.mockResolvedValue({
       success: false,
       error: 'Failed to process video'
     } as IPCResponse<MediaFile>)
@@ -187,7 +189,7 @@ describe('ImportZone', () => {
     fireEvent.drop(dropZone, { dataTransfer })
 
     await waitFor(() => {
-      expect(mockImportFile).toHaveBeenCalled()
+      expect(mockImportFileFromObject).toHaveBeenCalled()
     })
   })
 })

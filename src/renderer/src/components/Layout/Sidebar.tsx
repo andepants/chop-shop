@@ -74,26 +74,15 @@ export function Sidebar(): React.JSX.Element {
   }
 
   return (
-    <aside
-      className="w-[280px] flex flex-col pb-16"
-      style={{
-        backgroundColor: 'var(--bg-secondary)',
-        borderRight: '1px solid var(--border-subtle)'
-      }}
-    >
+    <aside className="w-[280px] flex flex-col pb-16 bg-zinc-800 border-r border-zinc-700">
       <div className="p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-            Media
-          </h2>
+          <h2 className="text-base font-semibold text-zinc-100">Media</h2>
           <Button
             onClick={handleImportClick}
             disabled={isImporting}
             size="sm"
-            style={{
-              backgroundColor: isImporting ? 'var(--bg-primary)' : 'var(--accent)',
-              color: 'var(--text-primary)'
-            }}
+            className={isImporting ? 'bg-zinc-900' : 'bg-cyan-500 hover:bg-cyan-600'}
           >
             {isImporting ? 'Importing...' : 'Import'}
           </Button>

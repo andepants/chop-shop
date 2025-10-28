@@ -64,4 +64,6 @@ export interface TimelineState {
   setPlayhead: (position: number) => void
   /** Select a clip by ID */
   selectClip: (clipId: string | null) => void
+  /** Reorder clips by moving clip from sourceIndex to destIndex */
+  reorderClips: (sourceIndex: number, destIndex: number) => void
 }

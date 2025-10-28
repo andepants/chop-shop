@@ -80,13 +80,57 @@ export const useTimelineStore = create<TimelineState>((set) => ({
 
   /**
    * Remove a clip from the timeline by ID
+   * Automatically closes gaps by shifting remaining clips left
+   * Updates playhead position if it was on the deleted clip
    */
   removeClip: (clipId) =>
     set((state) => {
-      const updatedTracks = state.tracks.map((track) => ({
-        ...track,
-        clips: track.clips.filter((clip) => clip.id !== clipId)
-      }))
+      // Find the deleted clip across all tracks
+      let deletedClip: Clip | undefined
+      let deletedTrackId: number | undefined
+
+      for (const track of state.tracks) {
+        const clip = track.clips.find((c) => c.id === clipId)
+        if (clip) {
+          deletedClip = clip
+          deletedTrackId = track.id
+          break
+        }
+      }
+
+      // If clip not found, return unchanged state
+      if (!deletedClip) {
+        console.warn(`Clip ${clipId} not found for removal`)
+        return state
+      }
+
+      const deletedStart = deletedClip.startTime
+      const deletedDuration = getEffectiveDuration(deletedClip)
+      const deletedEnd = deletedStart + deletedDuration
+
+      // Remove clip and close gap by shifting subsequent clips left
+      const updatedTracks = state.tracks.map((track) => {
+        if (track.id !== deletedTrackId) return track
+
+        // Filter out the deleted clip
+        const remainingClips = track.clips.filter((clip) => clip.id !== clipId)
+
+        // Shift clips after deleted clip to close gap
+        const shiftedClips = remainingClips.map((clip) => {
+          if (clip.startTime > deletedStart) {
+            return {
+              ...clip,
+              startTime: clip.startTime - deletedDuration
+            }
+          }
+          return clip
+        })
+
+        return {
+          ...track,
+          clips: shiftedClips.sort((a, b) => a.startTime - b.startTime)
+        }
+      })
 
       // Recalculate total duration using effective duration (accounts for trimming)
       const allClips = updatedTracks.flatMap((track) => track.clips)
@@ -95,9 +139,20 @@ export const useTimelineStore = create<TimelineState>((set) => ({
         return endTime > max ? endTime : max
       }, 0)
 
+      // Update playhead if it was within deleted clip bounds or after it
+      let newPlayhead = state.playheadPosition
+      if (state.playheadPosition >= deletedStart && state.playheadPosition < deletedEnd) {
+        // Playhead was on deleted clip - move to clip's start position
+        newPlayhead = deletedStart
+      } else if (state.playheadPosition >= deletedEnd) {
+        // Playhead was after deleted clip - shift left by deleted duration
+        newPlayhead = state.playheadPosition - deletedDuration
+      }
+
       return {
         tracks: updatedTracks,
         totalDuration: maxEndTime,
+        playheadPosition: newPlayhead,
         selectedClipId: state.selectedClipId === clipId ? null : state.selectedClipId
       }
     }),
@@ -210,5 +265,55 @@ export const useTimelineStore = create<TimelineState>((set) => ({
   selectClip: (clipId) =>
     set({
       selectedClipId: clipId
+    }),
+
+  /**
+   * Reorder clips on a track by moving a clip from sourceIndex to destIndex
+   * Recalculates startTime for all clips to maintain sequential positioning
+   * Operates on Track 1 (MVP single track)
+   *
+   * @param sourceIndex - Index of clip to move
+   * @param destIndex - Target index to insert clip
+   */
+  reorderClips: (sourceIndex, destIndex) =>
+    set((state) => {
+      // No-op if source and destination are the same
+      if (sourceIndex === destIndex) return state
+
+      const trackId = 1 // MVP: Single track only
+      const updatedTracks = state.tracks.map((track) => {
+        if (track.id !== trackId) return track
+
+        // Immutable reorder using array operations
+        const clips = [...track.clips]
+        const [movedClip] = clips.splice(sourceIndex, 1)
+        clips.splice(destIndex, 0, movedClip)
+
+        // Recalculate startTime for all clips sequentially
+        let currentTime = 0
+        const reorderedClips = clips.map((clip) => {
+          const effectiveDuration = getEffectiveDuration(clip)
+          const updatedClip = { ...clip, startTime: currentTime }
+          currentTime += effectiveDuration
+          return updatedClip
+        })
+
+        return {
+          ...track,
+          clips: reorderedClips
+        }
+      })
+
+      // Recalculate total duration using effective duration
+      const allClips = updatedTracks.flatMap((track) => track.clips)
+      const maxEndTime = allClips.reduce((max, clip) => {
+        const endTime = clip.startTime + getEffectiveDuration(clip)
+        return endTime > max ? endTime : max
+      }, 0)
+
+      return {
+        tracks: updatedTracks,
+        totalDuration: maxEndTime
+      }
     })
 }))
