@@ -1,0 +1,54 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>1</storyId>
+    <title>Multi-Track Timeline (2 Tracks)</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/4-1-multi-track-timeline-2-tracks.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>content creator</asA>
+    <iWant>to place clips on multiple timeline tracks</iWant>
+    <soThat>I can create picture-in-picture or overlay effects</soThat>
+    <tasks>
+      - Task 1: Extend timeline data model for multi-track support
+      - Task 2: Create TimelineTrack component with visual track separation
+      - Task 3: Update Timeline component to render 2 tracks
+      - Task 4: Implement drag-and-drop to specific tracks
+      - Task 5: Extend editing operations for track-aware behavior
+      - Task 6: Implement multi-track preview compositing
+      - Task 7: Update export pipeline for multi-track rendering
+      - Task 8: Add visual indicators and track management UI
+      - Task 9: Handle edge cases and error scenarios
+      - Task 10: Testing and validation
+      - Task 11: NFR Validation
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. Timeline displays 2 horizontal tracks: Track 1 (main) and Track 2 (overlay)
+    2. Users can drag clips from media library to either track
+    3. Track 2 clips render on top of Track 1 in preview (overlay/PiP positioning)
+    4. Each track independently supports trim, split, delete operations
+    5. Playhead synchronizes across both tracks during playback
+    6. Export renders both tracks composited into single output video
+    7. Track 2 clips show visual indicator (border/label) distinguishing from Track 1
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>{{docs_artifacts}}</docs>
+    <code>{{code_artifacts}}</code>
+    <dependencies>{{dependencies_artifacts}}</dependencies>
+  </artifacts>
+
+  <constraints>{{constraints}}</constraints>
+  <interfaces>{{interfaces}}</interfaces>
+  <tests>
+    <standards>{{test_standards}}</standards>
+    <locations>{{test_locations}}</locations>
+    <ideas>{{test_ideas}}</ideas>
+  </tests>
+</story-context>

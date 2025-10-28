@@ -1,12 +1,12 @@
 /**
  * ToolSelectionBar Component
  *
- * Toolbar for selecting timeline editing tools (Select, Trim, Split)
+ * Toolbar for selecting timeline editing tools (Select, Split)
  * Displays icon-only toggle buttons with tooltips and keyboard shortcuts
  * Positioned above the timeline for contextual grouping
  */
 
-import { MousePointer2, Scissors, SeparatorHorizontal } from 'lucide-react'
+import { MousePointer2, SeparatorHorizontal } from 'lucide-react'
 import { useToolStore } from '@/store/toolStore'
 import type { Tool } from '@/types/tools.types'
 import { DeleteTool } from '@/components/EditTools'
@@ -22,13 +22,6 @@ const TOOLS = [
     label: 'Select Tool',
     shortcut: 'V',
     description: 'Select and move clips'
-  },
-  {
-    id: 'trim' as Tool,
-    icon: Scissors,
-    label: 'Trim Tool',
-    shortcut: 'B',
-    description: 'Trim clip in/out points'
   },
   {
     id: 'split' as Tool,

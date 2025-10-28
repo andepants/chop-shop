@@ -8,7 +8,7 @@ import type { LucideIcon } from 'lucide-react'
 /**
  * Available timeline editing tools
  */
-export type Tool = 'select' | 'trim' | 'split'
+export type Tool = 'select' | 'split'
 
 /**
  * Tool configuration interface
@@ -40,13 +40,6 @@ export const TOOL_CONFIGS: Record<Tool, Omit<ToolConfig, 'id'>> = {
     shortcut: 'V',
     cursor: 'default',
     description: 'Select and move clips'
-  },
-  trim: {
-    label: 'Trim',
-    icon: null as any, // Will be imported as Scissors in component
-    shortcut: 'B',
-    cursor: 'ew-resize',
-    description: 'Trim clip in/out points'
   },
   split: {
     label: 'Razor',

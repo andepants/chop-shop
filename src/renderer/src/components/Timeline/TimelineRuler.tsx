@@ -67,19 +67,19 @@ export function TimelineRuler({
   })
 
   return (
-    <div className="h-8 border-b border-zinc-700 bg-zinc-900 relative">
+    <div className="h-10 border-b border-zinc-700 bg-zinc-900 relative">
       <div className="h-full relative">
         {markers.map((marker) => (
           <div
             key={marker.time}
-            className="absolute top-0 h-full flex flex-col justify-center"
+            className="absolute top-0 h-full flex flex-col"
             style={{ left: `${marker.position}px` }}
           >
-            {/* Subtle vertical line */}
-            <div className="w-px h-full bg-zinc-700" />
+            {/* Subtle vertical tick mark from top */}
+            <div className="w-px h-3 bg-zinc-600" />
 
-            {/* Minimal time label */}
-            <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 px-1.5 py-0.5 text-xs font-mono text-zinc-400">
+            {/* Time label at bottom of ruler */}
+            <div className="absolute bottom-1 -translate-x-1/2 px-1 text-[11px] font-mono text-zinc-400 leading-tight">
               {marker.label}
             </div>
           </div>

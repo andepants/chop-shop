@@ -46,8 +46,8 @@ function calculateGridIntervals(zoomLevel: number): {
   }
 
   // Show minor lines (every 1 second) only if zoom is high enough
-  // Minimum 20px per second to avoid overcrowding
-  const showMinor = zoomLevel >= 20
+  // Minimum 15px per second to avoid overcrowding
+  const showMinor = zoomLevel >= 15
 
   return { majorInterval, showMinor }
 }
@@ -102,7 +102,7 @@ export function TimelineGrid({
           className="absolute top-0 h-full w-px"
           style={{
             left: `${line.position}px`,
-            backgroundColor: 'rgba(255, 255, 255, 0.03)' // Very subtle
+            backgroundColor: 'rgba(255, 255, 255, 0.08)' // Subtle but visible
           }}
         />
       ))}
@@ -114,7 +114,7 @@ export function TimelineGrid({
           className="absolute top-0 h-full w-px"
           style={{
             left: `${line.position}px`,
-            backgroundColor: 'rgba(255, 255, 255, 0.08)' // Subtle but visible
+            backgroundColor: 'rgba(255, 255, 255, 0.12)' // More visible for major intervals
           }}
         />
       ))}

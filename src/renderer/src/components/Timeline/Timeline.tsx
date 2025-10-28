@@ -273,17 +273,14 @@ export function Timeline(): React.JSX.Element {
    * Handle keyboard shortcuts
    * - Delete/Backspace: Delete selected clip (Story 3.3)
    * - Escape: Deselect clip (Story 3.1)
-   * - V/B/C: Tool selection (Tool Selection System)
+   * - V/C: Tool selection (Tool Selection System)
    */
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent): void {
-      // Tool selection shortcuts (V/B/C)
+      // Tool selection shortcuts (V/C)
       const { setTool } = useToolStore.getState()
       if (e.key.toLowerCase() === 'v') {
         setTool('select')
-        return
-      } else if (e.key.toLowerCase() === 'b') {
-        setTool('trim')
         return
       } else if (e.key.toLowerCase() === 'c') {
         setTool('split')

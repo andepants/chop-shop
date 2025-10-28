@@ -63,12 +63,12 @@ development_status:
   3-5-export-timeline-to-mp4: review
   epic-3-retrospective: optional
 
-  epic-4: backlog
-  4-1-multi-track-timeline-2-tracks: backlog
-  4-2-timeline-zoom-controls: backlog
-  4-3-screen-recording-setup: backlog
-  4-4-webcam-recording: backlog
-  4-5-picture-in-picture-recording-screen-webcam: backlog
-  4-6-recording-stop-and-auto-import: backlog
-  4-7-enhanced-preview-with-multi-track-compositing: backlog
+  epic-4: contexted
+  4-1-multi-track-timeline-2-tracks: drafted
+  4-2-timeline-zoom-controls: drafted
+  4-3-screen-recording-setup: drafted
+  4-4-webcam-recording: drafted
+  4-5-picture-in-picture-recording-screen-webcam: drafted
+  4-6-recording-stop-and-auto-import: drafted
+  4-7-enhanced-preview-with-multi-track-compositing: drafted
   epic-4-retrospective: optional

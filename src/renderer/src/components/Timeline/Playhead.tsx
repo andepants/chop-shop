@@ -120,7 +120,7 @@ export function Playhead({ position, zoomLevel }: PlayheadProps): React.JSX.Elem
   return (
     <div
       ref={containerRef}
-      className="absolute top-0 bottom-0 z-10"
+      className="absolute top-0 bottom-0 z-40"
       style={{
         transform: `translateX(${leftPosition}px)`,
         cursor: 'col-resize', // Premiere Pro style cursor
@@ -129,30 +129,33 @@ export function Playhead({ position, zoomLevel }: PlayheadProps): React.JSX.Elem
       onMouseDown={handleMouseDown}
       aria-label={`Playhead at ${position.toFixed(2)} seconds`}
     >
-      {/* Draggable head at top - larger hit area */}
+      {/* Draggable head at top - Premiere Pro style */}
       <div
-        className="absolute top-0 left-1/2 -translate-x-1/2 w-4 h-4 cursor-col-resize"
+        className="absolute top-0 left-1/2 -translate-x-1/2 cursor-col-resize"
         style={{
-          marginTop: '-2px' // Slight offset for better visual alignment
+          marginTop: '0px'
         }}
       >
-        {/* Triangle indicator */}
+        {/* Red rectangular head (Premiere Pro style) */}
         <div
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-0 transition-opacity"
+          className="absolute top-0 left-1/2 -translate-x-1/2 transition-opacity rounded-sm"
           style={{
-            borderLeft: '6px solid transparent',
-            borderRight: '6px solid transparent',
-            borderTop: '8px solid rgb(6 182 212)', // cyan-500
-            opacity: isDragging ? 0.8 : 1
+            width: '14px',
+            height: '18px',
+            backgroundColor: '#EF4444', // red-500
+            opacity: isDragging ? 0.9 : 1,
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3)'
           }}
         />
       </div>
 
-      {/* Vertical line - full height, draggable */}
+      {/* Vertical white line - full height, draggable (Premiere Pro style) */}
       <div
-        className="w-0.5 h-full bg-cyan-500 transition-opacity cursor-col-resize"
+        className="h-full bg-white transition-opacity cursor-col-resize relative z-50"
         style={{
-          opacity: isDragging ? 0.8 : 1
+          width: '4px',
+          opacity: isDragging ? 0.9 : 1,
+          boxShadow: '0 0 8px rgba(0, 0, 0, 0.8), 0 0 2px rgba(255, 255, 255, 0.5)' // Enhanced shadow for better visibility
         }}
       />
     </div>

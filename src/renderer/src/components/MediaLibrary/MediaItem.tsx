@@ -1,6 +1,7 @@
 /**
  * MediaItem Component
- * Media file display with thumbnail, metadata, duration, and filename
+ * Compact media file display with thumbnail and metadata
+ * Adobe Premiere Pro inspired design with borders, shadows, and professional styling
  */
 
 import type { MediaFile } from '../../../../shared/types'
@@ -13,8 +14,8 @@ interface MediaItemProps {
 }
 
 /**
- * Media item showing thumbnail, duration badge, filename, and metadata
- * Supports click selection and drag-to-timeline
+ * Media item showing compact thumbnail, filename, and comprehensive metadata
+ * Supports click selection and drag-to-timeline with professional visual design
  */
 export function MediaItem({ file, isSelected, onSelect }: MediaItemProps): React.JSX.Element {
   /**
@@ -31,32 +32,36 @@ export function MediaItem({ file, isSelected, onSelect }: MediaItemProps): React
       onDragStart={handleDragStart}
       onClick={onSelect}
       className={cn(
-        'rounded mb-2 cursor-grab active:cursor-grabbing overflow-hidden transition-colors',
-        'hover:opacity-80 bg-zinc-800',
-        isSelected && 'ring-2 ring-cyan-500'
+        'rounded-md mb-1.5 cursor-grab active:cursor-grabbing overflow-hidden',
+        'border shadow-sm transition-all duration-150',
+        'bg-zinc-800/90',
+        isSelected
+          ? 'ring-2 ring-cyan-500 border-cyan-500'
+          : 'border-zinc-700 hover:border-zinc-600 hover:shadow-md hover:bg-zinc-800'
       )}
     >
-      {/* Thumbnail with duration badge */}
-      <div className="relative w-full h-28 bg-black overflow-hidden">
+      {/* Compact Thumbnail */}
+      <div className="relative w-full h-16 bg-black overflow-hidden">
         <img
           src={file.thumbnail || ''}
           alt={file.name}
           className="w-full h-full object-cover"
         />
-
-        {/* Duration badge */}
-        <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded text-xs font-mono bg-black/75 text-zinc-100">
-          {formatTime(file.duration)}
-        </div>
       </div>
 
-      {/* File info */}
-      <div className="px-2 py-1.5">
-        <p className="text-xs truncate text-zinc-100 mb-1">{file.name}</p>
-        <div className="flex justify-between text-xs text-zinc-400">
+      {/* File info with all metadata */}
+      <div className="px-2 py-1 space-y-0.5">
+        {/* Filename */}
+        <p className="text-xs truncate text-zinc-100 leading-tight">{file.name}</p>
+
+        {/* Duration • Resolution • File Size */}
+        <div className="flex items-center gap-1.5 text-[11px] font-mono text-zinc-400 leading-tight">
+          <span>{formatTime(file.duration)}</span>
+          <span className="text-zinc-600">•</span>
           <span>
             {file.resolution.width}×{file.resolution.height}
           </span>
+          <span className="text-zinc-600">•</span>
           <span>{formatFileSize(file.size)}</span>
         </div>
       </div>

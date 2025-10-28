@@ -6,10 +6,9 @@
  * scaled by the current zoom level (pixels per second).
  */
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { formatTime } from '@/utils'
 import { cn } from '@/utils/cn.util'
-import { TrimTool } from '@/components/EditTools'
 import { useToolStore } from '@/store/toolStore'
 import { useTimelineStore } from '@/store/timelineStore'
 import type { Clip } from './timeline.types'
@@ -62,22 +61,76 @@ export function TimelineClip({
   const [razorMouseX, setRazorMouseX] = useState<number | null>(null)
   const clipRef = useRef<HTMLDivElement>(null)
 
-  // Calculate effective duration accounting for trim values (Story 3.1)
-  const effectiveDuration = clip.duration - clip.trimIn - clip.trimOut
+  // Edge trim state - Adobe Premiere style edge detection
+  type EdgeHoverState = 'start-edge' | 'end-edge' | 'center' | null
+  const [edgeHoverState, setEdgeHoverState] = useState<EdgeHoverState>(null)
+  const [isTrimming, setIsTrimming] = useState(false)
+  const [trimmingEdge, setTrimmingEdge] = useState<'start' | 'end' | null>(null)
 
-  const leftPosition = clip.startTime * zoomLevel
+  // Preview trim values (only applied on mouse release)
+  const [previewTrimIn, setPreviewTrimIn] = useState(clip.trimIn)
+  const [previewTrimOut, setPreviewTrimOut] = useState(clip.trimOut)
+
+  // Ref to store initial trim state (captured on mouse down, not first mouse move)
+  const trimStartRef = useRef<{
+    mouseX: number
+    trimIn: number
+    trimOut: number
+    startTime: number
+  } | null>(null)
+
+  // Track current mouse X position for visual feedback
+  const [currentMouseX, setCurrentMouseX] = useState<number>(0)
+
+  // Track if trim is at bounds (for cursor feedback)
+  const [isAtBounds, setIsAtBounds] = useState(false)
+
+  // Refs to store latest preview values (avoids closure issues in mouseup handler)
+  const previewTrimInRef = useRef<number>(clip.trimIn)
+  const previewTrimOutRef = useRef<number>(clip.trimOut)
+
+  // Store for updating clip
+  const updateClip = useTimelineStore((state) => state.updateClip)
+
+  // Sync preview values when clip changes
+  useEffect(() => {
+    setPreviewTrimIn(clip.trimIn)
+    setPreviewTrimOut(clip.trimOut)
+    previewTrimInRef.current = clip.trimIn
+    previewTrimOutRef.current = clip.trimOut
+  }, [clip.trimIn, clip.trimOut])
+
+  // Calculate effective duration using preview values during trim, actual values otherwise
+  const activeTrimIn = isTrimming ? previewTrimIn : clip.trimIn
+  const activeTrimOut = isTrimming ? previewTrimOut : clip.trimOut
+  const effectiveDuration = clip.duration - activeTrimIn - activeTrimOut
+
+  // Calculate preview position for start-edge trim (ripple behavior)
+  const previewStartTime = isTrimming && trimmingEdge === 'start' && trimStartRef.current
+    ? trimStartRef.current.startTime + (previewTrimIn - trimStartRef.current.trimIn)
+    : clip.startTime
+
+  const leftPosition = previewStartTime * zoomLevel
   // Ensure minimum width of 80px so clips are always visible
   const calculatedWidth = effectiveDuration * zoomLevel
   const width = Math.max(80, calculatedWidth)
 
-  // Determine cursor based on active tool
+  // Determine cursor based on active tool and edge hover state
   const cursorStyle = isDragging
     ? 'grabbing'
-    : selectedTool === 'trim'
-      ? 'ew-resize'
-      : selectedTool === 'split'
-        ? 'crosshair'
-        : 'grab'
+    : isTrimming && isAtBounds
+      ? 'not-allowed'
+      : isTrimming
+        ? trimmingEdge === 'start'
+          ? 'e-resize'
+          : 'w-resize'
+        : selectedTool === 'split'
+          ? 'crosshair'
+          : selectedTool === 'select' && edgeHoverState === 'start-edge'
+            ? 'e-resize'
+            : selectedTool === 'select' && edgeHoverState === 'end-edge'
+              ? 'w-resize'
+              : 'grab'
 
   /**
    * Handle drag start - store clip ID and index for drop handler
@@ -106,23 +159,43 @@ export function TimelineClip({
   }
 
   /**
-   * Handle mouse move for razor tool preview
-   * Tracks mouse X position within clip for split line preview
+   * Handle mouse move - detects edge proximity for trimming and tracks razor position
    */
   function handleMouseMove(e: React.MouseEvent): void {
-    if (selectedTool !== 'split') return
     if (!clipRef.current) return
 
     const rect = clipRef.current.getBoundingClientRect()
     const mouseX = e.clientX - rect.left
-    setRazorMouseX(mouseX)
+
+    // Razor tool preview
+    if (selectedTool === 'split') {
+      setRazorMouseX(mouseX)
+      return
+    }
+
+    // Edge detection for trimming (only in select tool, not while dragging)
+    if (selectedTool === 'select' && !isDragging && !isTrimming) {
+      // Zoom-aware edge threshold: at least 10px or 0.5 seconds worth of pixels
+      const EDGE_THRESHOLD = Math.max(10, 0.5 * zoomLevel)
+
+      if (mouseX < EDGE_THRESHOLD) {
+        setEdgeHoverState('start-edge')
+      } else if (mouseX > width - EDGE_THRESHOLD) {
+        setEdgeHoverState('end-edge')
+      } else {
+        setEdgeHoverState('center')
+      }
+    }
   }
 
   /**
-   * Handle mouse leave - clear razor preview
+   * Handle mouse leave - clear razor preview and edge hover state
    */
   function handleMouseLeave(): void {
     setRazorMouseX(null)
+    if (!isTrimming) {
+      setEdgeHoverState(null)
+    }
   }
 
   /**
@@ -157,6 +230,116 @@ export function TimelineClip({
     return { position: mouseX, snapped: false, time: splitTime }
   }
 
+  /**
+   * Handle mouse down on clip - start trim if on edge, otherwise allow drag
+   */
+  function handleMouseDown(e: React.MouseEvent): void {
+    // Only handle trim on edges in select mode
+    if (selectedTool === 'select' && (edgeHoverState === 'start-edge' || edgeHoverState === 'end-edge')) {
+      e.preventDefault()
+      e.stopPropagation()
+
+      // Capture initial state immediately (not on first mouse move)
+      if (clipRef.current) {
+        const rect = clipRef.current.getBoundingClientRect()
+        trimStartRef.current = {
+          mouseX: e.clientX - rect.left,
+          trimIn: clip.trimIn,
+          trimOut: clip.trimOut,
+          startTime: clip.startTime
+        }
+      }
+
+      setIsTrimming(true)
+      setTrimmingEdge(edgeHoverState === 'start-edge' ? 'start' : 'end')
+    }
+  }
+
+  /**
+   * Global mouse move and mouse up handlers for trim operations
+   */
+  useEffect(() => {
+    if (!isTrimming || !trimmingEdge || !trimStartRef.current) return
+
+    const initialState = trimStartRef.current
+
+    function handleGlobalMouseMove(e: MouseEvent): void {
+      if (!clipRef.current || !isTrimming || !initialState) return
+
+      const rect = clipRef.current.getBoundingClientRect()
+      const mouseX = e.clientX - rect.left
+
+      // Update mouse position for visual feedback
+      setCurrentMouseX(mouseX)
+
+      // Calculate delta from initial mouse position (captured on mouse down)
+      const deltaX = mouseX - initialState.mouseX
+      const deltaTime = deltaX / zoomLevel
+
+      if (trimmingEdge === 'start') {
+        // Trimming start edge - adjust trimIn
+        const unclamped = initialState.trimIn + deltaTime
+        const maxTrimIn = clip.duration - initialState.trimOut - 0.1
+        const newTrimIn = Math.max(0, Math.min(unclamped, maxTrimIn))
+
+        // Check if we're at bounds
+        setIsAtBounds(unclamped <= 0 || unclamped >= maxTrimIn)
+        // Update both state (for UI) and ref (for mouseup handler)
+        setPreviewTrimIn(newTrimIn)
+        previewTrimInRef.current = newTrimIn
+      } else {
+        // Trimming end edge - adjust trimOut
+        const unclamped = initialState.trimOut - deltaTime
+        const maxTrimOut = clip.duration - initialState.trimIn - 0.1
+        const newTrimOut = Math.max(0, Math.min(unclamped, maxTrimOut))
+
+        // Check if we're at bounds
+        setIsAtBounds(unclamped <= 0 || unclamped >= maxTrimOut)
+        // Update both state (for UI) and ref (for mouseup handler)
+        setPreviewTrimOut(newTrimOut)
+        previewTrimOutRef.current = newTrimOut
+      }
+    }
+
+    function handleGlobalMouseUp(): void {
+      if (!isTrimming || !initialState) return
+
+      // Calculate updates - READ FROM REFS to avoid stale closure values
+      const updates: Partial<Clip> = {
+        trimIn: previewTrimInRef.current,
+        trimOut: previewTrimOutRef.current
+      }
+
+      // If trimming start edge, adjust startTime to move clip on timeline (ripple behavior)
+      if (trimmingEdge === 'start') {
+        const trimInDelta = previewTrimInRef.current - initialState.trimIn
+        updates.startTime = initialState.startTime + trimInDelta
+      }
+
+      // Apply all updates to store
+      updateClip(clip.id, updates)
+
+      // Reset trim state and refs
+      setIsTrimming(false)
+      setTrimmingEdge(null)
+      trimStartRef.current = null
+      setCurrentMouseX(0)
+      setIsAtBounds(false)
+      previewTrimInRef.current = clip.trimIn
+      previewTrimOutRef.current = clip.trimOut
+    }
+
+    window.addEventListener('mousemove', handleGlobalMouseMove)
+    window.addEventListener('mouseup', handleGlobalMouseUp)
+
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMouseMove)
+      window.removeEventListener('mouseup', handleGlobalMouseUp)
+    }
+    // Dependencies: only include values that are READ by the effect, not values that are SET by it
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTrimming, trimmingEdge, clip.duration, zoomLevel, updateClip])
+
   // Extract filename from sourceFile path
   const filename = clip.sourceFile.split('/').pop() || clip.sourceFile
 
@@ -164,7 +347,7 @@ export function TimelineClip({
     <div
       ref={clipRef}
       className={cn(
-        'absolute rounded',
+        'absolute rounded z-5',
         'transition-all duration-200 ease-out',
         // Fallback background if no thumbnail
         !clip.thumbnail && 'bg-cyan-500/60',
@@ -181,11 +364,12 @@ export function TimelineClip({
         top: '8px',
         cursor: cursorStyle
       }}
-      draggable={selectedTool === 'select'}
+      draggable={selectedTool === 'select' && edgeHoverState === 'center'}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
+      onMouseDown={handleMouseDown}
       onClick={(e) => onClick?.(e)}
       role="button"
       tabIndex={0}
@@ -213,6 +397,79 @@ export function TimelineClip({
         <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded text-xs font-mono bg-black/75 text-zinc-100 z-10">
           {formatTime(effectiveDuration)}
         </div>
+
+        {/* Trim preview overlay - grey out trimmed area during drag */}
+        {isTrimming && trimmingEdge && (() => {
+          const trimmedAreaWidth = trimmingEdge === 'start'
+            ? (previewTrimIn - clip.trimIn) * zoomLevel
+            : (previewTrimOut - clip.trimOut) * zoomLevel
+
+          const overlayLeft = trimmingEdge === 'start'
+            ? 0
+            : width + trimmedAreaWidth
+
+          return (
+            <>
+              {/* Gray overlay showing trimmed region */}
+              <div
+                className="absolute top-0 bottom-0 pointer-events-none z-15 transition-all duration-75"
+                style={{
+                  left: `${overlayLeft}px`,
+                  width: `${Math.abs(trimmedAreaWidth)}px`,
+                  backgroundColor: 'rgba(239, 68, 68, 0.4)', // Red-tinted gray
+                  backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0, 0, 0, 0.1) 10px, rgba(0, 0, 0, 0.1) 20px)'
+                }}
+              />
+
+              {/* Vertical line at cursor position (Premiere Pro style) */}
+              <div
+                className="absolute top-0 bottom-0 pointer-events-none z-20 transition-all duration-75"
+                style={{
+                  left: `${currentMouseX}px`,
+                  width: '2px',
+                  backgroundColor: '#3b82f6', // Blue
+                  boxShadow: '0 0 8px rgba(59, 130, 246, 0.8)'
+                }}
+              >
+                {/* Triangle indicator at top */}
+                <div
+                  className="absolute top-0 left-1/2 -translate-x-1/2"
+                  style={{
+                    width: 0,
+                    height: 0,
+                    borderLeft: '5px solid transparent',
+                    borderRight: '5px solid transparent',
+                    borderTop: '8px solid #3b82f6'
+                  }}
+                />
+              </div>
+
+              {/* Timecode tooltip showing trim amount */}
+              {trimStartRef.current && (
+                <div
+                  className="absolute pointer-events-none z-30 px-2 py-1 rounded text-xs font-mono whitespace-nowrap"
+                  style={{
+                    left: `${currentMouseX}px`,
+                    top: '-32px',
+                    transform: 'translateX(-50%)',
+                    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+                    color: '#3b82f6',
+                    border: '1px solid #3b82f6',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.5)'
+                  }}
+                >
+                  {(() => {
+                    const trimAmount = trimmingEdge === 'start'
+                      ? previewTrimIn - trimStartRef.current.trimIn
+                      : previewTrimOut - trimStartRef.current.trimOut
+                    const sign = trimAmount >= 0 ? '+' : ''
+                    return `${sign}${formatTime(Math.abs(trimAmount))}`
+                  })()}
+                </div>
+              )}
+            </>
+          )
+        })()}
 
         {/* Razor tool split preview - red line follows mouse cursor */}
         {selectedTool === 'split' && razorMouseX !== null && (() => {
@@ -263,9 +520,6 @@ export function TimelineClip({
             </>
           )
         })()}
-
-        {/* Trim handles - only shown when Trim tool active AND clip selected (Tool Selection System) */}
-        {isSelected && selectedTool === 'trim' && <TrimTool clip={clip} zoomLevel={zoomLevel} />}
       </div>
     </div>
   )
