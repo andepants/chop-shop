@@ -71,4 +71,5 @@ development_status:
   4-5-picture-in-picture-recording-screen-webcam: ready-for-dev
   4-6-recording-stop-and-auto-import: ready-for-dev
   4-7-enhanced-preview-with-multi-track-compositing: review
+  4-8-intermediate-codec-conversion-for-frame-accurate-editing: ready-for-dev
   epic-4-retrospective: optional

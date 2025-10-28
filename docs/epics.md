@@ -516,6 +516,33 @@ So that I can verify my picture-in-picture and overlay effects.
 
 ---
 
+**Story 4.8: Intermediate Codec Conversion for Frame-Accurate Editing**
+
+As a content creator,
+I want my imported videos automatically optimized for editing,
+So that I can perform frame-accurate cuts, smooth playback, and reliable multi-track sync without timing issues.
+
+**Acceptance Criteria:**
+
+1. Videos converted to ProRes intermediate codec on import with progress indicator
+2. Intermediate files stored in `.chop-shop/cache/` directory structure
+3. Variable Frame Rate (VFR) sources automatically converted to Constant Frame Rate (CFR)
+4. Timeline and compositor reference intermediate files for all editing operations
+5. Frame-accurate cutting works at any position (not limited to keyframes)
+6. Multi-track playback remains synchronized without drift
+7. Export pipeline reads from intermediate files and outputs H.264 MP4
+8. Cache management allows clearing intermediate files to free disk space
+9. Import shows "Optimizing for editing..." with percentage progress
+10. Smooth 60fps playback maintained with intermediate codec files
+
+**Prerequisites:** Story 4.7
+
+**Technical Context:**
+
+Professional video editors (CapCut, Premiere Pro) use intermediate codecs (ProRes, DNxHD) for editing because delivery codecs (H.264/H.265) use GOP compression that makes frame-accurate seeking difficult. This story implements industry-standard workflow: transcode on import → edit with I-frame codec → export to delivery format.
+
+---
+
 **📅 FINAL DEADLINE: Wednesday, October 29, 10:59 PM CT**
 
 ---

@@ -1,0 +1,272 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>8</storyId>
+    <title>Intermediate Codec Conversion for Frame-Accurate Editing</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/4-8-intermediate-codec-conversion-for-frame-accurate-editing.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a content creator</asA>
+    <iWant>my imported videos automatically optimized for editing</iWant>
+    <soThat>I can perform frame-accurate cuts, smooth playback, and reliable multi-track sync without timing issues</soThat>
+    <tasks>
+      - Task 1: Create Transcode Service (AC: #1, #2, #3)
+        - Subtask 1.1: Create `src/main/services/transcode.service.ts`
+        - Subtask 1.2: Implement `transcodeToProRes(sourcePath, outputPath, progressCallback)` using FFmpeg
+        - Subtask 1.3: Implement `detectVFR(filePath)` using ffprobe to detect variable frame rate
+        - Subtask 1.4: Implement `getIntermediatePath(sourceFile)` to generate cache paths
+        - Subtask 1.5: Create `.chop-shop/cache/` directory structure with proper permissions
+        - Subtask 1.6: Add progress tracking with callbacks for UI updates
+      - Task 2: Update File Import Flow (AC: #1, #4, #9)
+        - Subtask 2.1: Modify `src/main/services/file.service.ts` to trigger transcode after validation
+        - Subtask 2.2: Update `VideoMetadata` interface to include `intermediatePath` field
+        - Subtask 2.3: Create IPC channel `transcode-progress` for progress updates
+        - Subtask 2.4: Update media import UI to show "Optimizing for editing..." with progress bar
+        - Subtask 2.5: Store both original and intermediate paths in media metadata
+        - Subtask 2.6: Handle transcode errors with user-friendly messages
+      - Task 3: Update Timeline &amp; Compositor (AC: #4, #5, #6)
+        - Subtask 3.1: Modify `src/renderer/src/store/timelineStore.ts` to reference intermediate files
+        - Subtask 3.2: Update `Clip` interface to use intermediate path for playback
+        - Subtask 3.3: Modify `src/renderer/src/utils/VideoCompositor.ts` to load intermediate files
+        - Subtask 3.4: Update all clip operations (trim, split, playback) to use intermediate paths
+        - Subtask 3.5: Test frame-accurate seeking at any position
+        - Subtask 3.6: Verify multi-track synchronization with intermediate files
+      - Task 4: Update Export Pipeline (AC: #7)
+        - Subtask 4.1: Modify `src/main/services/ffmpeg.service.ts` to read from intermediate files
+        - Subtask 4.2: Update `buildFFmpegCommand` to use intermediate paths as input
+        - Subtask 4.3: Configure H.264 export with appropriate quality settings (CRF 18-20)
+        - Subtask 4.4: Test export from ProRes intermediate to H.264 MP4
+        - Subtask 4.5: Verify exported video quality matches source
+        - Subtask 4.6: Test multi-track export with intermediate files
+      - Task 5: Implement Cache Management (AC: #2, #8)
+        - Subtask 5.1: Create cache tracking system in `transcode.service.ts`
+        - Subtask 5.2: Implement `clearCache()` function to delete intermediate files
+        - Subtask 5.3: Add "Clear Cache" button in application settings/preferences
+        - Subtask 5.4: Display cache size in settings UI
+        - Subtask 5.5: Implement cleanup on app quit for orphaned cache files
+        - Subtask 5.6: Add disk space warnings if cache exceeds configurable threshold
+      - Task 6: Testing &amp; Validation (AC: All)
+        - Subtask 6.1: Test with VFR files (screen recordings) - verify CFR conversion
+        - Subtask 6.2: Test multi-track sync with converted files - verify no drift
+        - Subtask 6.3: Test cutting precision - verify frame-accurate cuts at any position
+        - Subtask 6.4: Test export quality - verify H.264 output matches intermediate quality
+        - Subtask 6.5: Memory usage testing with large files - ensure no leaks
+        - Subtask 6.6: Performance testing - verify smooth 60fps playback with ProRes files
+        - Subtask 6.7: Disk space testing - verify cache management works correctly
+        - Subtask 6.8: Edge case testing - handle transcode failures gracefully
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. Videos converted to ProRes intermediate codec on import with progress indicator
+    2. Intermediate files stored in `.chop-shop/cache/` directory structure
+    3. Variable Frame Rate (VFR) sources automatically converted to Constant Frame Rate (CFR)
+    4. Timeline and compositor reference intermediate files for all editing operations
+    5. Frame-accurate cutting works at any position (not limited to keyframes)
+    6. Multi-track playback remains synchronized without drift
+    7. Export pipeline reads from intermediate files and outputs H.264 MP4
+    8. Cache management allows clearing intermediate files to free disk space
+    9. Import shows "Optimizing for editing..." with percentage progress
+    10. Smooth 60fps playback maintained with intermediate codec files
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Document</title>
+        <section>Technology Stack and Project Structure</section>
+        <snippet>FFmpeg Integration via ffmpeg-static 5.2.0 (FFmpeg 6.0). Services in src/main/services/ include ffmpeg.service.ts for FFmpeg execution, file.service.ts for file operations. IPC handlers bridge renderer to main process for FFmpeg operations.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Service Layer and Multi-track Architecture</section>
+        <snippet>ffmpeg.service.ts extended for multi-track export with overlay compositing. file.service.ts handles recording temp file management. Recording streams managed in renderer, main process coordinates file operations per ADR-002.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epics Document</title>
+        <section>Story 4.8 - Intermediate Codec Conversion</section>
+        <snippet>Professional video editors use intermediate codecs (ProRes, DNxHD) because delivery codecs (H.264/H.265) use GOP compression making frame-accurate seeking difficult. Implements transcode on import → edit with I-frame codec → export to delivery format.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-4-ffmpeg-integration-setup.md</path>
+        <title>Story 1.4 - FFmpeg Integration Setup</title>
+        <section>FFmpeg Service Implementation Patterns</section>
+        <snippet>ffmpeg-static 5.2.0 bundles FFmpeg 6.0 binaries. Service pattern: getFfmpegPath(), executeFFmpegCommand() with progress callbacks, IPC handlers for renderer communication. Progress parsing from stderr for UI updates.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/main/services/file.service.ts</path>
+        <kind>service</kind>
+        <symbol>validateVideoFile</symbol>
+        <lines>entire file</lines>
+        <reason>Handles file validation during import - needs to trigger transcode after validation (Subtask 2.1)</reason>
+      </artifact>
+      <artifact>
+        <path>src/main/services/ffmpeg.service.ts</path>
+        <kind>service</kind>
+        <symbol>executeFFmpegCommand, parseProgress, getFfmpegPath</symbol>
+        <lines>entire file</lines>
+        <reason>FFmpeg execution patterns - will be used by new transcode service for ProRes conversion. Also needs extension to read intermediate files for export (Task 4)</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/store/timelineStore.ts</path>
+        <kind>store</kind>
+        <symbol>useTimelineStore</symbol>
+        <lines>entire file</lines>
+        <reason>Timeline state management - needs modification to reference intermediate files instead of original files (Subtask 3.1)</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/utils/VideoCompositor.ts</path>
+        <kind>utility</kind>
+        <symbol>VideoCompositor</symbol>
+        <lines>entire file</lines>
+        <reason>Multi-track compositing - needs to load intermediate files instead of original files (Subtask 3.3)</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/components/Timeline/timeline.types.ts</path>
+        <kind>types</kind>
+        <symbol>Clip</symbol>
+        <lines>11-32</lines>
+        <reason>Clip interface needs new intermediatePath field to reference ProRes cache files (Subtask 3.2)</reason>
+      </artifact>
+      <artifact>
+        <path>src/shared/types.ts</path>
+        <kind>types</kind>
+        <symbol>VideoMetadata</symbol>
+        <lines>52-62</lines>
+        <reason>VideoMetadata interface needs intermediatePath, isVFR, and transcodeStatus fields (Subtask 2.2)</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="ffmpeg-static" version="^5.2.0">Bundles FFmpeg 6.0 binaries - used for ProRes transcode</package>
+        <package name="ffprobe-static" version="^3.1.0">FFprobe for VFR detection and metadata extraction</package>
+        <package name="zustand" version="^5.0.8">State management - timeline and media stores</package>
+        <package name="video.js" version="^8.23.4">Video playback - will play intermediate ProRes files</package>
+        <package name="@electron-toolkit/utils" version="^4.0.0">Electron utilities and helpers</package>
+        <package name="@radix-ui/react-progress" version="^1.1.7">Progress UI component for transcode progress</package>
+      </node>
+      <electron>
+        <api name="ipcMain">IPC handlers for transcode requests</api>
+        <api name="ipcRenderer">Request transcode and listen for progress events</api>
+        <api name="child_process">spawn() for FFmpeg/ffprobe execution</api>
+        <api name="fs/promises">File system operations for cache management</api>
+        <api name="os">tmpdir() for cache directory base path</api>
+      </electron>
+      <testing>
+        <framework name="vitest" version="^4.0.4">Unit and integration testing</framework>
+        <framework name="@testing-library/react" version="^16.3.0">Component testing</framework>
+      </testing>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Main process handles all FFmpeg operations per ADR-002 (IPC architecture)
+    - Services layer pattern: create transcode.service.ts following existing ffmpeg.service.ts patterns
+    - All IPC handlers follow IPCResponse format convention
+    - TypeScript strict mode - all new code must include proper types
+    - Progress callbacks required for long-running operations (transcode, export)
+    - Error handling: try-catch with user-friendly messages displayed in UI
+    - File paths: Use OS temp directory patterns, create .chop-shop/cache/ structure
+    - Testing: Unit tests required for services, integration tests for IPC handlers
+    - Files should not exceed 500 lines per project guidelines
+    - All functions must have JSDoc/TSDoc documentation
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>transcode-file IPC channel</name>
+      <kind>IPC request/response</kind>
+      <signature>Request: { filePath: string } → Response: { intermediatePath: string }</signature>
+      <path>NEW - to be created in src/main/ipc/transcode.handlers.ts</path>
+    </interface>
+    <interface>
+      <name>transcode-progress IPC event</name>
+      <kind>IPC event (Main → Renderer)</kind>
+      <signature>Event: { percent: number, file: string }</signature>
+      <path>NEW - emitted from transcode service during conversion</path>
+    </interface>
+    <interface>
+      <name>clear-cache IPC channel</name>
+      <kind>IPC request/response</kind>
+      <signature>Request: void → Response: { freedSpace: number }</signature>
+      <path>NEW - to be created for cache management</path>
+    </interface>
+    <interface>
+      <name>VideoMetadata (extended)</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface VideoMetadata { duration: number; resolution: {...}; format: string; size: number; hasVideo: boolean; hasAudio: boolean; intermediatePath: string | null; isVFR: boolean; transcodeStatus: 'pending' | 'in-progress' | 'complete' | 'failed'; }</signature>
+      <path>src/shared/types.ts</path>
+    </interface>
+    <interface>
+      <name>Clip (extended)</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface Clip { id: string; sourceFile: string; intermediatePath: string; startTime: number; duration: number; trimIn: number; trimOut: number; trackId: number; thumbnail?: string; pipPosition?: string; pipSize?: number; }</signature>
+      <path>src/renderer/src/components/Timeline/timeline.types.ts</path>
+    </interface>
+    <interface>
+      <name>transcodeToProRes()</name>
+      <kind>Service function</kind>
+      <signature>async function transcodeToProRes(sourcePath: string, outputPath: string, progressCallback: (percent: number) =&gt; void): Promise&lt;void&gt;</signature>
+      <path>NEW - src/main/services/transcode.service.ts</path>
+    </interface>
+    <interface>
+      <name>detectVFR()</name>
+      <kind>Service function</kind>
+      <signature>async function detectVFR(filePath: string): Promise&lt;boolean&gt;</signature>
+      <path>NEW - src/main/services/transcode.service.ts</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Project uses Vitest for unit and integration testing following existing patterns in ffmpeg.service.test.ts and file.service.test.ts. Services require unit tests with mocked child_process and file system operations. IPC handlers require integration tests. All async operations should be properly tested with timeout handling. Test coverage required for error cases and edge conditions.</standards>
+    <locations>
+      - src/main/services/__tests__/ (service unit tests)
+      - src/main/ipc/__tests__/ (IPC handler integration tests)
+      - src/renderer/src/store/__tests__/ (store unit tests)
+    </locations>
+    <ideas>
+      <test ac="1,2,3" task="1">
+        Unit tests for transcode.service.ts:
+        - Test transcodeToProRes() command generation
+        - Test detectVFR() with mock ffprobe output
+        - Test getIntermediatePath() cache path generation
+        - Test progress parsing from FFmpeg stderr
+        - Test error handling for transcode failures
+      </test>
+      <test ac="4,5,6" task="3">
+        Unit tests for timelineStore modifications:
+        - Test clip operations use intermediatePath
+        - Test frame-accurate seeking with ProRes files
+        - Test multi-track sync with intermediate files
+      </test>
+      <test ac="7" task="4">
+        Unit tests for ffmpeg.service.ts export updates:
+        - Test buildFFmpegCommand uses intermediate paths
+        - Test export quality settings (CRF 18-20)
+        - Test multi-track export with intermediate files
+      </test>
+      <test ac="8" task="5">
+        Unit tests for cache management:
+        - Test clearCache() removes files correctly
+        - Test cache size calculation
+        - Test orphaned file cleanup
+      </test>
+      <test ac="all" task="6">
+        Integration/Manual tests:
+        - Import H.264 video → verify ProRes transcode with progress
+        - Import VFR screen recording → verify CFR conversion
+        - Test frame-accurate cuts at arbitrary positions
+        - Test multi-track sync during playback
+        - Test export quality from ProRes to H.264
+        - Test cache clearing functionality
+      </test>
+    </ideas>
+  </tests>
+</story-context>
