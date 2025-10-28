@@ -3,7 +3,7 @@
  * Left sidebar panel for media library
  */
 
-import { ImportZone, MediaLibrary } from '../MediaLibrary'
+import { MediaLibrary } from '../MediaLibrary'
 import { useMediaStore } from '../../store/mediaStore'
 import { useUIStore } from '../../store/uiStore'
 import { Button } from '@/components/ui/button'
@@ -75,7 +75,7 @@ export function Sidebar(): React.JSX.Element {
 
   return (
     <aside className="w-[280px] flex flex-col pb-16 bg-zinc-800 border-r border-zinc-700">
-      <div className="p-4 space-y-3">
+      <div className="px-4 py-3 border-b border-zinc-700">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-zinc-100">Media</h2>
           <Button
@@ -87,7 +87,6 @@ export function Sidebar(): React.JSX.Element {
             {isImporting ? 'Importing...' : 'Import'}
           </Button>
         </div>
-        <ImportZone />
       </div>
       <MediaLibrary />
     </aside>

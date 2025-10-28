@@ -119,7 +119,7 @@ export class VideoCompositor {
     const sourceFiles = new Set<string>()
     for (const track of this.tracks) {
       for (const clip of track.clips) {
-        // Use intermediate path for playback (ProRes optimized for editing)
+        // Use intermediate path for playback (H.264 Intra optimized for editing)
         sourceFiles.add(clip.intermediatePath)
       }
     }
@@ -363,6 +363,9 @@ export class VideoCompositor {
       // Update active clips if changed
       this.updateActiveClips()
 
+      // Preload upcoming clips for smooth transitions
+      this.preloadUpcomingClips()
+
       // Render frame
       this.renderFrame()
 
@@ -604,7 +607,9 @@ export class VideoCompositor {
 
     for (const track of this.tracks) {
       for (const clip of track.clips) {
-        const clipEnd = clip.startTime + clip.duration
+        // Calculate effective duration accounting for trim
+        const effectiveDuration = clip.duration - clip.trimIn - clip.trimOut
+        const clipEnd = clip.startTime + effectiveDuration
         if (this.state.currentTime >= clip.startTime && this.state.currentTime < clipEnd) {
           newActiveClips.push(clip)
         }
@@ -645,6 +650,35 @@ export class VideoCompositor {
   }
 
   /**
+   * Preload upcoming clips to reduce transition lag
+   * Pre-seeks video elements for clips starting within 0.5 seconds
+   */
+  private preloadUpcomingClips(): void {
+    const PRELOAD_WINDOW = 0.5 // Pre-seek clips starting within 0.5 seconds
+
+    for (const track of this.tracks) {
+      for (const clip of track.clips) {
+        // Check if clip starts within preload window
+        const timeUntilClipStarts = clip.startTime - this.state.currentTime
+
+        if (timeUntilClipStarts > 0 && timeUntilClipStarts <= PRELOAD_WINDOW) {
+          const source = this.sources.get(clip.intermediatePath)
+          if (source && source.isLoaded) {
+            // Pre-seek to the clip's start position (accounting for trim)
+            const targetTime = clip.trimIn
+
+            // Only seek if we're not already at the right position
+            if (Math.abs(source.element.currentTime - targetTime) > 0.1) {
+              source.element.currentTime = targetTime
+              console.log('[VideoCompositor] Preloaded clip', clip.id, 'at', targetTime, 's')
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * Get the primary track index for an intermediate file
    * Returns the lowest trackIndex that uses this intermediate file
    */
@@ -673,9 +707,11 @@ export class VideoCompositor {
 
     for (const track of this.tracks) {
       for (const clip of track.clips) {
-        const clipEnd = clip.startTime + clip.duration
+        // Calculate effective duration accounting for trim
+        const effectiveDuration = clip.duration - clip.trimIn - clip.trimOut
+        const clipEnd = clip.startTime + effectiveDuration
         // Include if clip overlaps with [time, preloadEnd]
-        // Use intermediate path for playback (ProRes optimized for editing)
+        // Use intermediate path for playback (H.264 Intra optimized for editing)
         if (clip.startTime < preloadEnd && clipEnd > time) {
           sources.add(clip.intermediatePath)
         }
@@ -743,9 +779,11 @@ export class VideoCompositor {
       video.addEventListener('loadedmetadata', onLoadedMetadata)
       video.addEventListener('error', onError)
 
-      // Set source with proper file:// protocol
+      // Set source with proper file:// protocol and URL encoding
+      // Normalize path separators and encode special characters (spaces, etc.)
       const normalizedPath = filePath.replace(/\\/g, '/')
-      video.src = `file://${normalizedPath}`
+      const encodedPath = encodeURI(normalizedPath)
+      video.src = `file://${encodedPath}`
     })
   }
 
@@ -801,7 +839,9 @@ export class VideoCompositor {
 
     for (const track of this.tracks) {
       for (const clip of track.clips) {
-        const clipEnd = clip.startTime + clip.duration
+        // Calculate effective duration accounting for trim
+        const effectiveDuration = clip.duration - clip.trimIn - clip.trimOut
+        const clipEnd = clip.startTime + effectiveDuration
         if (clipEnd > maxEnd) {
           maxEnd = clipEnd
         }

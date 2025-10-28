@@ -45,7 +45,7 @@ export interface MediaFile {
   size: number // in bytes
   thumbnail?: string // data URL or file path
   createdAt: number // timestamp
-  intermediatePath?: string // Path to ProRes intermediate file for editing
+  intermediatePath?: string // Path to H.264 Intra intermediate file for editing
 }
 
 /**

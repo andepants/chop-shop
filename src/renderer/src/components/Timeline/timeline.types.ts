@@ -14,7 +14,7 @@ export interface Clip {
   id: string
   /** Absolute path to the source video file */
   sourceFile: string
-  /** Path to intermediate ProRes file (used for playback and editing) */
+  /** Path to intermediate H.264 Intra file (used for playback and editing) */
   intermediatePath: string
   /** Position on timeline in seconds (when the clip starts playing) */
   startTime: number
@@ -60,8 +60,10 @@ export interface TimelineState {
   zoomLevel: number
   /** Computed pixels per second based on zoom level */
   pixelsPerSecond: number
-  /** ID of currently selected clip, null if none selected */
-  selectedClipId: string | null
+  /** Magnetic snap tolerance in seconds (0.1 to 2.0, default 0.5) */
+  snapTolerance: number
+  /** IDs of currently selected clips (empty array if none selected) */
+  selectedClipIds: string[]
 
   // Actions
   /** Add a new clip to the timeline */
@@ -70,16 +72,24 @@ export interface TimelineState {
   addClipToTrack: (clip: Omit<Clip, 'id' | 'trackId'>, trackId: number) => void
   /** Get all clips for a specific track */
   getClipsForTrack: (trackId: number) => Clip[]
-  /** Remove a clip from the timeline */
+  /** Remove a clip from the timeline (leaves gaps) */
   removeClip: (clipId: string) => void
+  /** Ripple delete: Remove clips and close gaps by shifting remaining clips left */
+  rippleDeleteClips: (clipIds: string[]) => void
   /** Update properties of an existing clip */
   updateClip: (clipId: string, updates: Partial<Clip>) => void
   /** Split a clip at a specific time position */
   splitClip: (clipId: string, splitTime: number) => void
   /** Set the playhead position */
   setPlayhead: (position: number) => void
-  /** Select a clip by ID */
+  /** Select a single clip (replaces current selection) */
   selectClip: (clipId: string | null) => void
+  /** Toggle a clip in/out of selection (Cmd/Ctrl+click) */
+  toggleClipSelection: (clipId: string) => void
+  /** Select a range of clips (Shift+click) */
+  selectClipRange: (fromClipId: string, toClipId: string) => void
+  /** Clear all selections */
+  clearSelection: () => void
   /** Move clip to specific timeline position (allows gaps, Premiere Pro style) */
   moveClipToPosition: (clipId: string, targetPosition: number) => void
   /** Reorder clips by moving clip from sourceIndex to destIndex */
@@ -92,4 +102,6 @@ export interface TimelineState {
   zoomOut: () => void
   /** Calculate zoom level to fit all clips in viewport */
   fitToTimeline: () => void
+  /** Set snap tolerance for magnetic snapping (0.1 to 2.0 seconds) */
+  setSnapTolerance: (value: number) => void
 }

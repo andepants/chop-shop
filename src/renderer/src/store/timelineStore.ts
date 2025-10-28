@@ -26,9 +26,32 @@ const MAX_ZOOM = 5.0
 const ZOOM_STEP = 1.2 // Premiere Pro standard
 
 /**
+ * Default framerate for frame-accurate snapping
+ * Used when source video framerate is unavailable
+ */
+const DEFAULT_FRAMERATE = 30
+
+/**
+ * Magnetic snap threshold in seconds
+ * Matches Premiere Pro behavior
+ */
+const SNAP_THRESHOLD = 0.5
+
+/**
  * LocalStorage key for persisting zoom level (Story 4.2: Task 9, AC #5)
  */
 const ZOOM_STORAGE_KEY = 'chop-shop-timeline-zoom'
+
+/**
+ * LocalStorage key for persisting snap tolerance
+ */
+const SNAP_STORAGE_KEY = 'chop-shop-snap-tolerance'
+
+/**
+ * Snap tolerance bounds in seconds
+ */
+const MIN_SNAP_TOLERANCE = 0.1
+const MAX_SNAP_TOLERANCE = 2.0
 
 /**
  * Load saved zoom level from localStorage
@@ -61,11 +84,58 @@ function saveZoom(zoomLevel: number): void {
 }
 
 /**
+ * Load saved snap tolerance from localStorage
+ * Returns default if not found or invalid
+ */
+function loadSavedSnapTolerance(): number {
+  try {
+    const saved = localStorage.getItem(SNAP_STORAGE_KEY)
+    if (saved) {
+      const parsed = parseFloat(saved)
+      if (!isNaN(parsed) && parsed >= MIN_SNAP_TOLERANCE && parsed <= MAX_SNAP_TOLERANCE) {
+        return parsed
+      }
+    }
+  } catch (error) {
+    console.warn('[TimelineStore] Failed to load saved snap tolerance:', error)
+  }
+  return SNAP_THRESHOLD
+}
+
+/**
+ * Save snap tolerance to localStorage
+ */
+function saveSnapTolerance(snapTolerance: number): void {
+  try {
+    localStorage.setItem(SNAP_STORAGE_KEY, snapTolerance.toString())
+  } catch (error) {
+    console.warn('[TimelineStore] Failed to save snap tolerance:', error)
+  }
+}
+
+/**
  * Calculate effective duration of a clip accounting for trim values
  * Effective duration = total duration - trim from start - trim from end
  */
 function getEffectiveDuration(clip: Clip): number {
   return clip.duration - clip.trimIn - clip.trimOut
+}
+
+/**
+ * Snap a time position to the nearest frame boundary
+ * Provides frame-accurate positioning for professional video editing
+ *
+ * @param position - Time position in seconds (can be decimal)
+ * @param framerate - Video framerate (fps), defaults to 30fps
+ * @returns Position quantized to nearest frame boundary
+ *
+ * @example
+ * snapToFrame(1.234, 30) // Returns 1.2333... (37th frame)
+ * snapToFrame(1.234, 60) // Returns 1.2333... (74th frame)
+ */
+function snapToFrame(position: number, framerate: number = DEFAULT_FRAMERATE): number {
+  const frameInterval = 1 / framerate
+  return Math.round(position / frameInterval) * frameInterval
 }
 
 /**
@@ -81,6 +151,7 @@ function getEffectiveDuration(clip: Clip): number {
 export const useTimelineStore = create<TimelineState>((set, get) => {
   // Load saved zoom level from localStorage (Story 4.2: Task 9, AC #5)
   const initialZoom = loadSavedZoom()
+  const initialSnapTolerance = loadSavedSnapTolerance()
 
   return {
     // State
@@ -100,7 +171,14 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
     totalDuration: 0,
     zoomLevel: initialZoom,
     pixelsPerSecond: BASE_PIXELS_PER_SECOND * initialZoom,
-    selectedClipId: null,
+    snapTolerance: initialSnapTolerance,
+    selectedClipIds: [],
+
+    // Backward-compatible getter for components still using selectedClipId (singular)
+    // Returns first selected clip ID or null
+    get selectedClipId() {
+      return get().selectedClipIds[0] ?? null
+    },
 
     // Actions
 
@@ -213,27 +291,16 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
       const deletedDuration = getEffectiveDuration(deletedClip)
       const deletedEnd = deletedStart + deletedDuration
 
-      // Remove clip and close gap by shifting subsequent clips left
+      // Remove clip (Premiere Pro style: leave gaps, don't shift remaining clips)
       const updatedTracks = state.tracks.map((track) => {
         if (track.id !== deletedTrackId) return track
 
-        // Filter out the deleted clip
+        // Filter out the deleted clip - keep remaining clips at their positions
         const remainingClips = track.clips.filter((clip) => clip.id !== clipId)
-
-        // Shift clips after deleted clip to close gap
-        const shiftedClips = remainingClips.map((clip) => {
-          if (clip.startTime > deletedStart) {
-            return {
-              ...clip,
-              startTime: clip.startTime - deletedDuration
-            }
-          }
-          return clip
-        })
 
         return {
           ...track,
-          clips: shiftedClips.sort((a, b) => a.startTime - b.startTime)
+          clips: remainingClips.sort((a, b) => a.startTime - b.startTime)
         }
       })
 
@@ -244,21 +311,126 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
         return endTime > max ? endTime : max
       }, 0)
 
-      // Update playhead if it was within deleted clip bounds or after it
+      // Update playhead if it was within deleted clip bounds (Premiere Pro style)
       let newPlayhead = state.playheadPosition
       if (state.playheadPosition >= deletedStart && state.playheadPosition < deletedEnd) {
         // Playhead was on deleted clip - move to clip's start position
         newPlayhead = deletedStart
-      } else if (state.playheadPosition >= deletedEnd) {
-        // Playhead was after deleted clip - shift left by deleted duration
-        newPlayhead = state.playheadPosition - deletedDuration
       }
+      // Don't shift playhead if it was after deleted clip (leave gaps)
 
       return {
         tracks: updatedTracks,
         totalDuration: maxEndTime,
         playheadPosition: newPlayhead,
-        selectedClipId: state.selectedClipId === clipId ? null : state.selectedClipId
+        selectedClipIds: state.selectedClipIds.filter((id) => id !== clipId)
+      }
+    }),
+
+  /**
+   * Ripple delete: Remove clips and close gaps by shifting remaining clips left
+   * Adobe Premiere Pro style - deletes clips and shifts all subsequent clips
+   *
+   * @param clipIds - Array of clip IDs to delete (supports multi-selection)
+   */
+  rippleDeleteClips: (clipIds: string[]) =>
+    set((state) => {
+      // Group clips by track for efficient processing
+      const clipsByTrack = new Map<number, Array<{ clipId: string; startTime: number; duration: number }>>()
+
+      // Find all clips to delete and organize by track
+      for (const clipId of clipIds) {
+        for (const track of state.tracks) {
+          const clip = track.clips.find((c) => c.id === clipId)
+          if (clip) {
+            const effectiveDuration = getEffectiveDuration(clip)
+            if (!clipsByTrack.has(track.id)) {
+              clipsByTrack.set(track.id, [])
+            }
+            clipsByTrack.get(track.id)!.push({
+              clipId: clip.id,
+              startTime: clip.startTime,
+              duration: effectiveDuration
+            })
+            break
+          }
+        }
+      }
+
+      // Sort clips by startTime within each track (process from earliest to latest)
+      for (const clips of clipsByTrack.values()) {
+        clips.sort((a, b) => a.startTime - b.startTime)
+      }
+
+      // Process each track
+      const updatedTracks = state.tracks.map((track) => {
+        const clipsToDelete = clipsByTrack.get(track.id)
+        if (!clipsToDelete || clipsToDelete.length === 0) {
+          return track // No clips to delete on this track
+        }
+
+        // Remove all clips marked for deletion
+        let remainingClips = track.clips.filter((clip) => !clipIds.includes(clip.id))
+
+        // Calculate cumulative shift amount for each position
+        // Process deletions from earliest to latest
+        for (const deletedClip of clipsToDelete) {
+          const { startTime: deletedStart, duration: deletedDuration } = deletedClip
+
+          // Shift all clips that start after this deleted clip
+          remainingClips = remainingClips.map((clip) => {
+            if (clip.startTime > deletedStart) {
+              return {
+                ...clip,
+                startTime: clip.startTime - deletedDuration
+              }
+            }
+            return clip
+          })
+        }
+
+        return {
+          ...track,
+          clips: remainingClips.sort((a, b) => a.startTime - b.startTime)
+        }
+      })
+
+      // Recalculate total duration
+      const allClips = updatedTracks.flatMap((track) => track.clips)
+      const maxEndTime = allClips.reduce((max, clip) => {
+        const endTime = clip.startTime + getEffectiveDuration(clip)
+        return endTime > max ? endTime : max
+      }, 0)
+
+      // Calculate total gap created by deletions
+      let totalGapDuration = 0
+      for (const clips of clipsByTrack.values()) {
+        for (const clip of clips) {
+          totalGapDuration += clip.duration
+        }
+      }
+
+      // Update playhead if it was within or after deleted clips
+      let newPlayhead = state.playheadPosition
+      const earliestDeletedStart = Math.min(
+        ...Array.from(clipsByTrack.values())
+          .flat()
+          .map((c) => c.startTime)
+      )
+
+      if (state.playheadPosition >= earliestDeletedStart) {
+        // Shift playhead left by total gap duration
+        newPlayhead = Math.max(earliestDeletedStart, state.playheadPosition - totalGapDuration)
+      }
+
+      // Clear selection for any deleted clips
+      const newSelectedClipIds = state.selectedClipIds.filter((id) => !clipIds.includes(id))
+
+      return {
+        tracks: updatedTracks,
+        totalDuration: maxEndTime,
+        playheadPosition: newPlayhead,
+        selectedClipIds: newSelectedClipIds
       }
     }),
 
@@ -352,7 +524,7 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
       return {
         tracks: updatedTracks,
         totalDuration: maxEndTime,
-        selectedClipId: null
+        selectedClipIds: []
       }
     }),
 
@@ -365,23 +537,105 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
     }),
 
   /**
-   * Select a clip by ID (null to deselect)
+   * Select a single clip (replaces current selection)
+   * Pass null to clear selection
    */
   selectClip: (clipId) =>
     set({
-      selectedClipId: clipId
+      selectedClipIds: clipId ? [clipId] : []
+    }),
+
+  /**
+   * Toggle a clip in/out of selection (Cmd/Ctrl+click behavior)
+   */
+  toggleClipSelection: (clipId) =>
+    set((state) => {
+      const isSelected = state.selectedClipIds.includes(clipId)
+      return {
+        selectedClipIds: isSelected
+          ? state.selectedClipIds.filter((id) => id !== clipId)
+          : [...state.selectedClipIds, clipId]
+      }
+    }),
+
+  /**
+   * Select a range of clips between two clips (Shift+click behavior)
+   * Finds all clips between fromClipId and toClipId on the timeline
+   */
+  selectClipRange: (fromClipId, toClipId) =>
+    set((state) => {
+      // Find both clips
+      let fromClip: Clip | undefined
+      let toClip: Clip | undefined
+      let trackId: number | undefined
+
+      for (const track of state.tracks) {
+        const from = track.clips.find((c) => c.id === fromClipId)
+        const to = track.clips.find((c) => c.id === toClipId)
+
+        if (from) {
+          fromClip = from
+          trackId = track.id
+        }
+        if (to) {
+          toClip = to
+          if (!trackId) trackId = track.id
+        }
+      }
+
+      if (!fromClip || !toClip || !trackId) {
+        // Can't find clips, just select the toClip
+        return { selectedClipIds: [toClipId] }
+      }
+
+      // Get all clips on the same track
+      const track = state.tracks.find((t) => t.id === trackId)
+      if (!track) return state
+
+      // Determine range bounds
+      const startTime = Math.min(fromClip.startTime, toClip.startTime)
+      const endTime = Math.max(fromClip.startTime, toClip.startTime)
+
+      // Select all clips within the time range
+      const clipIds = track.clips
+        .filter((clip) => clip.startTime >= startTime && clip.startTime <= endTime)
+        .map((clip) => clip.id)
+
+      return {
+        selectedClipIds: clipIds
+      }
+    }),
+
+  /**
+   * Clear all selections
+   */
+  clearSelection: () =>
+    set({
+      selectedClipIds: []
     }),
 
   /**
    * Move clip to a specific timeline position (Premiere Pro style)
    * Allows gaps between clips, with collision detection and magnetic snap
+   * Includes frame-accurate snapping and playhead magnetic snap
    *
    * @param clipId - ID of clip to move
    * @param targetPosition - Timeline position in seconds to move clip to
    */
   moveClipToPosition: (clipId, targetPosition) =>
     set((state) => {
-      const trackId = 1 // MVP: Single track only
+      // Find which track the clip is currently on
+      let sourceTrackId = 1
+      for (const track of state.tracks) {
+        if (track.clips.find((c) => c.id === clipId)) {
+          sourceTrackId = track.id
+          break
+        }
+      }
+
+      const trackId = sourceTrackId
+      const playheadPos = state.playheadPosition
+
       const updatedTracks = state.tracks.map((track) => {
         if (track.id !== trackId) return track
 
@@ -393,8 +647,6 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
 
         // Collision detection: check if target position overlaps any existing clip
         let finalPosition = Math.max(0, targetPosition) // Don't allow negative positions
-
-        const SNAP_THRESHOLD = 0.5 // 0.5 seconds magnetic snap (like Premiere Pro)
 
         // Check for collisions and find snap points
         for (const otherClip of otherClips) {
@@ -419,17 +671,26 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
           }
 
           // Magnetic snap to edges (within threshold)
-          if (Math.abs(finalPosition - otherEnd) < SNAP_THRESHOLD) {
+          if (Math.abs(finalPosition - otherEnd) < state.snapTolerance) {
             finalPosition = otherEnd // Snap to end of other clip
-          } else if (Math.abs(finalPosition + moveDuration - otherStart) < SNAP_THRESHOLD) {
+          } else if (Math.abs(finalPosition + moveDuration - otherStart) < state.snapTolerance) {
             finalPosition = otherStart - moveDuration // Snap end to start of other clip
           }
         }
 
         // Magnetic snap to timeline start
-        if (finalPosition < SNAP_THRESHOLD && finalPosition > 0) {
+        if (finalPosition < state.snapTolerance && finalPosition > 0) {
           finalPosition = 0
         }
+
+        // Magnetic snap to playhead position
+        if (Math.abs(finalPosition - playheadPos) < state.snapTolerance) {
+          finalPosition = playheadPos
+        }
+
+        // Apply frame-accurate quantization to final position
+        // Ensures clips land on exact frame boundaries (1/30s for 30fps)
+        finalPosition = snapToFrame(finalPosition, DEFAULT_FRAMERATE)
 
         // Update clip position
         const updatedClips = track.clips
@@ -606,6 +867,23 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
         return {
           zoomLevel: clampedZoomLevel,
           pixelsPerSecond: newPixelsPerSecond
+        }
+      }),
+
+    /**
+     * Set snap tolerance for magnetic snapping
+     * Value is clamped to valid range (0.1 - 2.0 seconds)
+     * Persists to localStorage
+     */
+    setSnapTolerance: (value: number) =>
+      set(() => {
+        const clampedValue = Math.max(MIN_SNAP_TOLERANCE, Math.min(MAX_SNAP_TOLERANCE, value))
+
+        // Persist to localStorage
+        saveSnapTolerance(clampedValue)
+
+        return {
+          snapTolerance: clampedValue
         }
       })
   }

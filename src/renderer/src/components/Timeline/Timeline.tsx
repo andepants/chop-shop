@@ -18,6 +18,19 @@ import { TimelineGrid } from './TimelineGrid'
 import { Playhead } from './Playhead'
 
 /**
+ * Format seconds to MM:SS.FF timecode
+ *
+ * @param seconds - Time in seconds
+ * @returns Formatted timecode string
+ */
+function formatTimecode(seconds: number): string {
+  const minutes = Math.floor(seconds / 60)
+  const secs = Math.floor(seconds % 60)
+  const frames = Math.floor((seconds % 1) * 30) // Assuming 30fps
+  return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${frames.toString().padStart(2, '0')}`
+}
+
+/**
  * Calculate next available position for sequential clip placement
  *
  * @param clips - All clips on track
@@ -57,10 +70,21 @@ function calculateNextPosition(clips: Array<{ startTime: number; duration: numbe
  * - AC #6: Timeline auto-adjusts zoom to fit clips
  * - AC #7: Playhead visible at timeline start
  */
+/**
+ * Snap point type for visual guides during drag
+ */
+interface SnapPoint {
+  position: number // Time position in seconds
+  type: 'timeline-start' | 'playhead' | 'clip-edge'
+}
+
 export function Timeline(): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
+  const dragRafRef = useRef<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [mousePosition, setMousePosition] = useState<{ x: number; y: number } | null>(null)
+  const [snapPoints, setSnapPoints] = useState<SnapPoint[]>([])
+  const [dragPreview, setDragPreview] = useState<{ position: number; clipId: string; duration: number } | null>(null)
 
   const { files } = useMediaStore()
   const {
@@ -68,10 +92,16 @@ export function Timeline(): React.JSX.Element {
     totalDuration,
     pixelsPerSecond,
     zoomLevel,
-    selectedClipId,
+    snapTolerance,
+    selectedClipIds,
+    playheadPosition,
     addClipToTrack,
     selectClip,
+    toggleClipSelection,
+    selectClipRange,
+    clearSelection,
     removeClip,
+    rippleDeleteClips,
     moveClipToPosition,
     zoomIn,
     zoomOut,
@@ -88,7 +118,8 @@ export function Timeline(): React.JSX.Element {
   // Use "Fit" button (backslash key) to fit timeline to viewport
 
   /**
-   * Handle drag over - allow drop and show drop indicator
+   * Handle drag over - allow drop and show drop indicator, snap guides, and preview
+   * Throttled with requestAnimationFrame for performance
    */
   function handleDragOver(e: React.DragEvent): void {
     e.preventDefault()
@@ -96,24 +127,75 @@ export function Timeline(): React.JSX.Element {
     // Check if this is a clip reorder drag (has clipIndex) or library drag (has fileId)
     // Note: dataTransfer.types lowercases the keys
     const isClipReorder = e.dataTransfer.types.includes('clipindex')
+    const isClipMove = e.dataTransfer.types.includes('clipid')
 
     if (isClipReorder) {
       // Clip reorder: calculate drop position
       e.dataTransfer.dropEffect = 'move'
       const dropIndex = calculateDropIndex(e)
       setDragOverIndex(dropIndex)
+    } else if (isClipMove) {
+      // Clip move (position-based drag): show snap guides and preview
+      e.dataTransfer.dropEffect = 'move'
+
+      // Throttle with requestAnimationFrame for smooth performance
+      if (dragRafRef.current !== null) {
+        return // Already scheduled, skip this frame
+      }
+
+      dragRafRef.current = requestAnimationFrame(() => {
+        dragRafRef.current = null
+
+        if (!containerRef.current) return
+
+        const rect = containerRef.current.getBoundingClientRect()
+        const relativeX = e.clientX - rect.left
+        const dropPosition = relativeX / pixelsPerSecond
+
+        // Get dragged clip info
+        const clipId = e.dataTransfer.getData('clipId') || null
+
+        // Calculate snap points once (they don't change during drag)
+        if (snapPoints.length === 0) {
+          const points = calculateSnapPoints(clipId)
+          setSnapPoints(points)
+        }
+
+        // Find the dragged clip to show preview
+        if (clipId) {
+          const draggedClip = tracks.flatMap(t => t.clips).find(c => c.id === clipId)
+          if (draggedClip) {
+            const effectiveDuration = draggedClip.duration - draggedClip.trimIn - draggedClip.trimOut
+            setDragPreview({
+              position: dropPosition,
+              clipId,
+              duration: effectiveDuration
+            })
+          }
+        }
+      })
     } else {
       // Library drag: use copy effect
       e.dataTransfer.dropEffect = 'copy'
       setDragOverIndex(null)
+      setSnapPoints([])
+      setDragPreview(null)
     }
   }
 
   /**
-   * Handle drag leave - clear drop indicator
+   * Handle drag leave - clear drop indicator, snap guides, and preview
    */
   function handleDragLeave(): void {
+    // Cancel any pending animation frame
+    if (dragRafRef.current !== null) {
+      cancelAnimationFrame(dragRafRef.current)
+      dragRafRef.current = null
+    }
+
     setDragOverIndex(null)
+    setSnapPoints([])
+    setDragPreview(null)
   }
 
   /**
@@ -144,6 +226,33 @@ export function Timeline(): React.JSX.Element {
   }
 
   /**
+   * Calculate snap points for visual guides
+   * Returns array of positions where clips should snap during drag
+   */
+  function calculateSnapPoints(draggedClipId: string | null): SnapPoint[] {
+    const points: SnapPoint[] = []
+
+    // Timeline start (0s)
+    points.push({ position: 0, type: 'timeline-start' })
+
+    // Playhead position
+    points.push({ position: playheadPosition, type: 'playhead' })
+
+    // All clip edges (excluding the dragged clip)
+    for (const track of tracks) {
+      for (const clip of track.clips) {
+        if (clip.id === draggedClipId) continue
+
+        const effectiveDuration = clip.duration - clip.trimIn - clip.trimOut
+        points.push({ position: clip.startTime, type: 'clip-edge' })
+        points.push({ position: clip.startTime + effectiveDuration, type: 'clip-edge' })
+      }
+    }
+
+    return points
+  }
+
+  /**
    * Handle drop on specific track - adds clip to targeted track
    * Implements AC #2 (multi-track drag-drop)
    */
@@ -162,6 +271,8 @@ export function Timeline(): React.JSX.Element {
 
       // Clear drag state
       setDragOverIndex(null)
+      setSnapPoints([])
+      setDragPreview(null)
 
       // Move clip to the dropped position (allows gaps, Premiere Pro style)
       moveClipToPosition(clipId, dropPosition)
@@ -170,6 +281,8 @@ export function Timeline(): React.JSX.Element {
 
     // Clear drag state for library drops
     setDragOverIndex(null)
+    setSnapPoints([])
+    setDragPreview(null)
 
     // Library drag to specific track (Story 4.1)
     const fileId = e.dataTransfer.getData('fileId')
@@ -245,13 +358,26 @@ export function Timeline(): React.JSX.Element {
         console.warn('[Timeline] Split position too close to clip edge')
       }
     } else {
-      // Select or Trim tool: Select clip and seek to its start
-      selectClip(clipId)
+      // Select or Trim tool: Handle clip selection with modifier keys
 
-      // Seek to clip's start time in the compositor
-      const clip = tracks.flatMap((track) => track.clips).find((c) => c.id === clipId)
-      if (clip) {
-        usePlaybackStore.getState().seek(clip.startTime)
+      // Cmd/Ctrl+click: Toggle clip in/out of selection
+      if (e.metaKey || e.ctrlKey) {
+        toggleClipSelection(clipId)
+      }
+      // Shift+click: Select range from last selected to this clip
+      else if (e.shiftKey && selectedClipIds.length > 0) {
+        const lastSelectedId = selectedClipIds[selectedClipIds.length - 1]
+        selectClipRange(lastSelectedId, clipId)
+      }
+      // No modifiers: Single select (replaces selection)
+      else {
+        selectClip(clipId)
+
+        // Seek to clip's start time in the compositor
+        const clip = tracks.flatMap((track) => track.clips).find((c) => c.id === clipId)
+        if (clip) {
+          usePlaybackStore.getState().seek(clip.startTime)
+        }
       }
     }
   }
@@ -318,16 +444,24 @@ export function Timeline(): React.JSX.Element {
 
       // Clip manipulation shortcuts
       if (e.key === 'Escape') {
-        selectClip(null)
-      } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedClipId) {
+        clearSelection()
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedClipIds.length > 0) {
         e.preventDefault() // Prevent browser back navigation on Backspace
-        removeClip(selectedClipId)
+
+        // Shift+Delete: Ripple delete (close gaps)
+        // Normal Delete: Leave gaps (Premiere Pro default)
+        if (e.shiftKey) {
+          rippleDeleteClips(selectedClipIds)
+        } else {
+          // Delete all selected clips one by one (leaves gaps)
+          selectedClipIds.forEach((clipId) => removeClip(clipId))
+        }
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedClipId, selectClip, removeClip, zoomIn, zoomOut, setZoomLevel, fitToTimeline])
+  }, [selectedClipIds, clearSelection, removeClip, rippleDeleteClips, zoomIn, zoomOut, setZoomLevel, fitToTimeline])
 
   /**
    * Track mouse position on timeline for cursor-aware zoom
@@ -456,6 +590,57 @@ export function Timeline(): React.JSX.Element {
         {/* Playhead - AC #7 */}
         <Playhead zoomLevel={pixelsPerSecond} />
 
+        {/* Snap guides - visual indicators for magnetic snap points during drag */}
+        {snapPoints.map((point, index) => {
+          const color =
+            point.type === 'timeline-start'
+              ? 'rgb(34, 197, 94)' // green-500
+              : point.type === 'playhead'
+                ? 'rgb(239, 68, 68)' // red-500
+                : 'rgb(251, 191, 36)' // amber-400
+
+          return (
+            <div
+              key={`snap-${point.type}-${index}`}
+              className="absolute h-full w-0.5 pointer-events-none z-20"
+              style={{
+                left: `${point.position * pixelsPerSecond}px`,
+                backgroundColor: color,
+                opacity: 0.6,
+                boxShadow: `0 0 8px ${color}`
+              }}
+            />
+          )
+        })}
+
+        {/* Drag preview - ghost outline showing where clip will land */}
+        {dragPreview && (
+          <div
+            className="absolute h-full pointer-events-none z-15"
+            style={{
+              left: `${dragPreview.position * pixelsPerSecond}px`,
+              width: `${dragPreview.duration * pixelsPerSecond}px`,
+              top: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(34, 211, 238, 0.2)', // cyan-500 with transparency
+              border: '2px dashed rgba(34, 211, 238, 0.6)',
+              borderRadius: '4px'
+            }}
+          >
+            {/* Timecode tooltip */}
+            <div
+              className="absolute -top-6 left-0 px-2 py-0.5 rounded text-[10px] font-mono whitespace-nowrap pointer-events-none"
+              style={{
+                backgroundColor: 'rgba(24, 24, 27, 0.95)',
+                color: 'rgb(34, 211, 238)',
+                border: '1px solid rgba(34, 211, 238, 0.4)'
+              }}
+            >
+              {formatTimecode(dragPreview.position)}
+            </div>
+          </div>
+        )}
+
         {/* Drop indicator - shows where clip will be inserted during drag */}
         {dragOverIndex !== null && tracks[0]?.clips && (
           <div
@@ -482,7 +667,7 @@ export function Timeline(): React.JSX.Element {
             key={track.id}
             track={track}
             zoomLevel={pixelsPerSecond}
-            selectedClipId={selectedClipId}
+            selectedClipIds={selectedClipIds}
             onClipClick={handleClipClick}
             onTrackClick={handleTimelineSeek}
             onDrop={(e) => handleTrackDrop(e, track.id)}
@@ -574,6 +759,61 @@ export function Timeline(): React.JSX.Element {
           >
             <span className="text-[10px]">⇄</span>
           </button>
+
+          {/* Separator */}
+          <div
+            className="w-px h-6 mx-1"
+            style={{ backgroundColor: 'rgba(63, 63, 70, 0.8)' }}
+          />
+
+          {/* Snap Tolerance Label */}
+          <div className="flex items-center gap-1">
+            <svg
+              className="w-3.5 h-3.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              style={{ color: 'rgb(161, 161, 170)' }}
+              title="Snap Tolerance"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+              />
+            </svg>
+          </div>
+
+          {/* Snap Tolerance Slider */}
+          <input
+            type="range"
+            min="0.1"
+            max="2.0"
+            step="0.1"
+            value={snapTolerance}
+            onChange={(e) =>
+              useTimelineStore.getState().setSnapTolerance(parseFloat(e.target.value))
+            }
+            className="w-20 h-1 rounded-full appearance-none cursor-pointer"
+            style={{
+              background: `linear-gradient(to right, rgb(34, 211, 238) 0%, rgb(34, 211, 238) ${((snapTolerance - 0.1) / (2.0 - 0.1)) * 100}%, rgb(63, 63, 70) ${((snapTolerance - 0.1) / (2.0 - 0.1)) * 100}%, rgb(63, 63, 70) 100%)`
+            }}
+            title="Snap Tolerance (seconds)"
+          />
+
+          {/* Snap Value Display */}
+          <div
+            className="text-xs font-mono font-medium px-2 py-0.5 rounded"
+            style={{
+              backgroundColor: 'rgba(39, 39, 42, 0.8)',
+              color: 'rgb(161, 161, 170)',
+              minWidth: '42px',
+              textAlign: 'center'
+            }}
+          >
+            {snapTolerance.toFixed(1)}s
+          </div>
         </div>
       </div>
     </div>

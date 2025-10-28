@@ -11,6 +11,7 @@
 
 import { TimelineClip } from './TimelineClip'
 import type { Track } from './timeline.types'
+import { Tooltip } from '../Tooltip'
 import { useState } from 'react'
 
 interface TimelineTrackProps {
@@ -18,8 +19,8 @@ interface TimelineTrackProps {
   track: Track
   /** Zoom level in pixels per second */
   zoomLevel: number
-  /** ID of currently selected clip */
-  selectedClipId: string | null
+  /** IDs of currently selected clips */
+  selectedClipIds: string[]
   /** Click handler for clip selection - receives clip ID and mouse event for position-based operations */
   onClipClick: (clipId: string, e: React.MouseEvent) => void
   /** Click handler for timeline seeking */
@@ -44,7 +45,7 @@ interface TimelineTrackProps {
  *
  * @param track - Track data with clips array
  * @param zoomLevel - Pixels per second for clip positioning
- * @param selectedClipId - ID of selected clip for highlighting
+ * @param selectedClipIds - IDs of selected clips for highlighting
  * @param onClipClick - Handler for clip selection
  * @param onTrackClick - Handler for timeline seeking
  * @param onDragOver - Handler for drag-over highlighting
@@ -54,7 +55,7 @@ interface TimelineTrackProps {
 export function TimelineTrack({
   track,
   zoomLevel,
-  selectedClipId,
+  selectedClipIds,
   onClipClick,
   onTrackClick,
   onDragOver,
@@ -158,26 +159,23 @@ export function TimelineTrack({
             {/* Mute/Solo/Lock buttons - placeholder for now */}
             <div className="flex items-center justify-center gap-1">
               {/* Mute button */}
-              <button
-                className="w-5 h-5 flex items-center justify-center rounded hover:bg-zinc-700 transition-colors text-zinc-500 hover:text-zinc-300"
-                title="Mute track"
-              >
-                <span className="text-[10px]">M</span>
-              </button>
+              <Tooltip text="Mute track">
+                <button className="w-5 h-5 flex items-center justify-center rounded hover:bg-zinc-700 transition-colors text-zinc-500 hover:text-zinc-300">
+                  <span className="text-[10px]">M</span>
+                </button>
+              </Tooltip>
               {/* Solo button */}
-              <button
-                className="w-5 h-5 flex items-center justify-center rounded hover:bg-zinc-700 transition-colors text-zinc-500 hover:text-zinc-300"
-                title="Solo track"
-              >
-                <span className="text-[10px]">S</span>
-              </button>
+              <Tooltip text="Solo track">
+                <button className="w-5 h-5 flex items-center justify-center rounded hover:bg-zinc-700 transition-colors text-zinc-500 hover:text-zinc-300">
+                  <span className="text-[10px]">S</span>
+                </button>
+              </Tooltip>
               {/* Lock button */}
-              <button
-                className="w-5 h-5 flex items-center justify-center rounded hover:bg-zinc-700 transition-colors text-zinc-500 hover:text-zinc-300"
-                title="Lock track"
-              >
-                <span className="text-[10px]">L</span>
-              </button>
+              <Tooltip text="Lock track">
+                <button className="w-5 h-5 flex items-center justify-center rounded hover:bg-zinc-700 transition-colors text-zinc-500 hover:text-zinc-300">
+                  <span className="text-[10px]">L</span>
+                </button>
+              </Tooltip>
             </div>
           </div>
         </div>
@@ -204,7 +202,7 @@ export function TimelineTrack({
               clip={clip}
               clipIndex={index}
               zoomLevel={zoomLevel}
-              isSelected={clip.id === selectedClipId}
+              isSelected={selectedClipIds.includes(clip.id)}
               onClick={(e) => onClipClick(clip.id, e)}
             />
           ))}

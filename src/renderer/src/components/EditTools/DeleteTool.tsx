@@ -19,18 +19,18 @@ import { useTimelineStore } from '@/store/timelineStore'
  * Displays in timeline toolbar for deleting selected clips
  */
 export function DeleteTool(): JSX.Element {
-  const { selectedClipId, removeClip } = useTimelineStore()
+  const { selectedClipIds, removeClip } = useTimelineStore()
 
   /**
    * Handle delete button click
-   * Removes currently selected clip from timeline
+   * Removes all selected clips from timeline
    */
   function handleDelete(): void {
-    if (!selectedClipId) return
-    removeClip(selectedClipId)
+    if (selectedClipIds.length === 0) return
+    selectedClipIds.forEach((clipId) => removeClip(clipId))
   }
 
-  const isDisabled = !selectedClipId
+  const isDisabled = selectedClipIds.length === 0
 
   return (
     <button
@@ -45,8 +45,8 @@ export function DeleteTool(): JSX.Element {
             : 'hover:bg-red-600/20 hover:ring-1 hover:ring-red-600'
         }
       `}
-      title="Delete Clip (Delete/Backspace)"
-      aria-label="Delete selected clip"
+      title={`Delete ${selectedClipIds.length > 1 ? `${selectedClipIds.length} Clips` : 'Clip'} (Delete/Backspace)`}
+      aria-label={`Delete ${selectedClipIds.length} selected clip${selectedClipIds.length !== 1 ? 's' : ''}`}
       style={{
         color: isDisabled ? 'var(--text-secondary)' : 'var(--text-primary)'
       }}

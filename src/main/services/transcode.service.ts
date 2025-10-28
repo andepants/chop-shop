@@ -1,7 +1,8 @@
 /**
  * Transcode Service
  * Handles intermediate codec conversion for frame-accurate editing
- * Converts imported videos to ProRes 422 for optimal editing performance
+ * Converts imported videos to H.264 Intra (all I-frames) for optimal editing performance
+ * Uses browser-compatible format for seamless HTML5 video playback in Electron
  */
 
 import { spawn } from 'child_process'
@@ -52,13 +53,13 @@ export async function ensureCacheDirectory(): Promise<void> {
  * Generate intermediate file path for a source file
  * Uses UUID to avoid naming collisions
  * @param sourceFile - Path to source video file
- * @returns Path to intermediate ProRes file in cache
+ * @returns Path to intermediate H.264 file in cache
  */
 export function getIntermediatePath(sourceFile: string): string {
   const cacheDir = getCacheDirectory()
   const uuid = randomUUID()
   const originalName = basename(sourceFile, '.mp4') // Remove extension
-  const intermediateName = `${originalName}-${uuid}-intermediate.mov`
+  const intermediateName = `${originalName}-${uuid}-intermediate.mp4`
   return join(cacheDir, intermediateName)
 }
 
@@ -151,10 +152,11 @@ async function getVideoDuration(filePath: string): Promise<number> {
 }
 
 /**
- * Transcode video to ProRes 422 intermediate codec
+ * Transcode video to H.264 Intra intermediate codec (all I-frames)
  * Applies CFR conversion for VFR sources
+ * Uses browser-compatible format for Electron HTML5 video playback
  * @param sourcePath - Path to source video file
- * @param outputPath - Path for output ProRes file
+ * @param outputPath - Path for output H.264 file
  * @param progressCallback - Optional callback for progress updates
  * @returns Promise that resolves when transcode completes
  */
@@ -177,18 +179,25 @@ export async function transcodeToProRes(
   // Get video duration for progress calculation
   const duration = await getVideoDuration(sourcePath)
 
-  console.log('[Transcode] Starting ProRes conversion...')
+  console.log('[Transcode] Starting H.264 Intra conversion...')
   console.log('[Transcode] Source:', sourcePath)
   console.log('[Transcode] Output:', outputPath)
   console.log('[Transcode] Duration:', duration.toFixed(2), 'seconds')
 
-  // Build FFmpeg command for ProRes conversion
+  // Build FFmpeg command for H.264 Intra conversion
+  // Uses all I-frames (-g 1) for frame-accurate seeking
+  // This format is universally supported by Chromium/Electron
   const args = [
     '-i', sourcePath,           // Input file
-    '-c:v', 'prores',           // ProRes video codec
-    '-profile:v', '2',          // ProRes 422 profile (good quality/size balance)
-    '-c:a', 'pcm_s16le',        // PCM audio (uncompressed)
+    '-c:v', 'libx264',          // H.264 video codec
+    '-preset', 'ultrafast',     // Fast encoding (editing workflow priority)
+    '-crf', '15',               // High quality (lower = better, 0-51 scale)
+    '-g', '1',                  // GOP size 1 (all I-frames for frame-accurate seeking)
+    '-pix_fmt', 'yuv420p',      // 8-bit 4:2:0 (Chromium compatible)
+    '-c:a', 'aac',              // AAC audio (widely supported)
+    '-b:a', '256k',             // High quality audio
     '-vsync', 'cfr',            // Force constant frame rate
+    '-movflags', '+faststart',  // Enable fast start for web playback
     '-y',                       // Overwrite output file
     outputPath                  // Output file
   ]
@@ -219,7 +228,7 @@ export async function transcodeToProRes(
     // Handle completion
     ffmpegProcess.on('close', (code: number | null) => {
       if (code === 0) {
-        console.log('[Transcode] ProRes conversion completed successfully')
+        console.log('[Transcode] H.264 Intra conversion completed successfully')
         console.log('[Transcode] Output file:', outputPath)
         resolve()
       } else {
