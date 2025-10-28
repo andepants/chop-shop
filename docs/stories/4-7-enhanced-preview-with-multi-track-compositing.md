@@ -1,6 +1,6 @@
 # Story 4.7: Enhanced Preview with Multi-Track Compositing
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -329,7 +329,7 @@ From `testing-strategy.md`:
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/stories/4-7-enhanced-preview-with-multi-track-compositing.context.xml
 
 ### Agent Model Used
 

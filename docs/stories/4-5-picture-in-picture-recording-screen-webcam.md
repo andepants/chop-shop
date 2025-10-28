@@ -1,6 +1,6 @@
 # Story 4.5: Picture-in-Picture Recording (Screen + Webcam)
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -318,7 +318,7 @@ From `testing-strategy.md`:
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/stories/4-5-picture-in-picture-recording-screen-webcam.context.xml
 
 ### Agent Model Used
 

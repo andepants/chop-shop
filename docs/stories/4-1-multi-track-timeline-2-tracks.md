@@ -1,6 +1,6 @@
 # Story 4.1: Multi-Track Timeline (2 Tracks)
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -271,7 +271,7 @@ From `testing-strategy.md`:
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/stories/4-1-multi-track-timeline-2-tracks.context.xml
 
 ### Agent Model Used
 

@@ -1,0 +1,144 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>3</storyId>
+    <title>Screen Recording Setup</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/4-3-screen-recording-setup.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>content creator</asA>
+    <iWant>to record my screen</iWant>
+    <soThat>I can capture tutorials and demonstrations</soThat>
+    <tasks>
+      - Task 1: Create recordingStore for state management
+      - Task 2: Implement unified get-sources IPC channel
+      - Task 3: Create RecordingModal component
+      - Task 4: Create SourceSelector component for screen sources
+      - Task 5: Implement preview before recording
+      - Task 6: Create AudioSourceSelector component
+      - Task 7: Add Record button to sidebar
+      - Task 8: Implement countdown before recording starts
+      - Task 9: Implement screen recording capture
+      - Task 10: Handle edge cases and error scenarios
+      - Task 11: Create RecordingService in main process
+      - Task 12: Implement recording-tick IPC event
+      - Task 13: NFR Validation - Security and Performance
+      - Task 14: Testing and validation
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. "Record" button visible in left sidebar
+    2. Clicking Record opens recording setup modal
+    3. User can select recording mode: "Screen Only"
+    4. User can choose full screen or specific window/application
+    5. Preview shows what will be recorded before starting
+    6. Audio source selection (microphone, system audio, both, or none)
+    7. "Start Recording" button initiates countdown (3-2-1) then begins capture
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-4.md" title="Epic 4 Technical Specification" section="Screen recording using desktopCapturer">
+        RecordingState interface with selectedScreen/selectedWebcam as string IDs only (not full objects). Source interface with id, name, type, thumbnail. Unified get-sources IPC returns both screens and webcams. start-recording IPC accepts RecordingConfig.
+      </doc>
+      <doc path="docs/tech-spec-epic-4.md" title="Epic 4 Technical Specification" section="Screen Recording Workflow">
+        User clicks Record → modal opens → select mode → get-sources IPC → display sources with thumbnails → select source (store ID only) → preview via getUserMedia → countdown (3-2-1) → MediaRecorder starts → recording-tick events update duration.
+      </doc>
+      <doc path="docs/architecture.md" title="Decision Architecture" section="ADR-002: FFmpeg in Main Process">
+        Main process handles source enumeration via desktopCapturer. Renderer process handles MediaRecorder capture (requires DOM context). IPC bridge for communication.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/renderer/src/components/Layout/Sidebar.tsx" kind="component" symbol="Sidebar" reason="Must add Record button below Import button with red accent styling.">
+      </artifact>
+      <artifact path="src/main/ipc/index.ts" kind="ipc-registry" symbol="registerIpcHandlers" reason="Must register recording IPC handlers (get-sources, start-recording, stop-recording).">
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="zustand" version="^5.0.8">State management for recordingStore</package>
+        <package name="@radix-ui/react-dialog" version="^1.1.15">Recording modal UI component</package>
+        <package name="lucide-react" version="^0.548.0">Record button icons</package>
+      </node>
+      <native>
+        <api name="desktopCapturer">Screen/window source enumeration (main process only)</api>
+        <api name="getUserMedia">Screen capture stream from desktopCapturer source (renderer)</api>
+        <api name="MediaRecorder">Recording to WebM format (renderer)</api>
+      </native>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Recording state managed in Zustand recordingStore
+    - Source IDs stored as strings, NOT full Source objects
+    - Unified get-sources IPC returns {screens: Source[], webcams: Source[]}
+    - Main process handles desktopCapturer enumeration (security)
+    - Renderer process handles MediaRecorder capture (requires DOM)
+    - RecordingModal uses shadcn/ui Dialog component
+    - Countdown: 3-2-1 display before recording starts
+    - recording-tick IPC event every second updates duration
+    - Temp directory: os.tmpdir()/chop-shop/recordings/
+    - Filename: screen-recording-YYYY-MM-DD-HHmmss.webm
+  </constraints>
+  <interfaces>
+    <interface name="RecordingState" kind="Zustand store interface" path="src/renderer/src/store/recordingStore.ts">
+      interface RecordingState {
+        isRecording: boolean;
+        mode: RecordingMode | null;  // 'screen' | 'webcam' | 'pip'
+        selectedScreen: string | null;      // Source ID (string only)
+        selectedWebcam: string | null;      // Device ID (string only)
+        recordingDuration: number;
+        outputFiles: string[];              // Completed recording paths
+        startRecording: (mode: RecordingMode) =&gt; void;
+        stopRecording: () =&gt; Promise&lt;string[]&gt;;
+        setSelectedScreen: (id: string) =&gt; void;
+        setSelectedWebcam: (id: string) =&gt; void;
+        updateDuration: (seconds: number) =&gt; void;
+      }
+    </interface>
+    <interface name="Source" kind="TypeScript interface" path="src/renderer/src/types/recording.types.ts">
+      interface Source {
+        id: string;                    // Device/source ID
+        name: string;                  // Display name
+        type: 'screen' | 'window' | 'webcam';
+        thumbnail?: string;            // Data URL for screens
+      }
+    </interface>
+    <interface name="get-sources IPC" kind="IPC channel" path="src/main/ipc/recording.handlers.ts">
+      Response: IPCResponse&lt;{
+        screens: Source[];    // All screen/window sources
+        webcams: Source[];    // All webcam devices
+      }&gt;
+    </interface>
+    <interface name="recording-tick IPC event" kind="IPC event" path="Main → Renderer">
+      Payload: { duration: number }  // Elapsed seconds
+      Emitted every second during recording
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Jest for unit testing recordingStore. Manual integration testing for IPC channels, MediaRecorder capture, permissions flow. Performance: source enumeration &lt; 500ms.
+    </standards>
+    <locations>
+      src/renderer/src/store/__tests__/
+      Manual testing: recording modal, source selection, permissions, actual screen recording
+    </locations>
+    <ideas>
+      - AC1: Manual verify Record button visible in sidebar with red accent
+      - AC2: Manual test clicking Record opens modal
+      - AC3: Manual verify "Screen Only" mode tab exists
+      - AC4: Manual test get-sources IPC returns screens, select source stores ID only
+      - AC5: Manual test preview shows selected screen before recording
+      - AC6: Manual test microphone selection (system audio disabled on macOS)
+      - AC7: Manual test countdown (3-2-1) then MediaRecorder starts
+      - Unit test recordingStore state transitions (idle → recording)
+      - Integration test: permission denied shows error with instructions
+      - Edge case: No sources available disables recording
+    </ideas>
+  </tests>
+</story-context>

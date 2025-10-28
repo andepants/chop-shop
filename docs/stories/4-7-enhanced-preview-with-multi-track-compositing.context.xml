@@ -1,0 +1,112 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>7</storyId>
+    <title>Enhanced Preview with Multi-Track Compositing</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/4-7-enhanced-preview-with-multi-track-compositing.md</sourceStoryPath>
+  </metadata>
+  <story>
+    <asA>content creator</asA>
+    <iWant>to see my multi-track timeline rendered correctly in preview</iWant>
+    <soThat>I can verify my picture-in-picture and overlay effects</soThat>
+    <tasks>
+      - Task 1: Create VideoCanvas component for multi-track rendering
+      - Task 2: Implement PiP positioning logic
+      - Task 3: Integrate VideoCanvas with PreviewPlayer
+      - Task 4: Implement synchronized playback for both tracks
+      - Task 5: Implement audio mixing
+      - Task 6: Implement scrubbing with multi-track preview
+      - Task 7: Optimize canvas rendering for 30fps performance
+      - Task 8: Handle timeline clip changes during playback
+      - Task 9: Add fallback for single-track playback
+      - Task 10: Handle edge cases and error scenarios
+      - Task 11: Add visual feedback for compositing
+      - Task 12: VideoCanvas API documentation
+      - Task 13: NFR Validation with timing requirements
+      - Task 14: Testing and validation
+    </tasks>
+  </story>
+  <acceptanceCriteria>
+    1. Preview player renders Track 2 clips overlaid on Track 1 clips
+    2. Webcam/PiP clips display in appropriate corner with correct size
+    3. Real-time playback shows composited multi-track result
+    4. Audio from both tracks mixed appropriately (Track 1 primary, Track 2 secondary)
+    5. Scrubbing updates preview with correct multi-track composition
+    6. Preview maintains 30fps smooth playback with 2 tracks
+  </acceptanceCriteria>
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-4.md" title="Epic 4 Technical Specification" section="VideoCanvasProps interface">
+        Exact interface from tech spec lines 292-300: track1Video/track2Video (HTMLVideoElement), pipPosition, pipSize (number), width, height. compositeFrame method draws Track 1 full-size, Track 2 as overlay with positioning.
+      </doc>
+      <doc path="docs/tech-spec-epic-4.md" title="Epic 4 Technical Specification" section="Multi-track preview compositing workflow">
+        requestAnimationFrame loop at 30fps: draw Track 1 full canvas, draw Track 2 overlay (25% size bottom-right), sync both video currentTime to playhead. NFR: loop executes within 16ms.
+      </doc>
+      <doc path="docs/tech-spec-epic-4.md" title="Epic 4 Technical Specification" section="Audio mixing">
+        CORRECTED: Track 1 gain = 1.0 (100%), Track 2 gain = 0.8 (80%) per tech spec line 709 NOT 50%.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/renderer/src/components/Preview/PreviewPlayer.tsx" kind="component" symbol="PreviewPlayer" reason="Must detect multi-track timeline and switch to VideoCanvas for rendering.">
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="video.js" version="^8.23.4">Single-track playback (hardware accelerated)</package>
+      </node>
+      <native>
+        <api name="Canvas API">Multi-track compositing (2D context)</api>
+        <api name="requestAnimationFrame">30fps render loop</api>
+        <api name="Web Audio API">Audio mixing with GainNode</api>
+        <api name="HTMLVideoElement">Track 1 and Track 2 video sources</api>
+      </native>
+    </dependencies>
+  </artifacts>
+  <constraints>
+    - VideoCanvasProps interface matches tech spec exactly (lines 292-300)
+    - pipSize type: number (percentage) per tech spec line 199
+    - requestAnimationFrame loop must execute within 16ms (tech spec line 456)
+    - Audio mixing: Track 1 = 100%, Track 2 = 80% (CORRECTED from 50%)
+    - Both videos currentTime sync to playhead position (tech spec line 411)
+    - 30fps minimum playback performance (NFR003)
+    - Single-track fallback to Video.js for better performance
+    - Canvas context: {alpha: false} for optimization
+    - PiP padding: 20px from canvas edges
+  </constraints>
+  <interfaces>
+    <interface name="VideoCanvasProps" kind="React component props" path="src/renderer/src/components/Preview/VideoCanvas.tsx">
+      interface VideoCanvasProps {
+        track1Video: HTMLVideoElement;
+        track2Video?: HTMLVideoElement;
+        pipPosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+        pipSize?: number;  // Percentage (e.g., 0.25 = 25%)
+        width: number;
+        height: number;
+      }
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Jest for unit tests. Manual integration testing for canvas compositing, audio mixing, playback sync. Performance monitoring: frame render time &lt; 16ms, CPU usage &lt; 70%.
+    </standards>
+    <locations>
+      src/renderer/src/components/Preview/__tests__/
+      Manual testing: multi-track preview, all PiP positions, audio mixing, scrubbing
+    </locations>
+    <ideas>
+      - AC1: Manual verify Track 2 renders overlaid on Track 1
+      - AC2: Manual test all 4 PiP corners, verify positioning correct
+      - AC3: Manual test playback synchronization of both tracks
+      - AC4: Manual verify audio mixing at correct gain levels (Track 2 = 80%)
+      - AC5: Manual test scrubbing updates preview correctly
+      - AC6: Performance test verify 30fps with 1080p + 720p tracks
+      - Unit test compositeFrame calculates PiP position correctly
+      - Integration test verify currentTime sync to playhead
+      - NFR validation: requestAnimationFrame loop &lt; 16ms
+      - Edge case: Track duration mismatch handled gracefully
+    </ideas>
+  </tests>
+</story-context>

@@ -1,0 +1,113 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>6</storyId>
+    <title>Recording Stop and Auto-Import</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/4-6-recording-stop-and-auto-import.md</sourceStoryPath>
+  </metadata>
+  <story>
+    <asA>content creator</asA>
+    <iWant>my recording to stop cleanly and automatically appear in my timeline</iWant>
+    <soThat>I can immediately begin editing without manual import</soThat>
+    <tasks>
+      - Task 1: Create persistent Stop Recording button
+      - Task 2: Implement stop-recording IPC channel
+      - Task 3: Move file save responsibility to main process
+      - Task 4: Implement codec detection and optimization
+      - Task 5: Generate thumbnails for recorded clips
+      - Task 6: Auto-import to media library
+      - Task 7: Auto-add to timeline
+      - Task 8: Display success notification
+      - Task 9: Clean up recording state
+      - Task 10: Implement auto-cleanup of old recordings
+      - Task 11: Handle edge cases and error scenarios
+      - Task 12: Implement stop-recording IPC channel
+      - Task 13: Implement recording-tick IPC event
+      - Task 14: NFR Validation
+      - Task 15: Testing and validation
+    </tasks>
+  </story>
+  <acceptanceCriteria>
+    1. "Stop Recording" button accessible during any recording mode
+    2. Clicking Stop ends recording immediately and saves files
+    3. Recording files processed and optimized for editing (codec conversion if needed)
+    4. Completed recording(s) automatically added to media library with thumbnails
+    5. For PiP recordings, both clips automatically placed on correct timeline tracks
+    6. Recording files stored in organized temp directory structure
+    7. User sees success notification with recording duration
+  </acceptanceCriteria>
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-4.md" title="Epic 4 Technical Specification" section="stop-recording IPC channel">
+        Main process handles file save (architecture change). IPC returns IPCResponse with {filePaths: string[]}. RecordingState.outputFiles array stores completed file paths. NFR: stop-recording completes within 2 seconds.
+      </doc>
+      <doc path="docs/tech-spec-epic-4.md" title="Epic 4 Technical Specification" section="recording-tick IPC event">
+        Main process emits recording-tick every second with {duration: number} payload. Renderer updates recordingStore.recordingDuration for display in Stop button.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/main/services/file.service.ts" kind="service" symbol="fileService" reason="Must implement recording file save with organized directory structure (date-based folders).">
+      </artifact>
+      <artifact path="src/main/services/thumbnail.service.ts" kind="service" symbol="thumbnailService" reason="Must generate thumbnails from first frame of recorded videos.">
+      </artifact>
+      <artifact path="src/renderer/src/store/mediaStore.ts" kind="store" symbol="mediaStore" reason="Receives auto-imported recordings with metadata and thumbnails.">
+      </artifact>
+      <artifact path="src/renderer/src/store/timelineStore.ts" kind="store" symbol="timelineStore" reason="Auto-adds recordings to Track 1 (single) or Track 1+2 (PiP) at timeline end.">
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="ffmpeg-static" version="^5.2.0">Codec conversion (WebM → MP4 if needed)</package>
+        <package name="ffprobe-static" version="^3.1.0">Codec detection</package>
+      </node>
+      <native>
+        <api name="fs (Node.js)">File save operations in main process</api>
+      </native>
+    </dependencies>
+  </artifacts>
+  <constraints>
+    - ARCHITECTURE CHANGE: Main process handles all file save operations
+    - Renderer sends blob data via stop-recording IPC
+    - Main returns filePaths array in IPCResponse
+    - Directory structure: os.tmpdir()/chop-shop/recordings/YYYY-MM-DD/
+    - RecordingState.outputFiles stores completed file paths
+    - Auto-cleanup: delete recordings older than 7 days, keep last 20
+    - Auto-import: screen → Track 1, webcam → Track 2 (PiP mode)
+    - Stop button: floating, top-right, shows "Recording: HH:MM:SS"
+    - Keyboard shortcut: Cmd/Ctrl + Shift + R to stop
+  </constraints>
+  <interfaces>
+    <interface name="stop-recording IPC" kind="IPC channel" path="src/main/ipc/recording.handlers.ts">
+      Request: { blob: Blob, mode: RecordingMode, timestamp: string }
+      Response: IPCResponse&lt;{ filePaths: string[] }&gt;
+    </interface>
+    <interface name="recording-tick IPC event" kind="IPC event" path="Main → Renderer">
+      Payload: { duration: number }
+      Emitted every second during recording
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Jest for unit tests. Manual integration testing for stop IPC, file save, auto-import workflow, codec conversion.
+    </standards>
+    <locations>
+      src/main/services/__tests__/
+      Manual testing: stop recording, file save, auto-import, notifications
+    </locations>
+    <ideas>
+      - AC1: Manual verify Stop button visible during recording
+      - AC2: Manual test clicking Stop saves files
+      - AC3: Manual test codec conversion (WebM → MP4 if needed)
+      - AC4: Manual verify thumbnails generated and displayed
+      - AC5: Manual test PiP stop creates 2 files, both auto-imported to Track 1+2
+      - AC6: Manual verify date-based directory organization
+      - AC7: Manual verify success notification displays with duration
+      - Unit test stop-recording IPC handler
+      - Unit test outputFiles array population
+      - Edge case: Disk full during save shows error
+    </ideas>
+  </tests>
+</story-context>

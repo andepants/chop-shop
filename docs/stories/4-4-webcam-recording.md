@@ -1,6 +1,6 @@
 # Story 4.4: Webcam Recording
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -288,7 +288,7 @@ From `testing-strategy.md`:
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/stories/4-4-webcam-recording.context.xml
 
 ### Agent Model Used
 

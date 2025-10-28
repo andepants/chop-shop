@@ -1,0 +1,107 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>4</storyId>
+    <title>Webcam Recording</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/4-4-webcam-recording.md</sourceStoryPath>
+  </metadata>
+  <story>
+    <asA>content creator</asA>
+    <iWant>to record from my webcam</iWant>
+    <soThat>I can capture talking head videos or reactions</soThat>
+    <tasks>
+      - Task 1: Extend recordingStore for webcam state
+      - Task 2: Use unified get-sources IPC channel
+      - Task 3: Add "Webcam Only" mode to RecordingModal
+      - Task 4: Create WebcamSelector component
+      - Task 5: Implement live webcam preview
+      - Task 6: Add microphone selector and audio level indicator
+      - Task 7: Implement webcam recording capture
+      - Task 8: Add Stop Recording button
+      - Task 9: Save recorded webcam file
+      - Task 10: Auto-import to media library and timeline
+      - Task 11: Handle edge cases and error scenarios
+      - Task 12: NFR Validation
+      - Task 13: Testing and validation
+    </tasks>
+  </story>
+  <acceptanceCriteria>
+    1. Recording setup modal includes "Webcam Only" mode option
+    2. User can select from available webcam devices
+    3. Live webcam preview shown in setup modal
+    4. Audio recording from selected microphone included
+    5. Recording starts after countdown (3-2-1)
+    6. Stop button visible during recording to end capture
+    7. Completed recording automatically imports to media library and timeline
+  </acceptanceCriteria>
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-4.md" title="Epic 4 Technical Specification" section="Webcam recording using getUserMedia">
+        Webcam capture at 30fps with 720p resolution. Use getUserMedia with video {deviceId: selectedWebcam} and audio {deviceId: selectedMic}. MediaRecorder with WebM VP9+Opus. Audio level indicator with Web Audio API.
+      </doc>
+      <doc path="docs/tech-spec-epic-4.md" title="Epic 4 Technical Specification" section="Webcam Recording Workflow">
+        User selects "Webcam Only" mode → get-sources IPC extracts webcams → display dropdown of devices → live preview via getUserMedia (640x480, mirrored for UX) → microphone selection with audio level meter → countdown → MediaRecorder captures → auto-import to Track 1.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/renderer/src/store/recordingStore.ts" kind="store" symbol="recordingStore" reason="Must be extended with selectedWebcam (device ID string), webcamStream state, audio level state.">
+      </artifact>
+      <artifact path="src/renderer/src/components/Recording/RecordingModal.tsx" kind="component" symbol="RecordingModal" reason="Must add Webcam Only tab with webcam selector and preview components.">
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="zustand" version="^5.0.8">Webcam state management</package>
+      </node>
+      <native>
+        <api name="getUserMedia">Webcam capture with video: {deviceId}, audio: {deviceId}</api>
+        <api name="MediaRecorder">WebM recording (VP9 + Opus)</api>
+        <api name="Web Audio API">Audio level indicator for microphone input</api>
+      </native>
+    </dependencies>
+  </artifacts>
+  <constraints>
+    - Webcam device ID stored as string (not full device object)
+    - Unified get-sources returns webcams array
+    - Capture resolution: 1280x720 at 30fps
+    - Preview: 640x480, mirrored (scaleX(-1)) for natural appearance
+    - Audio level indicator: green (good), yellow (low), red (clipping)
+    - Auto-import to media library and Track 1
+    - Filename: webcam-recording-YYYY-MM-DD-HHmmss.webm
+    - Temp directory: os.tmpdir()/chop-shop/recordings/
+  </constraints>
+  <interfaces>
+    <interface name="RecordingState (webcam)" kind="Zustand store extension" path="src/renderer/src/store/recordingStore.ts">
+      // Extended fields:
+      selectedWebcam: string | null;  // Device ID only
+      selectedMicrophoneDevice: string | null;
+      webcamStream: MediaStream | null;
+      setWebcamDevice: (deviceId: string) =&gt; void;
+      setMicrophoneDevice: (deviceId: string) =&gt; void;
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Jest for unit tests. Manual integration testing for getUserMedia, MediaRecorder, audio level indicator, auto-import flow.
+    </standards>
+    <locations>
+      src/renderer/src/store/__tests__/
+      Manual testing: webcam selection, live preview, audio levels, recording, auto-import
+    </locations>
+    <ideas>
+      - AC1: Manual verify "Webcam Only" tab in modal
+      - AC2: Manual test selecting webcam from dropdown by device ID
+      - AC3: Manual verify live mirrored preview displays
+      - AC4: Manual test microphone selection with audio level indicator
+      - AC5: Manual test countdown then recording starts
+      - AC6: Manual test Stop button ends recording
+      - AC7: Manual verify auto-import to media library and Track 1
+      - Unit test webcam state management
+      - Edge case: No webcam found shows error
+      - Edge case: Permission denied for camera/mic handled gracefully
+    </ideas>
+  </tests>
+</story-context>

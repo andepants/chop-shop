@@ -1,0 +1,107 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>5</storyId>
+    <title>Picture-in-Picture Recording (Screen + Webcam)</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/4-5-picture-in-picture-recording-screen-webcam.md</sourceStoryPath>
+  </metadata>
+  <story>
+    <asA>content creator</asA>
+    <iWant>to record screen and webcam simultaneously</iWant>
+    <soThat>I can create tutorials with my face visible</soThat>
+    <tasks>
+      - Task 1: Add PiP mode to recordingStore
+      - Task 2: Add "Picture-in-Picture" tab to RecordingModal
+      - Task 3: Create PiP preview component
+      - Task 4: Implement PiP position adjustment
+      - Task 5: Implement PiP size adjustment
+      - Task 6: Implement dual stream capture
+      - Task 7: Save separate recording files
+      - Task 8: Auto-import both clips to timeline
+      - Task 9: Implement PiP compositing in preview
+      - Task 10: Store PiP metadata with clips
+      - Task 11: Handle edge cases and error scenarios
+      - Task 12: Frame synchronization validation
+      - Task 13: NFR Validation
+      - Task 14: Testing and validation
+    </tasks>
+  </story>
+  <acceptanceCriteria>
+    1. Recording setup modal includes "Screen + Webcam (PiP)" mode
+    2. User selects screen source (full screen or window) AND webcam device
+    3. Webcam preview overlay shows position on screen preview (adjustable corner/size)
+    4. Both screen and webcam captured as separate video streams
+    5. Recording produces 2 clips: screen recording (Track 1) and webcam (Track 2)
+    6. Both clips automatically placed on timeline in correct tracks
+    7. Webcam clip positioned as overlay/PiP in preview compositing
+  </acceptanceCriteria>
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-4.md" title="Epic 4 Technical Specification" section="Picture-in-Picture Recording Workflow">
+        User selects PiP mode → choose screen source AND webcam device → PiP preview shows position/size adjustments → countdown → dual MediaRecorder instances start simultaneously → both files saved with same timestamp → auto-import screen to Track 1, webcam to Track 2 → PiP metadata stored with Track 2 clip.
+      </doc>
+      <doc path="docs/tech-spec-epic-4.md" title="Epic 4 Technical Specification" section="RecordingConfig interface">
+        RecordingConfig with mode, screenId, webcamId, pipPosition ('bottom-right' etc.), pipSize (number, not enum per tech spec line 199).
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/renderer/src/store/recordingStore.ts" kind="store" symbol="recordingStore" reason="Must add pipPosition, pipSize, screenStream, webcamStream, screenRecorder, webcamRecorder state fields.">
+      </artifact>
+      <artifact path="src/renderer/src/components/Preview/VideoCanvas.tsx" kind="component" symbol="VideoCanvas" reason="Must implement PiP compositing with position/size from clip metadata.">
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="zustand" version="^5.0.8">PiP state management</package>
+      </node>
+      <native>
+        <api name="MediaRecorder">Dual instances for screen + webcam</api>
+      </native>
+    </dependencies>
+  </artifacts>
+  <constraints>
+    - PiP position: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
+    - pipSize type: number per tech spec (e.g., 0.25 = 25%), document if using enum
+    - Both MediaRecorder instances start with same timestamp for sync
+    - Both files use same timestamp in filename (screen-TIMESTAMP.webm, webcam-TIMESTAMP.webm)
+    - Auto-import: screen → Track 1, webcam → Track 2 at position 0
+    - PiP metadata stored with Track 2 clip for preview/export
+    - 20px padding from canvas edges for PiP positioning
+    - Default: 25% size, bottom-right corner
+  </constraints>
+  <interfaces>
+    <interface name="RecordingConfig" kind="TypeScript interface" path="src/renderer/src/types/recording.types.ts">
+      interface RecordingConfig {
+        mode: RecordingMode;
+        screenId?: string;
+        webcamId?: string;
+        audioEnabled: boolean;
+        pipPosition?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+        pipSize?: number;  // Percentage (tech spec line 199)
+      }
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Jest for unit tests. Manual integration testing for dual stream capture, file pairing, auto-import, frame sync validation.
+    </standards>
+    <locations>
+      src/renderer/src/store/__tests__/
+      Manual testing: PiP recording, dual file save, timestamp pairing, Track 1+2 import
+    </locations>
+    <ideas>
+      - AC1: Manual verify "Picture-in-Picture" tab in modal
+      - AC2: Manual test selecting screen + webcam by IDs
+      - AC3: Manual test PiP position adjustment (4 corners)
+      - AC4: Manual test both MediaRecorder instances start simultaneously
+      - AC5: Manual verify 2 files saved with same timestamp
+      - AC6: Manual verify screen → Track 1, webcam → Track 2 auto-import
+      - AC7: Manual verify preview compositing shows webcam overlay
+      - Integration test: frame synchronization over 5-minute recording
+      - Edge case: One stream fails, save successful stream only
+    </ideas>
+  </tests>
+</story-context>

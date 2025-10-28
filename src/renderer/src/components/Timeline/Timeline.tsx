@@ -364,7 +364,7 @@ export function Timeline(): React.JSX.Element {
         />
 
         {/* Playhead - AC #7 */}
-        <Playhead position={playheadPosition} zoomLevel={zoomLevel} />
+        <Playhead zoomLevel={zoomLevel} />
 
         {/* Drop indicator - shows where clip will be inserted during drag */}
         {dragOverIndex !== null && tracks[0]?.clips && (

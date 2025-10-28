@@ -1,6 +1,6 @@
 # Story 4.3: Screen Recording Setup
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -323,7 +323,7 @@ From `testing-strategy.md`:
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/stories/4-3-screen-recording-setup.context.xml
 
 ### Agent Model Used
 

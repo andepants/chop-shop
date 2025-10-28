@@ -1,6 +1,6 @@
 # Story 4.6: Recording Stop and Auto-Import
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -351,7 +351,7 @@ From `testing-strategy.md`:
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/stories/4-6-recording-stop-and-auto-import.context.xml
 
 ### Agent Model Used
 

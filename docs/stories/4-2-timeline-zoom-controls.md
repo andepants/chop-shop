@@ -1,6 +1,6 @@
 # Story 4.2: Timeline Zoom Controls
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -251,7 +251,7 @@ From `testing-strategy.md`:
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/stories/4-2-timeline-zoom-controls.context.xml
 
 ### Agent Model Used
 

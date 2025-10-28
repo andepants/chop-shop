@@ -14,8 +14,6 @@ import { useTimelineStore } from '@/store/timelineStore'
 import { usePlaybackStore } from '@/store/playbackStore'
 
 interface PlayheadProps {
-  /** Current playhead position in seconds */
-  position: number
   /** Zoom level in pixels per second for positioning */
   zoomLevel: number
 }
@@ -33,12 +31,14 @@ interface PlayheadProps {
  * - Hover: cursor changes to col-resize (Premiere Pro style)
  * - Dragging: cursor remains col-resize, slight opacity change
  *
- * @param position - Playhead position in seconds
  * @param zoomLevel - Pixels per second for positioning
  */
-export function Playhead({ position, zoomLevel }: PlayheadProps): React.JSX.Element {
+export function Playhead({ zoomLevel }: PlayheadProps): React.JSX.Element {
   const [isDragging, setIsDragging] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // Subscribe directly to playheadPosition for real-time updates during video playback
+  const position = useTimelineStore((state) => state.playheadPosition)
   const { setPlayhead } = useTimelineStore()
   const { tracks } = useTimelineStore()
 

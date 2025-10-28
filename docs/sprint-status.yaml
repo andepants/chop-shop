@@ -64,11 +64,11 @@ development_status:
   epic-3-retrospective: optional
 
   epic-4: contexted
-  4-1-multi-track-timeline-2-tracks: drafted
-  4-2-timeline-zoom-controls: drafted
-  4-3-screen-recording-setup: drafted
-  4-4-webcam-recording: drafted
-  4-5-picture-in-picture-recording-screen-webcam: drafted
-  4-6-recording-stop-and-auto-import: drafted
-  4-7-enhanced-preview-with-multi-track-compositing: drafted
+  4-1-multi-track-timeline-2-tracks: ready-for-dev
+  4-2-timeline-zoom-controls: ready-for-dev
+  4-3-screen-recording-setup: ready-for-dev
+  4-4-webcam-recording: ready-for-dev
+  4-5-picture-in-picture-recording-screen-webcam: ready-for-dev
+  4-6-recording-stop-and-auto-import: ready-for-dev
+  4-7-enhanced-preview-with-multi-track-compositing: ready-for-dev
   epic-4-retrospective: optional

@@ -39,16 +39,144 @@
   </acceptanceCriteria>
 
   <artifacts>
-    <docs>{{docs_artifacts}}</docs>
-    <code>{{code_artifacts}}</code>
-    <dependencies>{{dependencies_artifacts}}</dependencies>
+    <docs>
+      <doc path="docs/tech-spec-epic-4.md" title="Epic 4 Technical Specification" section="Multi-Track Timeline Infrastructure">
+        Defines Track interface (id, clips array, height), Clip interface with trackId field, TimelineState with tracks array, and multi-track actions: addClipToTrack(), getClipsForTrack(). PiP compositing uses Canvas API at 30fps per NFR003.
+      </doc>
+      <doc path="docs/tech-spec-epic-4.md" title="Epic 4 Technical Specification" section="Multi-Track Timeline Interaction Workflow">
+        Workflow for drag-drop to tracks: highlight based on mouse Y position, call addClipToTrack(clip, trackId), prevent overlapping clips, clips stay within same track unless explicitly moved.
+      </doc>
+      <doc path="docs/tech-spec-epic-4.md" title="Epic 4 Technical Specification" section="Multi-Track Preview Compositing Workflow">
+        Canvas rendering loop via requestAnimationFrame: draw Track 1 full-size, draw Track 2 as overlay (25% size) in bottom-right corner, sync currentTime to playhead, 30fps requirement.
+      </doc>
+      <doc path="docs/tech-spec-epic-4.md" title="Epic 4 Technical Specification" section="Multi-Track Export Workflow">
+        FFmpeg overlay filter for export: [1:v]scale=iw*0.25:ih*0.25[pip];[0:v][pip]overlay=W-w-10:H-h-10. Canvas fallback if FFmpeg fails. Audio mixed from both tracks.
+      </doc>
+      <doc path="docs/architecture.md" title="Decision Architecture" section="ADR-001: Zustand for State Management">
+        Use Zustand for timelineStore extensions. Maintain immutability patterns for multi-track state updates.
+      </doc>
+      <doc path="docs/architecture.md" title="Decision Architecture" section="ADR-004: Video.js + Canvas for Preview">
+        Video.js for single-track playback (hardware accelerated), Canvas API for multi-track compositing overlay rendering.
+      </doc>
+      <doc path="docs/architecture.md" title="Decision Architecture" section="Component Structure and Naming">
+        Components in Timeline/ folder: Timeline.tsx, TimelineTrack.tsx, TimelineClip.tsx. Use PascalCase for components, camelCase for services/stores/types.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/renderer/src/store/timelineStore.ts" kind="store" symbol="useTimelineStore" reason="Contains timeline state management. Must be extended with tracks array and multi-track actions (addClipToTrack, getClipsForTrack).">
+      </artifact>
+      <artifact path="src/renderer/src/components/Timeline/Timeline.tsx" kind="component" symbol="Timeline" reason="Main timeline component. Must be updated to render 2 TimelineTrack components stacked vertically, share ruler and playhead across tracks.">
+      </artifact>
+      <artifact path="src/renderer/src/components/Timeline/TimelineClip.tsx" kind="component" symbol="TimelineClip" reason="Individual clip rendering. Must preserve trackId during trim/split/delete operations.">
+      </artifact>
+      <artifact path="src/renderer/src/components/MediaLibrary/MediaItem.tsx" kind="component" symbol="MediaItem" reason="Drag source for clips. Must be updated to support track-targeting during drag-drop.">
+      </artifact>
+      <artifact path="src/main/services/ffmpeg.service.ts" kind="service" symbol="ffmpegService" reason="FFmpeg export service. Must be extended with multi-track export method using overlay filter.">
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="zustand" version="^5.0.8">State management for multi-track timeline store</package>
+        <package name="video.js" version="^8.23.4">Video player for Track 1 playback</package>
+        <package name="ffmpeg-static" version="^5.2.0">FFmpeg 6.0 for multi-track export with overlay filters</package>
+        <package name="@radix-ui/react-dialog" version="^1.1.15">Modal components</package>
+        <package name="lucide-react" version="^0.548.0">Icons for timeline UI</package>
+        <package name="class-variance-authority" version="^0.7.1">Component styling utilities</package>
+      </node>
+      <native>
+        <api name="Canvas API">Multi-track compositing for preview rendering</api>
+        <api name="requestAnimationFrame">30fps rendering loop for Canvas compositing</api>
+        <api name="HTMLVideoElement">Track 1 and Track 2 video sources for Canvas compositing</api>
+      </native>
+    </dependencies>
   </artifacts>
 
-  <constraints>{{constraints}}</constraints>
-  <interfaces>{{interfaces}}</interfaces>
+  <constraints>
+    - Multi-track state managed in Zustand timelineStore with immutability patterns (ADR-001)
+    - Maximum 2 tracks: Track 1 (main, id=1), Track 2 (overlay, id=2) per ADR-010
+    - Clip interface must include trackId field (1 or 2)
+    - Timeline must maintain single playhead synchronized across both tracks
+    - Canvas compositing must maintain 30fps minimum during playback (NFR003)
+    - Track 2 clips render as overlay/PiP in bottom-right corner at 25% size
+    - FFmpeg overlay filter for export: [1:v]scale=iw*0.25:ih*0.25[pip];[0:v][pip]overlay=W-w-10:H-h-10
+    - Drag-drop must prevent cross-track movement unless explicitly intended
+    - Prevent clip overlap on same track
+    - All file paths stored as absolute paths
+    - Use Tailwind CSS for styling (ADR-003), no separate CSS files
+    - Use path.join for all file path operations
+    - Component naming: PascalCase for components (Timeline.tsx), camelCase for stores (timelineStore.ts)
+    - Visual indicators: Track 1 cyan border, Track 2 purple border for distinction (AC7)
+  </constraints>
+  <interfaces>
+    <interface name="Track" kind="TypeScript interface" path="src/renderer/src/types/timeline.types.ts">
+      interface Track {
+        id: number;        // 1 = main, 2 = overlay
+        clips: Clip[];
+        height: number;    // Track height in pixels
+      }
+    </interface>
+    <interface name="Clip (extended)" kind="TypeScript interface" path="src/renderer/src/types/timeline.types.ts">
+      interface Clip {
+        id: string;
+        sourceFile: string;
+        startTime: number;
+        duration: number;
+        trimIn: number;
+        trimOut: number;
+        trackId: number;   // NEW: 1 or 2
+      }
+    </interface>
+    <interface name="TimelineState (multi-track)" kind="Zustand store interface" path="src/renderer/src/store/timelineStore.ts">
+      interface TimelineState {
+        tracks: Track[];               // Always 2 tracks
+        playheadPosition: number;
+        totalDuration: number;
+        zoomLevel: number;
+        selectedClipId: string | null;
+        addClipToTrack: (clip: Omit&lt;Clip, 'id'&gt;, trackId: number) =&gt; void;
+        getClipsForTrack: (trackId: number) =&gt; Clip[];
+      }
+    </interface>
+    <interface name="VideoCanvasProps" kind="React component props" path="src/renderer/src/components/Preview/VideoCanvas.tsx">
+      interface VideoCanvasProps {
+        mainTrackVideo: HTMLVideoElement | null;     // Track 1
+        overlayTrackVideo: HTMLVideoElement | null;  // Track 2
+        pipPosition: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+        pipSize: number;     // Percentage (default 25)
+        width: number;
+        height: number;
+      }
+    </interface>
+    <interface name="MultiTrackExportOptions" kind="TypeScript interface" path="src/main/services/ffmpeg.service.ts">
+      interface MultiTrackExportOptions extends ExportOptions {
+        tracks: {
+          main: Clip[];       // Track 1 clips
+          overlay: Clip[];    // Track 2 clips
+        };
+        pipPosition: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+        pipSize: number;      // Percentage (default 25)
+      }
+    </interface>
+  </interfaces>
   <tests>
-    <standards>{{test_standards}}</standards>
-    <locations>{{test_locations}}</locations>
-    <ideas>{{test_ideas}}</ideas>
+    <standards>
+      Use Jest for unit testing (from electron-react-boilerplate). Unit tests for multi-track store operations (addClipToTrack, getClipsForTrack) with 95%+ coverage target. Manual integration testing for drag-drop, preview compositing, and export. Performance validation: 30fps with 10+ clips during playback (NFR001). Canvas compositing frame rate monitoring during preview.
+    </standards>
+    <locations>
+      src/renderer/src/store/__tests__/
+      Manual testing: timeline interactions, preview playback, export verification
+    </locations>
+    <ideas>
+      - AC1: Unit test Track interface and tracks array initialization (2 tracks)
+      - AC2: Manual test drag clip from media library to Track 1, then Track 2, verify independent placement
+      - AC3: Manual test preview playback with clips on both tracks, verify Track 2 renders as overlay in bottom-right
+      - AC4: Unit test trim/split/delete operations preserve trackId, Manual verify operations work independently per track
+      - AC5: Manual test playhead synchronization across both tracks during playback, scrubbing
+      - AC6: Manual export multi-track timeline, verify output video has composited overlay using FFmpeg filter
+      - AC7: Manual verify Track 2 clips show visual indicator (purple border, track label)
+      - NFR001: Performance test with 10 clips (5 per track), verify 30fps during zoom, drag, playback
+      - Edge case: Drop clip between tracks defaults to Track 1
+      - Edge case: Canvas compositing failure falls back to Track 1 only (no crash)
+    </ideas>
   </tests>
 </story-context>
