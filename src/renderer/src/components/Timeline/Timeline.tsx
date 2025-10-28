@@ -67,6 +67,7 @@ export function Timeline(): React.JSX.Element {
     tracks,
     totalDuration,
     pixelsPerSecond,
+    zoomLevel,
     selectedClipId,
     addClipToTrack,
     selectClip,
@@ -509,6 +510,71 @@ export function Timeline(): React.JSX.Element {
             </div>
           </div>
         )}
+
+        {/* Zoom Controls - Premiere Pro style (bottom-right corner) */}
+        <div
+          className="absolute bottom-3 right-3 flex items-center gap-2 px-3 py-1.5 rounded-md shadow-lg z-50"
+          style={{
+            backgroundColor: 'rgba(24, 24, 27, 0.95)', // zinc-900 with transparency
+            border: '1px solid rgba(63, 63, 70, 0.8)', // zinc-700
+            backdropFilter: 'blur(8px)'
+          }}
+        >
+          {/* Zoom Out Button */}
+          <button
+            onClick={() => useTimelineStore.getState().zoomOut()}
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-zinc-200"
+            title="Zoom Out (Cmd+-)"
+          >
+            <span className="text-sm font-bold">−</span>
+          </button>
+
+          {/* Zoom Slider */}
+          <input
+            type="range"
+            min="0.1"
+            max="5"
+            step="0.1"
+            value={zoomLevel}
+            onChange={(e) => useTimelineStore.getState().setZoomLevel(parseFloat(e.target.value))}
+            className="w-24 h-1 rounded-full appearance-none cursor-pointer"
+            style={{
+              background: `linear-gradient(to right, rgb(34, 211, 238) 0%, rgb(34, 211, 238) ${((zoomLevel - 0.1) / (5 - 0.1)) * 100}%, rgb(63, 63, 70) ${((zoomLevel - 0.1) / (5 - 0.1)) * 100}%, rgb(63, 63, 70) 100%)`
+            }}
+            title="Zoom Level"
+          />
+
+          {/* Zoom In Button */}
+          <button
+            onClick={() => useTimelineStore.getState().zoomIn()}
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-zinc-200"
+            title="Zoom In (Cmd++)"
+          >
+            <span className="text-sm font-bold">+</span>
+          </button>
+
+          {/* Zoom Percentage Display */}
+          <div
+            className="text-xs font-mono font-medium px-2 py-0.5 rounded"
+            style={{
+              backgroundColor: 'rgba(39, 39, 42, 0.8)', // zinc-800
+              color: 'rgb(161, 161, 170)', // zinc-400
+              minWidth: '48px',
+              textAlign: 'center'
+            }}
+          >
+            {Math.round(zoomLevel * 100)}%
+          </div>
+
+          {/* Fit to Timeline Button */}
+          <button
+            onClick={() => useTimelineStore.getState().fitToTimeline()}
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-zinc-200"
+            title="Fit to Timeline"
+          >
+            <span className="text-[10px]">⇄</span>
+          </button>
+        </div>
       </div>
     </div>
   )

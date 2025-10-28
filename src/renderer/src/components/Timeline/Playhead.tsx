@@ -42,7 +42,11 @@ export function Playhead({ zoomLevel }: PlayheadProps): React.JSX.Element {
   const { setPlayhead } = useTimelineStore()
   const { tracks } = useTimelineStore()
 
-  const leftPosition = position * zoomLevel
+  // TRACK_LABEL_WIDTH accounts for the 80px track label column (w-20 = 5rem = 80px)
+  // Clips are positioned relative to the track content area (after the label)
+  // Playhead must offset by this amount to align with clips
+  const TRACK_LABEL_WIDTH = 80
+  const leftPosition = position * zoomLevel + TRACK_LABEL_WIDTH
 
   /**
    * Start drag - capture mouse and track movement
@@ -65,7 +69,8 @@ export function Playhead({ zoomLevel }: PlayheadProps): React.JSX.Element {
       if (!timelineContainer) return
 
       const rect = timelineContainer.getBoundingClientRect()
-      const mouseX = e.clientX - rect.left
+      // Account for track label width (80px) when calculating mouse position
+      const mouseX = e.clientX - rect.left - TRACK_LABEL_WIDTH
       let newPosition = mouseX / zoomLevel
 
       // Clamp to valid range (0 to totalDuration)

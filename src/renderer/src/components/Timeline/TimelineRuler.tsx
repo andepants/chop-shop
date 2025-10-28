@@ -1,9 +1,15 @@
 /**
- * TimelineRuler Component
+ * TimelineRuler Component (Premiere Pro Style)
  *
  * Displays time markers and labels above the timeline tracks.
  * Marker intervals adjust dynamically based on zoom level to maintain
  * readable spacing (minimum 60px between markers).
+ *
+ * Adobe Premiere Pro enhancements:
+ * - Increased height from 40px to 48px for better visibility
+ * - Frame markers at high zoom levels (30 fps grid)
+ * - Enhanced styling with gradients and improved typography
+ * - More prominent tick marks
  */
 
 import { formatTime } from '@/utils'
@@ -66,20 +72,75 @@ export function TimelineRuler({
     }
   })
 
+  // Frame markers: Show at high zoom (>50px per second = very zoomed in)
+  // 30 fps = 1 frame every ~0.033 seconds
+  const FRAME_RATE = 30
+  const FRAME_INTERVAL = 1 / FRAME_RATE
+  const showFrameMarkers = zoomLevel > 50
+
+  const frameMarkers = showFrameMarkers
+    ? Array.from({ length: Math.ceil(totalDuration * FRAME_RATE) }, (_, i) => {
+        const time = i * FRAME_INTERVAL
+        return {
+          time,
+          position: time * zoomLevel,
+          frameNumber: i
+        }
+      })
+    : []
+
   return (
-    <div className="h-10 border-b border-zinc-700 bg-zinc-900 relative">
+    <div
+      className="h-12 border-b relative"
+      style={{
+        borderColor: 'rgba(63, 63, 70, 1)', // zinc-700
+        background: 'linear-gradient(to bottom, rgb(24, 24, 27), rgb(39, 39, 42))' // zinc-900 to zinc-800
+      }}
+    >
       <div className="h-full relative">
+        {/* Frame markers (very fine grid at high zoom) */}
+        {frameMarkers.map((frame) => (
+          <div
+            key={`frame-${frame.frameNumber}`}
+            className="absolute top-0"
+            style={{ left: `${frame.position}px` }}
+          >
+            {/* Tiny tick for frame boundaries */}
+            <div
+              className="w-px bg-zinc-600"
+              style={{
+                height: '4px',
+                opacity: 0.4
+              }}
+            />
+          </div>
+        ))}
+
+        {/* Main time markers */}
         {markers.map((marker) => (
           <div
             key={marker.time}
             className="absolute top-0 h-full flex flex-col"
             style={{ left: `${marker.position}px` }}
           >
-            {/* Subtle vertical tick mark from top */}
-            <div className="w-px h-3 bg-zinc-600" />
+            {/* Prominent vertical tick mark */}
+            <div
+              className="w-px bg-zinc-500"
+              style={{
+                height: '8px',
+                boxShadow: '0 0 2px rgba(0, 0, 0, 0.5)'
+              }}
+            />
 
-            {/* Time label at bottom of ruler */}
-            <div className="absolute bottom-1 -translate-x-1/2 px-1 text-[11px] font-mono text-zinc-400 leading-tight">
+            {/* Time label at bottom - Premiere Pro style */}
+            <div
+              className="absolute bottom-1 -translate-x-1/2 px-1.5 text-xs font-mono leading-tight"
+              style={{
+                color: 'rgb(212, 212, 216)', // zinc-300
+                textShadow: '0 1px 2px rgba(0, 0, 0, 0.8)',
+                fontWeight: 500
+              }}
+            >
               {marker.label}
             </div>
           </div>

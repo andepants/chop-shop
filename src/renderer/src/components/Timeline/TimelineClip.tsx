@@ -352,22 +352,25 @@ export function TimelineClip({
     <div
       ref={clipRef}
       className={cn(
-        'absolute rounded z-5',
+        'absolute rounded-sm z-5',
         'transition-all duration-200 ease-out',
         // Fallback background if no thumbnail
         !clip.thumbnail && 'bg-cyan-500/60',
-        'hover:opacity-90 hover:border-zinc-500',
-        isSelected
-          ? 'border-2 border-cyan-500'
-          : 'border border-transparent',
         isDragging && 'opacity-50 scale-105'
       )}
       style={{
         left: `${leftPosition}px`,
         width: `${width}px`,
-        height: '80px',
-        top: '8px',
-        cursor: cursorStyle
+        height: '92px',
+        top: '4px',
+        cursor: cursorStyle,
+        // Premiere Pro style borders and shadows
+        border: isSelected
+          ? '2px solid rgb(34, 211, 238)' // cyan-400
+          : '1px solid rgba(63, 63, 70, 0.8)', // zinc-700 with opacity
+        boxShadow: isSelected
+          ? '0 0 0 1px rgb(34, 211, 238), 0 0 12px rgba(34, 211, 238, 0.6), 0 4px 8px rgba(0, 0, 0, 0.4)' // Selection glow
+          : '0 2px 4px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)' // Subtle depth
       }}
       draggable={selectedTool === 'select' && edgeHoverState === 'center'}
       onDragStart={handleDragStart}
@@ -382,15 +385,16 @@ export function TimelineClip({
     >
       {/* Clip container with repeating thumbnail filmstrip (Premiere Pro style) */}
       <div
-        className="h-full w-full relative overflow-hidden rounded"
+        className="h-full w-full relative overflow-hidden rounded-sm"
         style={{
           ...(clip.thumbnail && {
             backgroundImage: `url(${clip.thumbnail})`,
             backgroundSize: 'auto 100%', // Height 100%, width auto (maintains aspect ratio)
             backgroundRepeat: 'repeat-x', // Repeat horizontally
             backgroundPosition: 'left center',
-            opacity: isSelected ? 0.8 : 0.6
-          })
+            opacity: isSelected ? 0.85 : 0.7
+          }),
+          backgroundColor: clip.thumbnail ? 'transparent' : 'rgba(6, 182, 212, 0.15)' // cyan fallback
         }}
       >
         {/* Filename label - top left */}

@@ -1,12 +1,15 @@
 /**
- * TimelineGrid Component
+ * TimelineGrid Component (Premiere Pro Style)
  *
  * Renders vertical grid lines through the timeline for visual reference.
- * Implements CapCut/Premiere Pro style grid with major and minor lines:
+ * Implements Premiere Pro style grid with major and minor lines:
  * - Major lines: Every 5/10/30 seconds (based on zoom) - more visible
  * - Minor lines: Every 1 second - subtle
  *
- * Grid lines extend from ruler through all tracks for precise editing.
+ * Enhanced aesthetics:
+ * - Refined opacity for better contrast without overwhelming clips
+ * - Subtle gradients and shadows for depth
+ * - Professional color palette matching Premiere Pro
  */
 
 interface TimelineGridProps {
@@ -94,27 +97,37 @@ export function TimelineGrid({
     : []
 
   return (
-    <div className="absolute inset-0 pointer-events-none">
-      {/* Minor grid lines - subtle */}
+    <div
+      className="absolute inset-0 pointer-events-none"
+      style={{
+        // Subtle gradient overlay for depth (Premiere Pro style)
+        background: 'linear-gradient(to bottom, rgba(0, 0, 0, 0.05), transparent 20%, transparent 80%, rgba(0, 0, 0, 0.05))'
+      }}
+    >
+      {/* Minor grid lines - subtle, refined for Premiere Pro */}
       {minorLines.map((line) => (
         <div
           key={`minor-${line.time}`}
-          className="absolute top-0 h-full w-px"
+          className="absolute top-0 h-full"
           style={{
             left: `${line.position}px`,
-            backgroundColor: 'rgba(255, 255, 255, 0.08)' // Subtle but visible
+            width: '1px',
+            background: 'linear-gradient(to bottom, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.04))',
+            boxShadow: '0 0 1px rgba(0, 0, 0, 0.2)'
           }}
         />
       ))}
 
-      {/* Major grid lines - more visible */}
+      {/* Major grid lines - more visible with gradient */}
       {majorLines.map((line) => (
         <div
           key={`major-${line.time}`}
-          className="absolute top-0 h-full w-px"
+          className="absolute top-0 h-full"
           style={{
             left: `${line.position}px`,
-            backgroundColor: 'rgba(255, 255, 255, 0.12)' // More visible for major intervals
+            width: '1px',
+            background: 'linear-gradient(to bottom, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.15))',
+            boxShadow: '0 0 2px rgba(0, 0, 0, 0.3), 1px 0 0 rgba(0, 0, 0, 0.1)'
           }}
         />
       ))}

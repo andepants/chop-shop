@@ -88,12 +88,12 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
       {
         id: 1,
         clips: [],
-        height: 80
+        height: 100
       },
       {
         id: 2,
         clips: [],
-        height: 80
+        height: 100
       }
     ],
     playheadPosition: 0,

@@ -125,13 +125,61 @@ export function TimelineTrack({
     <div className="mb-1" data-track-id={track.id}>
       {/* Track container with visual indicator and label */}
       <div className="flex">
-        {/* Track label with color indicator */}
+        {/* Track label with color indicator - Premiere Pro style */}
         <div
-          className="w-20 flex items-center px-2 text-xs font-medium text-zinc-400 border-r border-zinc-800"
-          style={{ height: `${track.height}px` }}
+          className="w-20 flex flex-col justify-between px-1.5 py-2 text-xs font-medium border-r"
+          style={{
+            height: `${track.height}px`,
+            backgroundColor: 'rgb(24, 24, 27)', // zinc-900
+            borderColor: 'rgb(39, 39, 42)' // zinc-800
+          }}
         >
-          <div className={`w-1 h-full ${style.labelBg} mr-2 rounded-sm`} />
-          <span>Track {track.id}</span>
+          {/* Track number badge and color indicator */}
+          <div className="flex items-center gap-1.5">
+            <div
+              className={`w-0.5 h-6 ${style.labelBg} rounded-full`}
+              style={{
+                boxShadow: '0 0 4px rgba(0, 0, 0, 0.3)'
+              }}
+            />
+            <span
+              className="text-[11px] font-semibold px-1.5 py-0.5 rounded"
+              style={{
+                backgroundColor: 'rgb(39, 39, 42)', // zinc-800
+                color: 'rgb(161, 161, 170)' // zinc-400
+              }}
+            >
+              V{track.id}
+            </span>
+          </div>
+
+          {/* Track controls - Premiere Pro style icons */}
+          <div className="flex flex-col gap-1">
+            {/* Mute/Solo/Lock buttons - placeholder for now */}
+            <div className="flex items-center justify-center gap-1">
+              {/* Mute button */}
+              <button
+                className="w-5 h-5 flex items-center justify-center rounded hover:bg-zinc-700 transition-colors text-zinc-500 hover:text-zinc-300"
+                title="Mute track"
+              >
+                <span className="text-[10px]">M</span>
+              </button>
+              {/* Solo button */}
+              <button
+                className="w-5 h-5 flex items-center justify-center rounded hover:bg-zinc-700 transition-colors text-zinc-500 hover:text-zinc-300"
+                title="Solo track"
+              >
+                <span className="text-[10px]">S</span>
+              </button>
+              {/* Lock button */}
+              <button
+                className="w-5 h-5 flex items-center justify-center rounded hover:bg-zinc-700 transition-colors text-zinc-500 hover:text-zinc-300"
+                title="Lock track"
+              >
+                <span className="text-[10px]">L</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Track content area with clips */}
