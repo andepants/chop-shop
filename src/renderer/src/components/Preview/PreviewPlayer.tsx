@@ -118,6 +118,12 @@ export function PreviewPlayer(): React.JSX.Element {
   }, [])
 
   const hasTimeline = duration > 0
+  const isMultiTrack = tracks.filter((t) => t.clips.length > 0).length > 1
+
+  // Edge case: Track 1 empty but Track 2+ has clips (invalid multi-track configuration)
+  const track1Empty = tracks.length > 0 && tracks[0].clips.length === 0
+  const track2HasClips = tracks.length > 1 && tracks.slice(1).some((t) => t.clips.length > 0)
+  const invalidMultiTrack = track1Empty && track2HasClips
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center bg-black" ref={containerRef}>
@@ -128,6 +134,32 @@ export function PreviewPlayer(): React.JSX.Element {
         >
           <p className="text-sm">No clips on timeline</p>
           <p className="text-xs mt-1">Drag media to timeline to start</p>
+        </div>
+      )}
+
+      {/* Error overlay for invalid multi-track configuration */}
+      {invalidMultiTrack && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'rgba(220, 38, 38, 0.9)',
+            color: 'white',
+            padding: '16px 24px',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: 600,
+            zIndex: 40,
+            pointerEvents: 'none',
+            textAlign: 'center'
+          }}
+        >
+          <div>⚠️ Track 1 Required for Multi-Track</div>
+          <div style={{ fontSize: '12px', fontWeight: 400, marginTop: '8px' }}>
+            Track 1 must have clips when using overlay tracks
+          </div>
         </div>
       )}
 
@@ -144,6 +176,27 @@ export function PreviewPlayer(): React.JSX.Element {
           display: 'block'
         }}
       />
+
+      {/* Multi-track preview badge */}
+      {isMultiTrack && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            background: 'var(--color-primary, #3B82F6)',
+            color: 'white',
+            padding: '6px 12px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            fontWeight: 600,
+            zIndex: 30,
+            pointerEvents: 'none'
+          }}
+        >
+          Multi-Track Preview
+        </div>
+      )}
 
       {/* Debug info (remove in production) */}
       {hasTimeline && (

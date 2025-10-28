@@ -46,7 +46,11 @@ function convertToCompositorClip(clip: Clip, trackId: string, trackIndex: number
     duration: calculateEffectiveDuration(clip),
     trimIn: clip.trimIn,
     trimOut: clip.trimOut,
-    opacity: 1.0 // Default opacity, can be extended later
+    opacity: 1.0, // Default opacity, can be extended later
+    // PiP metadata (Track 2+ overlays)
+    pipPosition: clip.pipPosition || (trackIndex > 0 ? 'bottom-right' : undefined),
+    pipSize: clip.pipSize || (trackIndex > 0 ? 0.25 : undefined),
+    showBorder: trackIndex > 0 ? true : false // Default: border on Track 2+, no border on Track 1
   }
 }
 
@@ -55,9 +59,9 @@ function convertToCompositorClip(clip: Clip, trackId: string, trackIndex: number
  */
 function convertToCompositorTracks(tracks: Track[]): CompositorTrack[] {
   return tracks.map((track, index) => ({
-    id: track.id,
+    id: String(track.id), // Convert number to string
     index,
-    clips: track.clips.map(clip => convertToCompositorClip(clip, track.id, index))
+    clips: track.clips.map((clip) => convertToCompositorClip(clip, String(track.id), index))
   }))
 }
 

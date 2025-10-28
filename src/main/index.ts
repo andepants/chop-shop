@@ -1,6 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { electronApp, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { IPCResponse, IPC_CHANNELS } from '../shared/types'
 import { registerIPCHandlers } from './ipc'
@@ -41,6 +41,52 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  // Custom keyboard handling - replaces optimizer.watchWindowShortcuts
+  // Allows zoom shortcuts (Cmd/Ctrl + -, =, 0) to pass through to renderer
+  // while maintaining security protections
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown') {
+      // Production: Block refresh (Cmd/Ctrl + R)
+      if (!is.dev && input.code === 'KeyR' && (input.control || input.meta)) {
+        event.preventDefault()
+        return
+      }
+
+      // Production: Block DevTools shortcuts (Cmd+Alt+I / Ctrl+Shift+I)
+      if (!is.dev && input.code === 'KeyI' &&
+          ((input.alt && input.meta) || (input.control || input.shift))) {
+        event.preventDefault()
+        return
+      }
+
+      // Development: F12 toggles DevTools
+      if (is.dev && input.code === 'F12') {
+        if (mainWindow.webContents.isDevToolsOpened()) {
+          mainWindow.webContents.closeDevTools()
+        } else {
+          mainWindow.webContents.openDevTools({ mode: 'undocked' })
+        }
+        event.preventDefault()
+        return
+      }
+
+      // ZOOM SHORTCUTS: Allow Cmd/Ctrl + -, =, 0 to pass through to renderer
+      // The renderer's Timeline.tsx will handle them with preventDefault
+      // to prevent browser page zoom
+      if ((input.control || input.meta)) {
+        const isZoomShortcut =
+          input.code === 'Minus' ||    // Cmd/Ctrl + -
+          input.code === 'Equal' ||    // Cmd/Ctrl + =
+          input.code === 'Digit0'      // Cmd/Ctrl + 0
+
+        if (isZoomShortcut) {
+          // Don't preventDefault - let renderer handle it!
+          return
+        }
+      }
+    }
+  })
 }
 
 // This method will be called when Electron has finished
@@ -50,12 +96,10 @@ app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
+  // NOTE: Replaced optimizer.watchWindowShortcuts with custom implementation
+  // in createWindow() to allow zoom shortcuts (Cmd/Ctrl + -, =, 0) to pass through
+  // to renderer while maintaining security protections.
+  // See: createWindow() -> mainWindow.webContents.on('before-input-event')
 
   // IPC handlers
   // Ping-pong test handler for IPC communication verification

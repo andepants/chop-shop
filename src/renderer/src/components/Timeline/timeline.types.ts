@@ -26,6 +26,10 @@ export interface Clip {
   trackId: number
   /** Optional thumbnail data URL (base64-encoded image) for visual preview */
   thumbnail?: string
+  /** PiP position for overlay clips (Track 2+) */
+  pipPosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+  /** PiP size as percentage (e.g., 0.25 = 25% of canvas width) */
+  pipSize?: number
 }
 
 /**

@@ -21,6 +21,7 @@ import type {
   CompositorEventCallback,
   CompositorEventType
 } from '../types/compositor.types'
+import { AudioMixer } from './AudioMixer'
 
 export class VideoCompositor {
   // Canvas and rendering
@@ -42,8 +43,10 @@ export class VideoCompositor {
   // Event handling
   private eventListeners: Map<CompositorEventType, Set<CompositorEventCallback>> = new Map()
 
+  // Audio mixing
+  private audioMixer: AudioMixer
+
   // Performance tracking
-  private lastFrameTime: number = 0
   private frameCount: number = 0
 
   constructor(options: CompositorOptions) {
@@ -76,6 +79,9 @@ export class VideoCompositor {
       rafHandle: null,
       canvas: this.canvas
     }
+
+    // Initialize audio mixer
+    this.audioMixer = new AudioMixer()
 
     console.log('[VideoCompositor] Initialized', {
       width: this.width,
@@ -120,7 +126,7 @@ export class VideoCompositor {
     console.log('[VideoCompositor] Unique sources:', sourceFiles.size)
 
     // Unload sources no longer needed
-    for (const [filePath, source] of this.sources) {
+    for (const [filePath] of this.sources) {
       if (!sourceFiles.has(filePath)) {
         this.unloadVideoSource(filePath)
       }
@@ -130,7 +136,9 @@ export class VideoCompositor {
     const currentSources = this.getSourcesNearTime(this.state.currentTime)
     for (const sourceFile of currentSources) {
       if (!this.sources.has(sourceFile)) {
-        await this.loadVideoSource(sourceFile)
+        await this.loadVideoSource(sourceFile).catch((error) => {
+          console.error('[VideoCompositor] Failed to load source:', sourceFile, error)
+        })
       }
     }
 
@@ -285,6 +293,9 @@ export class VideoCompositor {
       this.unloadVideoSource(filePath)
     }
 
+    // Dispose audio mixer
+    this.audioMixer.dispose()
+
     // Clear event listeners
     this.eventListeners.clear()
 
@@ -330,15 +341,12 @@ export class VideoCompositor {
   private startRenderLoop(): void {
     if (this.state.rafHandle !== null) return
 
-    this.lastFrameTime = performance.now()
     this.frameCount = 0
 
-    const render = (timestamp: number): void => {
+    const render = (_timestamp: number): void => {
       if (!this.state.isPlaying) return
 
-      // Calculate delta time
-      const deltaTime = (timestamp - this.lastFrameTime) / 1000
-      this.lastFrameTime = timestamp
+      // Update frame tracking
       this.frameCount++
 
       // Update current time based on video element times
@@ -380,6 +388,108 @@ export class VideoCompositor {
   }
 
   /**
+   * Calculate PiP dimensions based on clip settings, video aspect ratio, and canvas size
+   * Handles landscape, portrait, square, and ultra-wide aspect ratios
+   */
+  private calculatePipDimensions(
+    clip: CompositorClip,
+    video: HTMLVideoElement
+  ): { width: number; height: number } {
+    // Validate and clamp pipSize to [0.05, 0.5] range
+    let pipSize = clip.pipSize ?? 0.25
+    pipSize = Math.max(0.05, Math.min(0.5, pipSize))
+
+    // Skip if video dimensions not ready
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      return { width: this.width * pipSize, height: this.height * pipSize }
+    }
+
+    // Get video aspect ratio
+    const videoAspect = video.videoWidth / video.videoHeight
+
+    let width: number
+    let height: number
+
+    // Determine aspect ratio category
+    if (videoAspect > 1.5) {
+      // Landscape (16:9, 21:9, etc.) - width-first
+      width = this.width * pipSize
+      height = width / videoAspect
+    } else if (videoAspect < 0.7) {
+      // Portrait (9:16, etc.) - height-first
+      height = this.height * pipSize
+      width = height * videoAspect
+    } else {
+      // Square or near-square (1:1, 4:3, etc.)
+      width = this.width * pipSize
+      height = width / videoAspect
+    }
+
+    // Handle very small canvas (< 200px) - enforce min PiP size of 80px
+    if (this.width < 200 || this.height < 200) {
+      const minSize = 80
+      if (width < minSize) {
+        width = minSize
+        height = width / videoAspect
+      }
+      if (height < minSize) {
+        height = minSize
+        width = height * videoAspect
+      }
+    }
+
+    return { width, height }
+  }
+
+  /**
+   * Calculate PiP position with 20px padding from edges
+   * Defaults to 'bottom-right' if position is invalid
+   */
+  private calculatePipPosition(
+    clip: CompositorClip,
+    pipWidth: number,
+    pipHeight: number
+  ): { x: number; y: number } {
+    const padding = 20
+    let position = clip.pipPosition ?? 'bottom-right'
+
+    // Validate position, default to 'bottom-right' if invalid
+    const validPositions = ['top-left', 'top-right', 'bottom-left', 'bottom-right']
+    if (!validPositions.includes(position)) {
+      position = 'bottom-right'
+    }
+
+    let x: number
+    let y: number
+
+    switch (position) {
+      case 'top-left':
+        x = padding
+        y = padding
+        break
+      case 'top-right':
+        x = this.width - pipWidth - padding
+        y = padding
+        break
+      case 'bottom-left':
+        x = padding
+        y = this.height - pipHeight - padding
+        break
+      case 'bottom-right':
+      default:
+        x = this.width - pipWidth - padding
+        y = this.height - pipHeight - padding
+        break
+    }
+
+    // Clamp to canvas bounds (safety check)
+    x = Math.max(0, Math.min(x, this.width - pipWidth))
+    y = Math.max(0, Math.min(y, this.height - pipHeight))
+
+    return { x, y }
+  }
+
+  /**
    * Render a single frame to canvas
    */
   private renderFrame(): void {
@@ -411,26 +521,47 @@ export class VideoCompositor {
       // Draw video to canvas with opacity
       this.ctx.globalAlpha = clip.opacity
 
-      // Calculate aspect ratio fit
-      const videoAspect = video.videoWidth / video.videoHeight
-      const canvasAspect = this.width / this.height
+      if (clip.trackIndex === 0) {
+        // Track 1: Render full-screen with aspect-fit (existing behavior)
+        const videoAspect = video.videoWidth / video.videoHeight
+        const canvasAspect = this.width / this.height
 
-      let drawWidth = this.width
-      let drawHeight = this.height
-      let drawX = 0
-      let drawY = 0
+        let drawWidth = this.width
+        let drawHeight = this.height
+        let drawX = 0
+        let drawY = 0
 
-      if (videoAspect > canvasAspect) {
-        // Video is wider - fit width
-        drawHeight = this.width / videoAspect
-        drawY = (this.height - drawHeight) / 2
+        if (videoAspect > canvasAspect) {
+          // Video is wider - fit width
+          drawHeight = this.width / videoAspect
+          drawY = (this.height - drawHeight) / 2
+        } else {
+          // Video is taller - fit height
+          drawWidth = this.height * videoAspect
+          drawX = (this.width - drawWidth) / 2
+        }
+
+        this.ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight)
       } else {
-        // Video is taller - fit height
-        drawWidth = this.height * videoAspect
-        drawX = (this.width - drawWidth) / 2
-      }
+        // Track 2+: Render as PiP overlay
+        // Skip if video dimensions not ready
+        if (video.videoWidth > 0 && video.videoHeight > 0) {
+          const { width, height } = this.calculatePipDimensions(clip, video)
+          const { x, y } = this.calculatePipPosition(clip, width, height)
 
-      this.ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight)
+          // Draw video
+          this.ctx.drawImage(video, x, y, width, height)
+
+          // Draw border if enabled (default true for Track 2+)
+          if (clip.showBorder !== false) {
+            this.ctx.save()
+            this.ctx.strokeStyle = '#FFFFFF'
+            this.ctx.lineWidth = 2
+            this.ctx.strokeRect(x, y, width, height)
+            this.ctx.restore()
+          }
+        }
+      }
     }
 
     // Reset alpha
@@ -513,6 +644,24 @@ export class VideoCompositor {
   }
 
   /**
+   * Get the primary track index for a source file
+   * Returns the lowest trackIndex that uses this source
+   */
+  private getTrackIndexForSource(filePath: string): number {
+    let minTrackIndex = 999
+
+    for (const track of this.tracks) {
+      for (const clip of track.clips) {
+        if (clip.sourceFile === filePath && clip.trackIndex < minTrackIndex) {
+          minTrackIndex = clip.trackIndex
+        }
+      }
+    }
+
+    return minTrackIndex === 999 ? 0 : minTrackIndex
+  }
+
+  /**
    * Get source files needed near a given time
    * Includes current clips and upcoming clips within preload window
    */
@@ -569,6 +718,11 @@ export class VideoCompositor {
         source.isLoaded = true
         source.duration = video.duration
         console.log('[VideoCompositor] Source loaded:', filePath, 'duration:', video.duration)
+
+        // Connect to AudioMixer for per-track gain control
+        const trackIndex = this.getTrackIndexForSource(filePath)
+        this.audioMixer.connectVideo(video, trackIndex)
+
         video.removeEventListener('loadedmetadata', onLoadedMetadata)
         video.removeEventListener('error', onError)
         resolve()
@@ -600,6 +754,9 @@ export class VideoCompositor {
     if (!source) return
 
     console.log('[VideoCompositor] Unloading source:', filePath)
+
+    // Disconnect from AudioMixer
+    this.audioMixer.disconnectVideo(source.element)
 
     // Stop and clear video
     source.element.pause()

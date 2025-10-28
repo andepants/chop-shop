@@ -44,6 +44,12 @@ export interface CompositorClip {
   trimOut: number
   /** Opacity for compositing (0-1) */
   opacity: number
+  /** PiP position for overlay clips (Track 2+) */
+  pipPosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+  /** PiP size as percentage (e.g., 0.25 = 25% of canvas width), clamped to [0.05, 0.5] */
+  pipSize?: number
+  /** Whether to render border around this clip (default true for trackIndex > 0) */
+  showBorder?: boolean
 }
 
 /**
