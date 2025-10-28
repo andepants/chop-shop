@@ -115,6 +115,11 @@ export function TimelineClip({
   const calculatedWidth = effectiveDuration * zoomLevel
   const width = Math.max(80, calculatedWidth)
 
+  // DEBUG: Track zoom level changes and clip width
+  useEffect(() => {
+    console.log(`[TimelineClip ${clip.id.substring(0, 8)}] zoomLevel:`, zoomLevel, 'effectiveDuration:', effectiveDuration, 'calculatedWidth:', calculatedWidth, 'finalWidth:', width)
+  }, [zoomLevel, effectiveDuration, calculatedWidth, width, clip.id])
+
   // Determine cursor based on active tool and edge hover state
   const cursorStyle = isDragging
     ? 'grabbing'

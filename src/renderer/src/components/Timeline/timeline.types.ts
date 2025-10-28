@@ -60,8 +60,8 @@ export interface TimelineState {
   // Actions
   /** Add a new clip to the timeline */
   addClip: (clip: Omit<Clip, 'id'>) => void
-  /** Add a clip to a specific track */
-  addClipToTrack: (clip: Omit<Clip, 'id'>, trackId: number) => void
+  /** Add a clip to a specific track (trackId will be set by the function) */
+  addClipToTrack: (clip: Omit<Clip, 'id' | 'trackId'>, trackId: number) => void
   /** Get all clips for a specific track */
   getClipsForTrack: (trackId: number) => Clip[]
   /** Remove a clip from the timeline */

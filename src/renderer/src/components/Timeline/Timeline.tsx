@@ -17,26 +17,6 @@ import { TimelineTrack } from './TimelineTrack'
 import { TimelineGrid } from './TimelineGrid'
 import { Playhead } from './Playhead'
 
-const MIN_ZOOM = 10 // Minimum 10 pixels per second
-const MAX_ZOOM = 100 // Maximum 100 pixels per second
-const DEFAULT_WIDTH = 1000 // Default timeline width for initial zoom calculation
-
-/**
- * Calculate auto-zoom level to fit all clips in container
- *
- * @param totalDuration - Total timeline duration in seconds
- * @param containerWidth - Available width in pixels
- * @returns Zoom level clamped between MIN_ZOOM and MAX_ZOOM
- */
-function calculateAutoZoom(totalDuration: number, containerWidth: number): number {
-  if (totalDuration === 0) {
-    return 50 // Default zoom when empty
-  }
-
-  const calculatedZoom = containerWidth / totalDuration
-  return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, calculatedZoom))
-}
-
 /**
  * Calculate next available position for sequential clip placement
  *
@@ -79,8 +59,8 @@ function calculateNextPosition(clips: Array<{ startTime: number; duration: numbe
  */
 export function Timeline(): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [containerWidth, setContainerWidth] = useState(DEFAULT_WIDTH)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const [mousePosition, setMousePosition] = useState<{ x: number; y: number } | null>(null)
 
   const { files } = useMediaStore()
   const {
@@ -88,7 +68,6 @@ export function Timeline(): React.JSX.Element {
     totalDuration,
     pixelsPerSecond,
     selectedClipId,
-    addClip,
     addClipToTrack,
     selectClip,
     removeClip,
@@ -99,19 +78,10 @@ export function Timeline(): React.JSX.Element {
     fitToTimeline
   } = useTimelineStore()
 
-  // Measure container width (used for manual Fit to Timeline calculation)
+  // DEBUG: Track pixelsPerSecond changes
   useEffect(() => {
-    if (!containerRef.current) return
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width)
-      }
-    })
-
-    resizeObserver.observe(containerRef.current)
-    return () => resizeObserver.disconnect()
-  }, [])
+    console.log('[Timeline] pixelsPerSecond updated:', pixelsPerSecond, 'zoomLevel:', useTimelineStore.getState().zoomLevel)
+  }, [pixelsPerSecond])
 
   // Note: Auto-zoom removed in Story 4.2 - users now control zoom manually
   // Use "Fit" button (backslash key) to fit timeline to viewport
@@ -296,6 +266,25 @@ export function Timeline(): React.JSX.Element {
    */
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent): void {
+      // CRITICAL: Prevent default for ALL Cmd/Ctrl zoom shortcuts FIRST
+      // Electron intercepts these before our handler otherwise
+      if (e.metaKey || e.ctrlKey) {
+        // Check if it's a zoom-related key
+        const isZoomKey =
+          e.key === '=' || e.key === '+' || e.code === 'Equal' ||
+          e.key === '-' || e.code === 'Minus' ||
+          e.key === '0' || e.code === 'Digit0'
+
+        if (isZoomKey) {
+          e.preventDefault() // Prevent browser/Electron zoom BEFORE checking conditions
+        }
+      }
+
+      // DEBUG: Log all keyboard events with Cmd/Ctrl modifier
+      if (e.metaKey || e.ctrlKey) {
+        console.log(`[Keyboard] Cmd/Ctrl pressed - key="${e.key}" code="${e.code}" metaKey=${e.metaKey} ctrlKey=${e.ctrlKey} shiftKey=${e.shiftKey} altKey=${e.altKey}`)
+      }
+
       // Tool selection shortcuts (V/C)
       const { setTool } = useToolStore.getState()
       if (e.key.toLowerCase() === 'v') {
@@ -307,19 +296,20 @@ export function Timeline(): React.JSX.Element {
       }
 
       // Zoom shortcuts (Story 4.2)
-      if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
-        e.preventDefault() // Prevent browser zoom
+      if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+' || e.code === 'Equal')) {
+        console.log('[Keyboard] ZOOM IN triggered')
         zoomIn()
         return
-      } else if ((e.metaKey || e.ctrlKey) && (e.key === '-' || e.key === '_')) {
-        e.preventDefault() // Prevent browser zoom
+      } else if ((e.metaKey || e.ctrlKey) && (e.key === '-' || e.code === 'Minus')) {
+        console.log('[Keyboard] ZOOM OUT triggered')
         zoomOut()
         return
-      } else if ((e.metaKey || e.ctrlKey) && e.key === '0') {
-        e.preventDefault()
+      } else if ((e.metaKey || e.ctrlKey) && (e.key === '0' || e.code === 'Digit0')) {
+        console.log('[Keyboard] ZOOM RESET triggered')
         setZoomLevel(1.0) // Reset to 100%
         return
-      } else if (e.key === '\\') {
+      } else if (e.key === '\\' || e.code === 'Backslash') {
+        console.log('[Keyboard] FIT TIMELINE triggered')
         fitToTimeline()
         return
       }
@@ -338,19 +328,82 @@ export function Timeline(): React.JSX.Element {
   }, [selectedClipId, selectClip, removeClip, zoomIn, zoomOut, setZoomLevel, fitToTimeline])
 
   /**
-   * Prevent default browser zoom on Cmd/Ctrl + scroll
-   * Story 4.2: Task 3
+   * Track mouse position on timeline for cursor-aware zoom
+   * Story 4.2: Task 5
    */
   useEffect(() => {
-    function handleWheel(e: WheelEvent): void {
-      if (e.metaKey || e.ctrlKey) {
-        e.preventDefault() // Prevent browser zoom
+    function handleMouseMove(e: MouseEvent): void {
+      if (!containerRef.current) return
+      const rect = containerRef.current.getBoundingClientRect()
+
+      // Check if mouse is over the timeline container
+      if (
+        e.clientX >= rect.left &&
+        e.clientX <= rect.right &&
+        e.clientY >= rect.top &&
+        e.clientY <= rect.bottom
+      ) {
+        setMousePosition({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+      } else {
+        setMousePosition(null)
       }
     }
 
-    window.addEventListener('wheel', handleWheel, { passive: false })
-    return () => window.removeEventListener('wheel', handleWheel)
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => window.removeEventListener('mousemove', handleMouseMove)
   }, [])
+
+  /**
+   * Handle cursor-aware zoom with Alt + scroll wheel (Story 4.2: Task 5)
+   * Also prevents default browser zoom on Cmd/Ctrl + scroll (Task 3)
+   */
+  useEffect(() => {
+    function handleWheel(e: WheelEvent): void {
+      // Prevent browser zoom on Cmd/Ctrl + scroll
+      if (e.metaKey || e.ctrlKey) {
+        e.preventDefault()
+        return
+      }
+
+      // Cursor-aware zoom on Alt + scroll (Premiere Pro pattern)
+      if (e.altKey && containerRef.current) {
+        e.preventDefault()
+
+        // Get scroll container for offset adjustment
+        const scrollContainer = containerRef.current.parentElement
+        if (!scrollContainer) return
+
+        // Calculate time at cursor position before zoom
+        const cursorX = mousePosition?.x ?? scrollContainer.scrollLeft + scrollContainer.clientWidth / 2
+        const timeBeforeZoom = cursorX / pixelsPerSecond
+
+        // Zoom in/out based on wheel direction
+        if (e.deltaY < 0) {
+          zoomIn()
+        } else {
+          zoomOut()
+        }
+
+        // Wait for zoom state to update, then adjust scroll position
+        requestAnimationFrame(() => {
+          const newPixelsPerSecond = useTimelineStore.getState().pixelsPerSecond
+
+          // Calculate new pixel position of the cursor time
+          const newCursorX = timeBeforeZoom * newPixelsPerSecond
+
+          // Adjust scroll offset to keep cursor time at same visual position
+          const scrollAdjustment = newCursorX - cursorX
+          scrollContainer.scrollLeft += scrollAdjustment
+        })
+      }
+    }
+
+    const scrollContainer = containerRef.current?.parentElement
+    if (!scrollContainer) return
+
+    scrollContainer.addEventListener('wheel', handleWheel, { passive: false })
+    return () => scrollContainer.removeEventListener('wheel', handleWheel)
+  }, [mousePosition, pixelsPerSecond, zoomIn, zoomOut])
 
   /**
    * Handle timeline seeking (AC #6)

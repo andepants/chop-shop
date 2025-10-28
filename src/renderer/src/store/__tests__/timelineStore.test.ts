@@ -17,8 +17,8 @@ describe('timelineStore', () => {
       ],
       playheadPosition: 0,
       totalDuration: 0,
-      zoomLevel: 1.0,
-      pixelsPerSecond: 50,
+      zoomLevel: 0.1, // Default 10% zoom
+      pixelsPerSecond: 5, // 50 * 0.1
       selectedClipId: null
     })
   })
@@ -1354,11 +1354,11 @@ describe('timelineStore', () => {
 
   // Zoom functionality tests (Story 4.2)
   describe('Zoom Controls - Story 4.2', () => {
-    it('initializes with default zoom level 1.0 and pixelsPerSecond 50 (AC #5)', () => {
+    it('initializes with default zoom level 0.1 (10%) and pixelsPerSecond 5 (AC #5)', () => {
       const state = useTimelineStore.getState()
 
-      expect(state.zoomLevel).toBe(1.0)
-      expect(state.pixelsPerSecond).toBe(50)
+      expect(state.zoomLevel).toBe(0.1)
+      expect(state.pixelsPerSecond).toBe(5) // 50 * 0.1
     })
 
     it('setZoomLevel updates both zoomLevel and pixelsPerSecond (AC #2, #3)', () => {
@@ -1394,12 +1394,12 @@ describe('timelineStore', () => {
     it('zoomIn multiplies zoom level by 1.2 (AC #2)', () => {
       const { zoomIn } = useTimelineStore.getState()
 
-      // Starting from 1.0
+      // Starting from 0.1 (10% default)
       zoomIn()
 
       const state = useTimelineStore.getState()
-      expect(state.zoomLevel).toBeCloseTo(1.2, 5)
-      expect(state.pixelsPerSecond).toBeCloseTo(60, 5) // 50 * 1.2
+      expect(state.zoomLevel).toBeCloseTo(0.12, 5) // 0.1 * 1.2
+      expect(state.pixelsPerSecond).toBeCloseTo(6, 5) // 50 * 0.12
     })
 
     it('zoomIn respects maximum bound of 5.0 (bounds checking)', () => {
@@ -1417,14 +1417,15 @@ describe('timelineStore', () => {
     })
 
     it('zoomOut divides zoom level by 1.2 (AC #3)', () => {
-      const { zoomOut } = useTimelineStore.getState()
+      const { setZoomLevel, zoomOut } = useTimelineStore.getState()
 
-      // Starting from 1.0
+      // Start from a level above minimum to test division
+      setZoomLevel(1.2)
       zoomOut()
 
       const state = useTimelineStore.getState()
-      expect(state.zoomLevel).toBeCloseTo(1.0 / 1.2, 5)
-      expect(state.pixelsPerSecond).toBeCloseTo(50 / 1.2, 5)
+      expect(state.zoomLevel).toBeCloseTo(1.0, 5) // 1.2 / 1.2
+      expect(state.pixelsPerSecond).toBeCloseTo(50, 5) // 50 * 1.0
     })
 
     it('zoomOut respects minimum bound of 0.1 (bounds checking)', () => {
@@ -1444,31 +1445,31 @@ describe('timelineStore', () => {
     it('performs multiple zoom operations correctly', () => {
       const { zoomIn, zoomOut } = useTimelineStore.getState()
 
-      // Zoom in twice
+      // Zoom in twice from 0.1 default
       zoomIn()
       zoomIn()
 
       let state = useTimelineStore.getState()
-      expect(state.zoomLevel).toBeCloseTo(1.44, 5) // 1.0 * 1.2 * 1.2
+      expect(state.zoomLevel).toBeCloseTo(0.144, 5) // 0.1 * 1.2 * 1.2
 
       // Zoom out once
       zoomOut()
 
       state = useTimelineStore.getState()
-      expect(state.zoomLevel).toBeCloseTo(1.2, 5) // 1.44 / 1.2
+      expect(state.zoomLevel).toBeCloseTo(0.12, 5) // 0.144 / 1.2
     })
 
-    it('fitToTimeline resets to 1.0 when timeline is empty', () => {
+    it('fitToTimeline resets to 0.1 (10%) when timeline is empty', () => {
       const { fitToTimeline } = useTimelineStore.getState()
 
-      // Set zoom to something other than 1.0
+      // Set zoom to something other than default
       useTimelineStore.setState({ zoomLevel: 3.0, pixelsPerSecond: 150 })
 
       fitToTimeline()
 
       const state = useTimelineStore.getState()
-      expect(state.zoomLevel).toBe(1.0)
-      expect(state.pixelsPerSecond).toBe(50)
+      expect(state.zoomLevel).toBe(0.1) // Default 10% zoom
+      expect(state.pixelsPerSecond).toBe(5) // 50 * 0.1
     })
 
     it('fitToTimeline calculates zoom to fit all clips in viewport', () => {
@@ -1565,10 +1566,10 @@ describe('timelineStore', () => {
 
       const newState = useTimelineStore.getState()
 
-      // Original state should be unchanged
-      expect(originalZoomLevel).toBe(1.0)
+      // Original state should be unchanged (was default 0.1)
+      expect(originalZoomLevel).toBe(0.1)
       // New state should have updated zoom
-      expect(newState.zoomLevel).toBeCloseTo(1.2, 5)
+      expect(newState.zoomLevel).toBeCloseTo(0.12, 5) // 0.1 * 1.2
     })
 
     it('zoom level affects clip positioning calculations', () => {

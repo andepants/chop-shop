@@ -17,313 +17,384 @@ so that I can verify my picture-in-picture and overlay effects.
 5. Scrubbing updates preview with correct multi-track composition
 6. Preview maintains 30fps smooth playback with 2 tracks
 
+## Architecture Context
+
+**IMPORTANT**: The VideoCompositor architecture has been implemented and handles most multi-track rendering automatically:
+
+✅ **Already Implemented by VideoCompositor:**
+- Canvas-based multi-track rendering at 60fps
+- Video element pool management with LRU caching
+- Automatic clip transitions and track layering
+- Frame-accurate seeking and scrubbing support
+- RequestAnimationFrame render loop with performance monitoring
+- Synchronized multi-track playback via PlaybackOrchestrator
+- Video loading error handling with event emission
+- Memory management and resource cleanup
+
+❌ **Still Needed (This Story):**
+- **PiP positioning logic** for Track 2 overlays (currently all tracks render full-screen)
+- **Audio mixing** with Web Audio API gain control (Track 1 = 100%, Track 2 = 80%)
+- **PiP metadata** support on clips (pipPosition, pipSize)
+- **Visual feedback** (border around Track 2, multi-track badge)
+- **Edge case handling** specific to PiP and audio mixing
+
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create VideoCanvas component for multi-track rendering (AC: 1, 2, 3)
-  - [ ] Create `src/renderer/src/components/Preview/VideoCanvas.tsx`
-  - [ ] Implement VideoCanvasProps interface exactly from tech spec (lines 292-300):
+- [ ] Task 1: Extend CompositorClip interface to support PiP metadata (AC: 2)
+  - [ ] Update `src/renderer/src/types/compositor.types.ts`
+  - [ ] Add optional PiP fields to CompositorClip interface:
     ```typescript
-    interface VideoCanvasProps {
-      track1Video: HTMLVideoElement;
-      track2Video?: HTMLVideoElement;
-      pipPosition?: PipPosition;
-      pipSize?: number;
-      width: number;
-      height: number;
+    export interface CompositorClip {
+      // ... existing fields ...
+      /** PiP position for overlay clips (Track 2+) */
+      pipPosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+      /** PiP size as percentage (e.g., 0.25 = 25% of canvas width) */
+      pipSize?: number
+      /** Whether to render border around this clip */
+      showBorder?: boolean
     }
     ```
-  - [ ] Use HTML5 Canvas API for real-time compositing
-  - [ ] Set canvas size to match Track 1 resolution (e.g., 1920x1080)
-  - [ ] Implement `renderFrame()` function called at 30fps (requestAnimationFrame)
-  - [ ] Load video elements for Track 1 and Track 2 clips
-  - [ ] Draw Track 1 frame to canvas first (full canvas, 0,0 position)
-  - [ ] Draw Track 2 frame on top (PiP position/size from clip metadata)
-  - [ ] Apply 2px white border around Track 2 overlay for visibility
+  - [ ] Update `playbackOrchestrator.ts` convertToCompositorClip() to pass through PiP metadata from timeline clips
+  - [ ] Extend Clip interface in `timeline.types.ts` with optional PiP fields if not already present
 
-- [ ] Task 2: Implement PiP positioning logic (AC: 2)
-  - [ ] Read pipMetadata from Track 2 clip:
-    - position: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
-    - size: number (tech spec line 199) - Note: If using enum, document deviation
-  - [ ] Calculate PiP dimensions:
-    - If pipSize is number: use as percentage (e.g., 0.25 = 25%)
-    - If pipSize is enum: map 'small'→15%, 'medium'→25%, 'large'→33%
-    - width: Track1Width * sizePercent
-    - height: width * (9/16) for 16:9 aspect ratio
-  - [ ] Calculate PiP position with 20px padding from edges:
-    - bottom-right: x = canvasWidth - pipWidth - 20, y = canvasHeight - pipHeight - 20
-    - bottom-left: x = 20, y = canvasHeight - pipHeight - 20
-    - top-right: x = canvasWidth - pipWidth - 20, y = 20
-    - top-left: x = 20, y = 20
-  - [ ] Use canvas.drawImage(track2Video, x, y, width, height)
+- [ ] Task 2: Implement PiP rendering in VideoCompositor (AC: 1, 2, 6)
+  - [ ] Modify `src/renderer/src/utils/VideoCompositor.ts` renderFrame() method
+  - [ ] Add helper function `calculatePipDimensions(clip, canvas)`:
+    - Validate pipSize: clamp to [0.05, 0.5] range (5% min, 50% max)
+    - Default pipSize: 0.25 if not specified or invalid
+    - Get video aspect ratio from video.videoWidth / video.videoHeight
+    - Calculate PiP dimensions based on aspect ratio:
+      - For 16:9 (landscape): width = canvasWidth * pipSize, height = width * (9/16)
+      - For 9:16 (portrait): height = canvasHeight * pipSize, width = height * (9/16)
+      - For 1:1 (square): size = canvasWidth * pipSize for both dimensions
+      - For other ratios: maintain source aspect ratio
+  - [ ] Add helper function `calculatePipPosition(clip, pipWidth, pipHeight, canvas)`:
+    - Default pipPosition to 'bottom-right' if not specified
+    - Apply 20px padding from edges
+    - Position calculation:
+      - 'bottom-right': {x: canvasWidth - pipWidth - 20, y: canvasHeight - pipHeight - 20}
+      - 'bottom-left': {x: 20, y: canvasHeight - pipHeight - 20}
+      - 'top-right': {x: canvasWidth - pipWidth - 20, y: 20}
+      - 'top-left': {x: 20, y: 20}
+    - Clamp to canvas bounds if dimensions exceed (safety check)
+  - [ ] Update renderFrame() to detect Track 2+ and apply PiP:
+    - Track 1 (trackIndex === 0): Render full-screen with aspect-fit (existing behavior)
+    - Track 2+ (trackIndex > 0): Render as PiP overlay using calculated dimensions and position
+    - Skip PiP logic if video.videoWidth or video.videoHeight is 0 (not ready)
 
-- [ ] Task 3: Integrate VideoCanvas with PreviewPlayer (AC: 1, 3)
+- [ ] Task 3: Add visual border for PiP overlays (AC: 2)
+  - [ ] In VideoCompositor.renderFrame(), after drawing PiP video frame:
+    - Check if clip.showBorder !== false (default: true for Track 2+)
+    - Save canvas context state
+    - Set strokeStyle: ctx.strokeStyle = '#FFFFFF'
+    - Set lineWidth: ctx.lineWidth = 2
+    - Draw rectangle around PiP: ctx.strokeRect(pipX, pipY, pipWidth, pipHeight)
+    - Optional: Add subtle drop shadow for depth
+    - Restore context state
+  - [ ] Border should be visible regardless of video content colors
+
+- [ ] Task 4: Implement Web Audio API for audio mixing (AC: 4)
+  - [ ] Create new utility: `src/renderer/src/utils/AudioMixer.ts`
+  - [ ] Implement AudioMixer class:
+    ```typescript
+    class AudioMixer {
+      private audioContext: AudioContext | null = null
+      private sourceNodes: Map<HTMLVideoElement, MediaElementAudioSourceNode> = new Map()
+      private gainNodes: Map<HTMLVideoElement, GainNode> = new Map()
+
+      // Initialize AudioContext (lazy - only when needed)
+      initializeContext(): void
+
+      // Connect video element to audio graph with gain
+      connectVideo(video: HTMLVideoElement, trackIndex: number): void
+
+      // Disconnect video element from audio graph
+      disconnectVideo(video: HTMLVideoElement): void
+
+      // Update gain for a specific video
+      setGain(video: HTMLVideoElement, gain: number): void
+
+      // Handle AudioContext state (suspended/blocked)
+      resumeContext(): Promise<void>
+
+      // Cleanup
+      dispose(): void
+    }
+    ```
+  - [ ] Set gain levels per track:
+    - Track 1 (index 0): gain = 1.0 (100%)
+    - Track 2 (index 1): gain = 0.8 (80% per tech spec line 709)
+  - [ ] Handle edge cases:
+    - AudioContext blocked: Defer initialization until user interaction
+    - AudioContext suspended: Expose resumeContext() method
+    - Video already connected: Disconnect before reconnecting
+    - Both tracks no audio: Skip AudioContext creation entirely
+    - Track 1 no audio, Track 2 has audio: Promote Track 2 to gain = 1.0
+  - [ ] Integrate AudioMixer into VideoCompositor:
+    - Create AudioMixer instance in constructor
+    - In loadVideoSource(), connect video to AudioMixer after creating element
+    - Detect audio streams: Check if video.mozHasAudio or video.webkitAudioDecodedByteCount exists
+    - In unloadVideoSource(), disconnect video from AudioMixer
+    - In dispose(), call AudioMixer.dispose()
+
+- [ ] Task 5: Add multi-track visual feedback to PreviewPlayer (AC: 1)
   - [ ] Update `src/renderer/src/components/Preview/PreviewPlayer.tsx`
-  - [ ] Detect multi-track timeline (timelineStore.tracks[2].length > 0)
-  - [ ] If single track: use Video.js player (existing behavior)
-  - [ ] If multi-track: render VideoCanvas instead of Video.js player
-  - [ ] Pass Track 1 and Track 2 clip data to VideoCanvas
-  - [ ] Maintain playback controls: play/pause, seek, current time display
+  - [ ] Detect multi-track timeline:
+    ```typescript
+    const isMultiTrack = tracks.filter(t => t.clips.length > 0).length > 1
+    ```
+  - [ ] If multi-track, render badge in top-right corner:
+    ```tsx
+    {isMultiTrack && (
+      <div
+        style={{
+          position: 'absolute',
+          top: '16px',
+          right: '16px',
+          background: 'var(--color-primary, #3B82F6)',
+          color: 'white',
+          padding: '6px 12px',
+          borderRadius: '4px',
+          fontSize: '12px',
+          fontWeight: 600,
+          zIndex: 30,
+          pointerEvents: 'none'
+        }}
+      >
+        Multi-Track Preview
+      </div>
+    )}
+    ```
+  - [ ] Show active track count in debug info (already exists, verify it works)
 
-- [ ] Task 4: Implement synchronized playback for both tracks (AC: 3, 6)
-  - [ ] Load both video elements:
-    - track1Video: hidden <video> element for Track 1 clip
-    - track2Video: hidden <video> element for Track 2 clip
-  - [ ] Synchronize playback:
-    - On play: call track1Video.play() and track2Video.play() simultaneously
-    - On pause: call track1Video.pause() and track2Video.pause()
-    - On seek: set track1Video.currentTime and track2Video.currentTime to playhead position
-  - [ ] CRITICAL: Sync both video currentTime to playhead (tech spec line 411)
-  - [ ] Use requestAnimationFrame loop to render frames at 30fps
-  - [ ] Monitor frame drop: if FPS < 25, reduce canvas resolution automatically
+- [ ] Task 6: Edge case handling for PiP and Audio
 
-- [ ] Task 5: Implement audio mixing (AC: 4)
-  - [ ] Use Web Audio API for audio mixing:
-    - Create AudioContext
-    - Create MediaElementAudioSourceNode for track1Video and track2Video
-    - Create GainNode for each track
-  - [ ] Set gain levels (CORRECTED FROM TECH SPEC):
-    - Track 1 (screen): gain = 1.0 (100%, primary audio)
-    - Track 2 (webcam): gain = 0.8 (80%, secondary audio - tech spec line 709, NOT 50%)
-  - [ ] Connect both sources to AudioContext.destination
-  - [ ] Handle case: only one track has audio (no mixing needed)
+  **PiP Edge Cases:**
+  - [ ] Invalid pipSize (0, negative, >1.0): Clamp to [0.05, 0.5], default 0.25
+  - [ ] Invalid pipPosition (typo, wrong value): Default to 'bottom-right'
+  - [ ] Portrait video (9:16): Calculate height-first, then width
+  - [ ] Square video (1:1): Use pipSize for both dimensions
+  - [ ] Ultra-wide video (21:9+): Maintain aspect ratio, clamp to max dimensions
+  - [ ] Video dimensions not ready (videoWidth = 0): Skip PiP rendering this frame
+  - [ ] PiP exceeds canvas bounds: Clamp position to keep within canvas
+  - [ ] Very small canvas (< 200px): Set min PiP size to 80px
+  - [ ] Very large canvas (> 4096px): Log warning, continue (browser handles limits)
 
-- [ ] Task 6: Implement scrubbing with multi-track preview (AC: 5)
-  - [ ] On timeline scrub (user drags playhead):
-    1. Pause both video elements
-    2. Update currentTime for both videos
-    3. Wait for 'seeked' event on both videos
-    4. Render single frame to canvas (don't start playback)
-  - [ ] Debounce scrub updates (update every 33ms = 30fps max)
-  - [ ] Show loading spinner if seek takes > 100ms
+  **Audio Edge Cases:**
+  - [ ] AudioContext blocked by browser: Catch error, log, continue with muted playback
+  - [ ] AudioContext suspended: Provide resumeContext() method, call on user interaction
+  - [ ] Video already connected to graph: Disconnect first, then reconnect
+  - [ ] Track 1 no audio, Track 2 has audio: Set Track 2 gain to 1.0
+  - [ ] Both tracks no audio: Don't create AudioContext
+  - [ ] Gain values outside [0, 1]: Clamp to valid range
+  - [ ] Web Audio API not supported: Fallback to video.volume property
 
-- [ ] Task 7: Optimize canvas rendering for 30fps performance (AC: 6)
-  - [ ] Use `requestAnimationFrame` for render loop
-  - [ ] NFR REQUIREMENT: requestAnimationFrame loop executes within 16ms (tech spec line 456)
-  - [ ] Monitor frame time: if render takes > 33ms (30fps), log warning
-  - [ ] Implement frame skipping if behind: skip rendering intermediate frames
-  - [ ] Use `canvas.getContext('2d', { alpha: false })` for better performance
-  - [ ] Consider OffscreenCanvas for rendering in Web Worker (advanced optimization)
-  - [ ] Profile with Chrome DevTools: ensure CPU usage < 70% during playback
+  **Track Configuration Edge Cases:**
+  - [ ] Single track (Track 1 only): Skip PiP logic entirely, render full-screen
+  - [ ] Empty Track 2: Render Track 1 only, no compositing overhead
+  - [ ] Track 1 empty, Track 2 has clips: Show error overlay "Track 1 required for multi-track"
+  - [ ] Both tracks empty: Show placeholder (already handled by PreviewPlayer)
+  - [ ] Track duration mismatch: VideoCompositor already handles (longer track continues)
+  - [ ] Same source file on both tracks: VideoCompositor pool allows duplicate elements
 
-- [ ] Task 8: Handle timeline clip changes during playback (AC: 3)
-  - [ ] Detect clip boundaries:
-    - When currentTime exceeds Track 1 clip duration: stop playback or load next clip
-    - When currentTime exceeds Track 2 clip duration: render Track 1 only
-  - [ ] Implement clip transitions:
-    - Seamlessly switch to next clip on Track 1 if sequential clips exist
-    - Handle gap between clips: show black frame or pause
-  - [ ] Update VideoCanvas when timeline clips change (edit during preview)
+- [ ] Task 7: Testing and validation (All ACs)
 
-- [ ] Task 9: Add fallback for single-track playback (AC: 1, 3)
-  - [ ] If Track 2 empty: render Track 1 only (no compositing)
-  - [ ] If Track 1 empty but Track 2 has clip: show error "Track 1 required"
-  - [ ] If both tracks empty: show placeholder "No clips to preview"
-  - [ ] Maintain Video.js player for single-track timelines (better performance)
+  **AC1 Test**: Preview renders Track 2 overlaid on Track 1
+  - [ ] Load timeline with Track 1 clip (1920x1080, 10s)
+  - [ ] Add Track 2 clip (1280x720, 5s) starting at 2s
+  - [ ] Verify Track 2 renders as PiP overlay in bottom-right corner
+  - [ ] Verify Track 1 visible behind Track 2
 
-- [ ] Task 10: Handle edge cases and error scenarios
-  - [ ] Video load error: show error message, disable playback
-  - [ ] Audio context blocked (browser policy): show "Click to enable audio" button
-  - [ ] Track duration mismatch: continue playing longer track after shorter ends
-  - [ ] Track resolution mismatch: scale Track 2 to Track 1 resolution
-  - [ ] Canvas size exceeds GPU limits: downscale to max supported size (4096x4096)
-  - [ ] Frame drop (< 25fps): automatically reduce canvas resolution by 25%
-  - [ ] Memory leak: ensure video elements released when clips change
-  - [ ] Multiple rapid seek operations: debounce and cancel pending seeks
-  - [ ] Playback during trim/split operations: pause playback, update after operation
+  **AC2 Test**: PiP positioning and sizing
+  - [ ] Test pipPosition = 'bottom-right': Verify 20px padding from bottom and right edges
+  - [ ] Test pipPosition = 'bottom-left': Verify 20px padding from bottom and left edges
+  - [ ] Test pipPosition = 'top-right': Verify 20px padding from top and right edges
+  - [ ] Test pipPosition = 'top-left': Verify 20px padding from top and left edges
+  - [ ] Test pipSize = 0.25 (25%): Verify PiP width is 25% of canvas width
+  - [ ] Test pipSize = 0.15 (15%): Verify smaller PiP
+  - [ ] Verify 16:9 video maintains aspect ratio
+  - [ ] Test portrait video (9:16): Verify aspect ratio maintained
+  - [ ] Test square video (1:1): Verify aspect ratio maintained
+  - [ ] Verify 2px white border visible around Track 2 overlay
 
-- [ ] Task 11: Add visual feedback for compositing (AC: 1, 2)
-  - [ ] Show "Multi-Track Preview" badge in preview area
-  - [ ] Add toggle button: "Show/Hide Track 2" (for Track 1 only preview)
-  - [ ] Show track indicator on preview: "Track 1 + Track 2" label
-  - [ ] Add border to Track 2 overlay (2px white) for clear distinction
-  - [ ] Show loading indicator while videos load
+  **AC3 Test**: Real-time playback synchronization
+  - [ ] Play multi-track timeline
+  - [ ] Verify both tracks play simultaneously (no audio/video drift)
+  - [ ] Verify clip transitions work correctly on both tracks
+  - [ ] Verify playback continues when Track 2 ends but Track 1 continues
 
-- [ ] Task 11: VideoCanvas API documentation task
-  - [ ] Document VideoCanvasProps interface with usage examples
-  - [ ] Create JSDoc comments for all VideoCanvas methods
-  - [ ] Document pipSize handling (number vs enum decision)
-  - [ ] Add inline comments for audio mixing gain levels (80% for Track 2)
-  - [ ] Document performance optimization techniques used
+  **AC4 Test**: Audio mixing gain levels
+  - [ ] Play Track 1 only: Verify audio at 100% volume
+  - [ ] Play Track 1 + Track 2 (both with audio): Listen for Track 2 at lower volume (80%)
+  - [ ] Verify no audio clipping or distortion when both play
+  - [ ] Test AudioContext blocked: Click to enable audio, verify works after click
+  - [ ] Test Track 1 no audio, Track 2 has audio: Verify Track 2 plays at 100%
 
-- [ ] Task 12: NFR Validation with timing requirements
-  - [ ] Verify requestAnimationFrame loop executes within 16ms (tech spec line 456)
-  - [ ] Test 30fps playback with 1080p Track 1 + 720p Track 2
-  - [ ] Measure canvas render time per frame (target < 16ms)
-  - [ ] Validate audio mixing levels: Track 1 = 100%, Track 2 = 80%
-  - [ ] Test video currentTime sync to playhead (< 33ms accuracy)
-  - [ ] Profile CPU usage during playback (< 70% target)
+  **AC5 Test**: Scrubbing with multi-track
+  - [ ] Drag playhead forward through timeline: Verify both tracks update in real-time
+  - [ ] Drag playhead backward: Verify both tracks seek correctly
+  - [ ] Rapid scrubbing: Verify no crashes, smooth updates
+  - [ ] Scrub to Track 2 start/end: Verify PiP appears/disappears correctly
 
-- [ ] Task 13: Testing and validation
-  - [ ] Test preview with Track 1 clip only (single track)
-  - [ ] Test preview with Track 1 + Track 2 clips (multi-track)
-  - [ ] Test playback synchronization (both tracks start/stop together)
-  - [ ] Test audio mixing with correct gain levels (80% for Track 2)
-  - [ ] Test scrubbing (preview updates correctly)
-  - [ ] Test all 4 PiP positions (corners)
-  - [ ] Test pipSize handling (validate matches tech spec type)
-  - [ ] Performance test: verify 16ms frame render time
-  - [ ] Test track duration mismatch (longer Track 1, longer Track 2)
-  - [ ] Test resolution mismatch (4K Track 1, 720p Track 2)
-  - [ ] Test video currentTime sync to playhead
+  **AC6 Test**: Performance validation
+  - [ ] Monitor frame render time in console: Verify < 16ms (60fps)
+  - [ ] Profile with Chrome DevTools Performance tab during 30s playback
+  - [ ] Verify CPU usage < 70% during 1080p Track 1 + 720p Track 2 playback
+  - [ ] Test with 4K Track 1 + 1080p Track 2: Verify performance acceptable or auto-downscale
+  - [ ] Verify no memory leaks during 5-minute continuous playback
+
+  **Edge Case Tests**:
+  - [ ] Invalid pipSize (0, -1, 2.0): Verify defaults to 0.25
+  - [ ] Invalid pipPosition ('center'): Verify defaults to 'bottom-right'
+  - [ ] Portrait video in PiP: Verify correct dimensions
+  - [ ] AudioContext blocked: Verify graceful fallback
+  - [ ] Track 1 empty + Track 2 full: Verify error message shown
+  - [ ] Both tracks empty: Verify placeholder shown
+  - [ ] Delete active clip during playback: Verify graceful stop or transition
+
+- [ ] Task 8: Performance optimization validation (AC: 6)
+  - [ ] Verify VideoCompositor renderFrame() executes within 16ms for 60fps
+  - [ ] Test canvas rendering with alpha: false optimization (already implemented)
+  - [ ] Monitor video element pool size (should not exceed 10 elements)
+  - [ ] Verify LRU eviction works when pool is full (already implemented)
+  - [ ] Profile memory usage: ensure video buffers released when clips removed
+  - [ ] Test with different canvas sizes: 1080p, 720p, 4K
+  - [ ] Verify desynchronized canvas context flag for better performance (already implemented)
 
 ## Traceability
 
 **Tech Spec References:**
-- VideoCanvasProps interface (lines 292-300) - exact interface structure
-- pipSize type: number (line 199) - document if using enum instead
-- Video currentTime sync requirement (line 411) - both videos sync to playhead
-- Audio mixing levels: Track 2 = 80% (line 709) - CORRECTED from 50%
-- NFR timing: requestAnimationFrame < 16ms (line 456)
-
-**Critical Corrections:**
-- Audio mixing: Track 2 gain = 0.8 (80%), NOT 0.5 (50%) as initially documented
-- Video sync: Both track currentTime must sync to playhead position
-- Frame render: Must complete within 16ms for 60fps target
+- VideoCompositor architecture (implemented outside this story)
+- pipSize type: number (percentage, e.g., 0.25 = 25%)
+- Audio mixing levels: Track 2 = 80% (tech spec line 709)
+- NFR timing: 60fps render (16ms per frame, compositor already implements this)
+- Canvas optimization: alpha: false, desynchronized: true (already in VideoCompositor)
 
 **Architecture References:**
-- ADR-004: Canvas API for 2D compositing
-- Web Audio API for real-time audio mixing
-- requestAnimationFrame for 30fps render loop
-- Performance target: 30fps minimum, 60fps ideal
+- VideoCompositor: Handles multi-track rendering, video pool, RAF loop
+- PlaybackOrchestrator: Converts timeline clips to compositor format
+- PlaybackStore: Manages playback state via compositor callbacks
+- PreviewPlayer: Renders canvas element for compositor output
+
+**What VideoCompositor Already Provides:**
+- ✅ Multi-track canvas rendering at 60fps
+- ✅ Video element pool with LRU caching (max 10 elements)
+- ✅ Automatic clip sequencing and transitions
+- ✅ Frame-accurate seeking with single-frame rendering
+- ✅ Performance monitoring with frame time tracking
+- ✅ Event system for timeupdate, play, pause, ended, clipchange
+- ✅ Video loading error handling with sourceerror events
+- ✅ Memory management and resource cleanup
+
+**What This Story Adds:**
+- PiP positioning logic for Track 2+ overlays
+- Audio mixing with Web Audio API (Track 1 = 100%, Track 2 = 80%)
+- Visual feedback (2px white border, multi-track badge)
+- Edge case handling for PiP and audio
 
 ## Dev Notes
 
-### Multi-Track Preview Best Practices
+### PiP Rendering Strategy
 
-**Canvas API for Compositing** (Industry standard):
-- Premiere Pro: GPU-accelerated compositing (Mercury Playback Engine)
-- Final Cut Pro: Metal-based compositing
-- Chop Shop: Canvas API (sufficient for 2 tracks, simpler than WebGL)
+Current compositor renders all clips full-screen with aspect-fit. This story extends renderFrame() to detect Track 2+ and apply PiP:
 
-**Real-Time Preview** (NLE standard):
-- 30fps minimum for smooth playback (Premiere Pro standard)
-- Frame-accurate scrubbing (every frame visible during scrub)
-- Synchronized audio (tracks mixed in real-time)
-
-**Audio Mixing Levels** (Professional audio standards):
-- Primary track (screen): 100% (0dB)
-- Secondary track (webcam): 50% (-6dB) to prevent echo/overlap
-- Prevents audio clipping when both tracks play simultaneously
-
-**PiP Visual Indicator** (UX best practice):
-- 2px white border around overlay (clear distinction from main video)
-- Subtle drop shadow (optional, for depth)
-- Always visible regardless of video content colors
-
-### Architecture Patterns and Constraints
-
-**Canvas-Based Rendering** (ADR-004):
-- Canvas API for 2D compositing (no WebGL needed for 2 tracks)
-- requestAnimationFrame for 30fps render loop
-- Hardware-accelerated by browser (GPU compositing)
-
-**Performance Target** (NFR003):
-- 30fps minimum during playback
-- < 33ms per frame render time
-- Frame skipping if behind (maintain real-time playback)
-- Automatic downscaling if FPS drops below 25
-
-**State Management** (ADR-001):
-- `playbackStore.ts` manages playback state (isPlaying, currentTime)
-- `timelineStore.ts` provides clip data for both tracks
-- VideoCanvas subscribes to both stores for reactive updates
-
-**Audio Architecture**:
-- Web Audio API for mixing (GainNode for each track)
-- AudioContext handles browser audio permissions
-- Fallback: single audio track if Web Audio not supported
-
-### Edge Cases and Error Handling
-
-1. **Track Duration Mismatch**: Continue playing longer track, show black frame for shorter track
-2. **Resolution Mismatch**: Scale Track 2 to Track 1 resolution (maintain aspect ratio)
-3. **Audio Context Blocked**: Show "Click to enable audio" button (browser autoplay policy)
-4. **Video Load Error**: Show error message, disable playback, log detailed error
-5. **Canvas Size Exceeds GPU**: Downscale to 4096x4096 max (most GPUs support this)
-6. **Frame Drop (< 25fps)**: Auto-reduce canvas resolution by 25%, show warning
-7. **Memory Leak**: Ensure video elements removed from DOM when clips change
-8. **Rapid Seek Operations**: Debounce to 33ms (30fps), cancel pending seeks
-9. **Playback During Edit**: Pause playback during trim/split, resume after operation
-10. **Empty Track 2**: Render Track 1 only (no compositing overhead)
-11. **Audio-Only Track**: If Track 2 is audio-only (no video), show waveform visualization
-12. **Browser Compatibility**: Test in Electron (Chromium-based), fallback for missing features
-
-### Performance Optimization
-
-**requestAnimationFrame Loop**:
 ```javascript
-function renderFrame() {
-  const startTime = performance.now();
+// VideoCompositor.renderFrame() - UPDATED
+for (const clip of sortedClips) {
+  const source = this.sources.get(clip.sourceFile)
+  if (!source || !source.isLoaded) continue
 
-  // Draw Track 1
-  ctx.drawImage(track1Video, 0, 0, canvas.width, canvas.height);
+  const video = source.element
+  if (video.readyState < 2) continue
 
-  // Draw Track 2 (if exists)
-  if (track2Video) {
-    ctx.drawImage(track2Video, pipX, pipY, pipWidth, pipHeight);
+  // Draw with opacity
+  this.ctx.globalAlpha = clip.opacity
+
+  if (clip.trackIndex === 0) {
+    // Track 1: Full-screen with aspect-fit (existing)
+    const { drawX, drawY, drawWidth, drawHeight } = this.calculateAspectFit(video)
+    this.ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight)
+  } else {
+    // Track 2+: PiP overlay
+    const { width, height } = this.calculatePipDimensions(clip, video)
+    const { x, y } = this.calculatePipPosition(clip, width, height)
+    this.ctx.drawImage(video, x, y, width, height)
+
+    // Draw border if enabled
+    if (clip.showBorder !== false) {
+      this.ctx.strokeStyle = '#FFFFFF'
+      this.ctx.lineWidth = 2
+      this.ctx.strokeRect(x, y, width, height)
+    }
   }
 
-  const renderTime = performance.now() - startTime;
-  if (renderTime > 33) console.warn('Frame drop:', renderTime);
-
-  if (isPlaying) requestAnimationFrame(renderFrame);
+  this.ctx.globalAlpha = 1.0
 }
 ```
 
-**Frame Skipping**:
-- If render takes > 33ms (30fps), skip intermediate frames
-- Maintain audio sync (don't skip audio)
-- Visual stutter acceptable (< 25fps), but audio must stay smooth
+### Audio Mixing Architecture
 
-**Canvas Optimization**:
-- `alpha: false` in getContext (better performance)
-- Avoid canvas transforms (use raw pixel positioning)
-- Reuse canvas, don't recreate on each frame
+Web Audio API approach with lazy initialization:
 
-### Project Structure Notes
-
-**New Files Created**:
-- `src/renderer/src/components/Preview/VideoCanvas.tsx`
-- `src/renderer/src/hooks/useVideoCompositing.ts` (custom hook for canvas logic)
-
-**Files Modified**:
-- `src/renderer/src/components/Preview/PreviewPlayer.tsx` (integrate VideoCanvas)
-- `src/renderer/src/components/Preview/PlaybackControls.tsx` (support multi-track controls)
-- `src/renderer/src/store/playbackStore.ts` (multi-track playback state)
-
-**Component Hierarchy**:
 ```
-PreviewPlayer
-├── VideoCanvas (if multi-track)
-│   ├── <canvas> (compositing surface)
-│   ├── <video hidden> (Track 1 source)
-│   └── <video hidden> (Track 2 source)
-├── Video.js Player (if single-track, existing)
-└── PlaybackControls
-    ├── Play/Pause
-    ├── Timeline Scrubber
-    └── Time Display
+VideoElement (Track 1) → MediaElementSourceNode → GainNode (1.0) → AudioContext.destination
+VideoElement (Track 2) → MediaElementSourceNode → GainNode (0.8) → AudioContext.destination
 ```
 
-### Testing Standards Summary
+Benefits:
+- Real-time gain control per track
+- No audio clipping when both tracks play
+- Browser-native audio mixing (low CPU)
+- Lazy initialization avoids blocked AudioContext errors
 
-From `testing-strategy.md`:
-- Unit tests for PiP positioning calculations
-- Unit tests for audio gain calculations
-- Integration test: multi-track playback, verify 30fps
-- Integration test: scrubbing updates preview correctly
-- Performance test: CPU usage < 70% during 1080p playback
-- Edge case tests: duration mismatch, resolution mismatch, frame drop handling
+Edge case handling:
+- AudioContext blocked: Catch error, continue with muted playback
+- AudioContext suspended: Resume on user interaction
+- Track 1 no audio: Promote Track 2 to gain = 1.0
+- Both no audio: Skip AudioContext creation entirely
+
+### Aspect Ratio Handling
+
+Different aspect ratios require different PiP dimension calculations:
+
+- **16:9 (landscape)**: width = canvasWidth * pipSize, height = width * (9/16)
+- **9:16 (portrait)**: height = canvasHeight * pipSize, width = height * (9/16)
+- **1:1 (square)**: size = canvasWidth * pipSize for both
+- **21:9 (ultra-wide)**: Maintain source aspect ratio, clamp to max dimensions
+- **Unknown**: Use video.videoWidth / video.videoHeight to calculate
+
+### Performance Expectations
+
+With current compositor (60fps target):
+- Track 1 only: ~8ms per frame (1080p)
+- Track 1 + Track 2 PiP: ~12ms per frame (1080p + 720p)
+- CPU usage: 40-60% during playback
+- Well within 16ms budget for 60fps
+
+### Testing Standards
+
+Manual testing required for:
+- All 4 PiP corner positions
+- Portrait, square, and ultra-wide videos
+- Audio mixing gain levels (listen test)
+- AudioContext browser policy handling
+- All edge cases from Task 6
+
+Performance testing with Chrome DevTools:
+- Frame render time monitoring
+- CPU usage profiling
+- Memory leak detection
 
 ### References
 
 - [Source: docs/epics.md#Story 4.7]
 - [Source: docs/PRD.md#NFR003 - Preview 30fps minimum]
 - [Source: docs/architecture.md#ADR-004 - Canvas API for compositing]
-- [Source: docs/architecture.md#Preview Rendering - Multi-track compositing]
-- [Source: docs/tech-spec-epic-4.md#Multi-track compositing preview]
-- [Adobe Premiere Pro: Mercury Playback Engine (GPU compositing reference)]
-- [HTML5 Canvas API: requestAnimationFrame for smooth rendering]
+- [Source: VideoCompositor.ts - Existing multi-track infrastructure]
+- [Source: playbackOrchestrator.ts - Timeline to compositor adapter]
+- [HTML5 Canvas API: 2D rendering and compositing]
+- [Web Audio API: GainNode for per-track volume control]
+- [MDN: Autoplay policy for Web Audio](https://developer.mozilla.org/en-US/docs/Web/Media/Autoplay_guide)
 
 ## Dev Agent Record
 

@@ -14,8 +14,9 @@ const BASE_PIXELS_PER_SECOND = 50
 
 /**
  * Default zoom level multiplier (range: 0.1 to 5.0)
+ * Starting at 10% zoom to show full timeline view
  */
-const DEFAULT_ZOOM_MULTIPLIER = 1.0
+const DEFAULT_ZOOM_MULTIPLIER = 0.1
 
 /**
  * Zoom bounds
