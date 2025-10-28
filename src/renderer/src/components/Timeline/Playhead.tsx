@@ -39,17 +39,15 @@ export function Playhead({ position, zoomLevel }: PlayheadProps): React.JSX.Elem
       aria-label={`Playhead at ${position.toFixed(2)} seconds`}
     >
       {/* Vertical line */}
-      <div className="w-0.5 h-full" style={{ backgroundColor: 'var(--accent)' }} />
+      <div className="w-0.5 h-full bg-cyan-500" />
 
       {/* Triangle indicator at top */}
       <div
-        className="absolute top-0 left-1/2 -translate-x-1/2"
+        className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-0"
         style={{
-          width: 0,
-          height: 0,
           borderLeft: '6px solid transparent',
           borderRight: '6px solid transparent',
-          borderTop: '8px solid var(--accent)'
+          borderTop: '8px solid rgb(6 182 212)' // cyan-500
         }}
       />
     </div>

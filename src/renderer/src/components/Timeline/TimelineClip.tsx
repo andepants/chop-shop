@@ -99,13 +99,20 @@ export function TimelineClip({
     setIsDragging(false)
   }
 
+  // Extract filename from sourceFile path
+  const filename = clip.sourceFile.split('/').pop() || clip.sourceFile
+
   return (
     <div
       className={cn(
         'absolute rounded',
         'transition-all duration-200 ease-out',
-        'hover:opacity-90',
-        isSelected && 'ring-1',
+        // Fallback background if no thumbnail
+        !clip.thumbnail && 'bg-cyan-500/60',
+        'hover:opacity-90 hover:border-zinc-500',
+        isSelected
+          ? 'border-2 border-cyan-500'
+          : 'border border-transparent',
         isDragging && 'opacity-50 scale-105'
       )}
       style={{
@@ -113,8 +120,6 @@ export function TimelineClip({
         width: `${width}px`,
         height: '80px',
         top: '8px',
-        backgroundColor: isSelected ? 'var(--accent)' : 'rgba(0, 212, 212, 0.6)',
-        borderColor: isSelected ? 'var(--accent)' : 'transparent',
         cursor: cursorStyle
       }}
       draggable={selectedTool === 'select'}
@@ -125,13 +130,26 @@ export function TimelineClip({
       tabIndex={0}
       aria-label={`Clip at ${formatTime(clip.startTime)}, duration ${formatTime(effectiveDuration)}`}
     >
-      {/* Minimal clip container with duration only */}
-      <div className="h-full w-full relative overflow-hidden rounded">
-        {/* Duration label - shows effective duration after trimming */}
-        <div
-          className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded text-xs font-mono"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.75)', color: 'var(--text-primary)' }}
-        >
+      {/* Clip container with repeating thumbnail filmstrip (Premiere Pro style) */}
+      <div
+        className="h-full w-full relative overflow-hidden rounded"
+        style={{
+          ...(clip.thumbnail && {
+            backgroundImage: `url(${clip.thumbnail})`,
+            backgroundSize: 'auto 100%', // Height 100%, width auto (maintains aspect ratio)
+            backgroundRepeat: 'repeat-x', // Repeat horizontally
+            backgroundPosition: 'left center',
+            opacity: isSelected ? 0.8 : 0.6
+          })
+        }}
+      >
+        {/* Filename label - top left */}
+        <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-xs font-mono bg-black/75 text-zinc-100 truncate max-w-[calc(100%-3rem)] z-10">
+          {filename}
+        </div>
+
+        {/* Duration label - bottom right */}
+        <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded text-xs font-mono bg-black/75 text-zinc-100 z-10">
           {formatTime(effectiveDuration)}
         </div>
 

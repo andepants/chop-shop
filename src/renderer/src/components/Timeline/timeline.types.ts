@@ -24,6 +24,8 @@ export interface Clip {
   trimOut: number
   /** Which track the clip belongs to (1 for single-track MVP) */
   trackId: number
+  /** Optional thumbnail data URL (base64-encoded image) for visual preview */
+  thumbnail?: string
 }
 
 /**

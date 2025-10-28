@@ -133,9 +133,13 @@ describe('Sidebar - File Picker', () => {
 
     fireEvent.click(importButton)
 
-    // Check immediately for the importing state
-    const importingText = await screen.findByText(/importing\.\.\./i, {}, { timeout: 100 })
-    expect(importingText).toBeInTheDocument()
+    // Check that the button shows "Importing..." state
+    const importingButton = await screen.findByRole(
+      'button',
+      { name: /importing\.\.\./i },
+      { timeout: 100 }
+    )
+    expect(importingButton).toBeInTheDocument()
   })
 
   it('disables Import button during import (AC: #6)', async () => {

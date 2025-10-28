@@ -216,7 +216,8 @@ export function Timeline(): React.JSX.Element {
       duration: file.duration,
       trimIn: 0, // Trim offset from start (seconds)
       trimOut: 0, // Trim offset from end (seconds)
-      trackId: 1
+      trackId: 1,
+      thumbnail: file.thumbnail // Pass thumbnail data URL for visual preview
     })
   }
 

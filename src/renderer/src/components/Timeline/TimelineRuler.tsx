@@ -67,13 +67,7 @@ export function TimelineRuler({
   })
 
   return (
-    <div
-      className="h-8 border-b relative"
-      style={{
-        backgroundColor: 'var(--bg-timeline)',
-        borderColor: 'var(--border-subtle)'
-      }}
-    >
+    <div className="h-8 border-b border-zinc-700 bg-zinc-900 relative">
       <div className="h-full relative">
         {markers.map((marker) => (
           <div
@@ -82,13 +76,10 @@ export function TimelineRuler({
             style={{ left: `${marker.position}px` }}
           >
             {/* Subtle vertical line */}
-            <div className="w-px h-full" style={{ backgroundColor: 'var(--border-subtle)' }} />
+            <div className="w-px h-full bg-zinc-700" />
 
             {/* Minimal time label */}
-            <div
-              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 px-1.5 py-0.5 text-xs font-mono"
-              style={{ color: 'var(--text-secondary)' }}
-            >
+            <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 px-1.5 py-0.5 text-xs font-mono text-zinc-400">
               {marker.label}
             </div>
           </div>
