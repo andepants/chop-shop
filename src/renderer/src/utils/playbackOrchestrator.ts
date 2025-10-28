@@ -1,35 +1,23 @@
 /**
  * PlaybackOrchestrator
  *
- * Manages continuous playback across multiple timeline clips with seamless transitions.
- * Handles trim bounds, clip sequencing, pre-loading, and playhead synchronization.
+ * Adapter layer between timeline data and the VideoCompositor.
+ * Converts timeline clips to compositor format and manages compositor lifecycle.
  *
  * Key responsibilities:
- * - Build playback queue from timeline clips
- * - Convert between global timeline position and clip-specific time
- * - Detect approaching trim end points and trigger transitions
- * - Provide smooth 60fps playhead synchronization via RAF
- * - Pre-load next clips to eliminate transition lag
+ * - Convert timeline clips to compositor tracks/clips format
+ * - Initialize and manage VideoCompositor instance
+ * - Forward compositor events to callbacks
+ * - Provide utility functions for timeline calculations
  *
  * Architecture Note:
- * This orchestrator reads directly from Zustand stores on every RAF tick
- * to avoid closure capture bugs. This ensures it always sees the latest
- * timeline state, even when clips are trimmed/deleted during playback.
+ * With the canvas-based compositor, we no longer need complex RAF monitoring
+ * or transition detection - the compositor handles all rendering and sequencing internally.
  */
 
-import type { Clip } from '../components/Timeline/timeline.types'
-import { usePlaybackStore } from '../store/playbackStore'
-import { useTimelineStore } from '../store/timelineStore'
-
-export interface ClipPosition {
-  clip: Clip
-  clipTime: number // Time within the clip (accounting for trimIn)
-}
-
-export interface PlaybackQueue {
-  clips: Clip[]
-  totalDuration: number
-}
+import type { Clip, Track } from '../components/Timeline/timeline.types'
+import type { CompositorClip, CompositorTrack } from '../types/compositor.types'
+import { VideoCompositor } from './VideoCompositor'
 
 /**
  * Calculate the effective duration of a clip (after trim adjustments)
@@ -46,242 +34,232 @@ export function calculateClipEndTime(clip: Clip): number {
 }
 
 /**
+ * Convert timeline clip to compositor clip format
+ */
+function convertToCompositorClip(clip: Clip, trackId: string, trackIndex: number): CompositorClip {
+  return {
+    id: clip.id,
+    trackId,
+    trackIndex,
+    sourceFile: clip.sourceFile,
+    startTime: clip.startTime,
+    duration: calculateEffectiveDuration(clip),
+    trimIn: clip.trimIn,
+    trimOut: clip.trimOut,
+    opacity: 1.0 // Default opacity, can be extended later
+  }
+}
+
+/**
+ * Convert timeline tracks to compositor tracks format
+ */
+function convertToCompositorTracks(tracks: Track[]): CompositorTrack[] {
+  return tracks.map((track, index) => ({
+    id: track.id,
+    index,
+    clips: track.clips.map(clip => convertToCompositorClip(clip, track.id, index))
+  }))
+}
+
+/**
  * PlaybackOrchestrator class
- * Singleton pattern for managing timeline playback state
+ * Adapter between timeline data and VideoCompositor
  */
 export class PlaybackOrchestrator {
-  private rafId: number | null = null
-  private isMonitoring = false
-  private transitionBuffer = 0.15 // 150ms before end to start transition
+  private compositor: VideoCompositor | null = null
 
-  // Callbacks for orchestrator actions
-  private onPlayheadUpdate?: (position: number) => void
-  private onClipTransition?: (nextClipId: string) => Promise<void>
+  // Callbacks for events
+  private onTimeUpdate?: (time: number) => void
+  private onPlayStateChange?: (isPlaying: boolean) => void
   private onPlaybackEnd?: () => void
-  private getCurrentTime?: () => number
+  private onActiveClipsChange?: (clipIds: string[]) => void
 
   constructor() {
     console.log('[PlaybackOrchestrator] Initialized')
   }
 
   /**
-   * Build ordered playback queue from timeline clips
+   * Initialize compositor with canvas element
    */
-  buildPlaybackQueue(tracks: Array<{ clips: Clip[] }>): PlaybackQueue {
-    const allClips = tracks
-      .flatMap(track => track.clips)
-      .sort((a, b) => a.startTime - b.startTime)
+  initializeCompositor(canvas: HTMLCanvasElement, width: number, height: number): void {
+    if (this.compositor) {
+      console.warn('[PlaybackOrchestrator] Compositor already initialized, disposing old instance')
+      this.compositor.dispose()
+    }
 
-    const totalDuration = allClips.length > 0
-      ? Math.max(...allClips.map(clip => calculateClipEndTime(clip)))
-      : 0
+    this.compositor = new VideoCompositor({
+      canvas,
+      width,
+      height,
+      maxVideoElements: 10,
+      preloadAhead: 2
+    })
 
-    return { clips: allClips, totalDuration }
-  }
-
-  /**
-   * Convert clip-specific time to global timeline position
-   */
-  calculateGlobalPosition(clip: Clip, clipTime: number): number {
-    // Global position = clip start + (current time - trim offset)
-    return clip.startTime + (clipTime - clip.trimIn)
-  }
-
-  /**
-   * Find clip at a specific global timeline position
-   * Returns the clip and the time to seek to within that clip
-   */
-  findClipAtPosition(position: number, clips: Clip[]): ClipPosition | null {
-    for (const clip of clips) {
-      const effectiveDuration = calculateEffectiveDuration(clip)
-      const clipEnd = clip.startTime + effectiveDuration
-
-      // Check if position falls within this clip
-      if (position >= clip.startTime && position < clipEnd) {
-        const offsetInClip = position - clip.startTime
-        const clipTime = clip.trimIn + offsetInClip
-        return { clip, clipTime }
+    // Wire up compositor events
+    this.compositor.on('timeupdate', (event) => {
+      if (event.currentTime !== undefined) {
+        this.onTimeUpdate?.(event.currentTime)
       }
+    })
+
+    this.compositor.on('play', () => {
+      this.onPlayStateChange?.(true)
+    })
+
+    this.compositor.on('pause', () => {
+      this.onPlayStateChange?.(false)
+    })
+
+    this.compositor.on('ended', () => {
+      this.onPlayStateChange?.(false)
+      this.onPlaybackEnd?.()
+    })
+
+    this.compositor.on('clipchange', (event) => {
+      if (event.clipIds) {
+        this.onActiveClipsChange?.(event.clipIds)
+      }
+    })
+
+    console.log('[PlaybackOrchestrator] Compositor initialized')
+  }
+
+  /**
+   * Load timeline into compositor
+   */
+  async loadTimeline(tracks: Track[]): Promise<void> {
+    if (!this.compositor) {
+      throw new Error('Compositor not initialized')
     }
 
-    return null
+    const compositorTracks = convertToCompositorTracks(tracks)
+    await this.compositor.loadTimeline(compositorTracks)
   }
 
   /**
-   * Get the next clip in the playback queue
+   * Play from current position
    */
-  getNextClip(currentClipId: string, clips: Clip[]): Clip | null {
-    const currentIndex = clips.findIndex(c => c.id === currentClipId)
-
-    if (currentIndex >= 0 && currentIndex < clips.length - 1) {
-      return clips[currentIndex + 1]
+  async play(): Promise<void> {
+    if (!this.compositor) {
+      throw new Error('Compositor not initialized')
     }
 
-    return null
+    await this.compositor.play()
   }
 
   /**
-   * Check if current playback is approaching the trim end boundary
-   * Returns true if within transition buffer
+   * Pause playback
    */
-  isApproachingTrimEnd(clip: Clip, currentTime: number): boolean {
-    const trimEndTime = clip.duration - clip.trimOut
-    return currentTime >= trimEndTime - this.transitionBuffer
+  pause(): void {
+    if (!this.compositor) {
+      throw new Error('Compositor not initialized')
+    }
+
+    this.compositor.pause()
   }
 
   /**
-   * Check if current playback has reached the trim end boundary
+   * Seek to specific time
    */
-  hasReachedTrimEnd(clip: Clip, currentTime: number): boolean {
-    const trimEndTime = clip.duration - clip.trimOut
-    return currentTime >= trimEndTime
+  async seek(time: number): Promise<void> {
+    if (!this.compositor) {
+      throw new Error('Compositor not initialized')
+    }
+
+    await this.compositor.seek(time)
   }
 
   /**
-   * Set callback functions for orchestrator events
+   * Get current playback time
+   */
+  getCurrentTime(): number {
+    if (!this.compositor) {
+      return 0
+    }
+
+    return this.compositor.getCurrentTime()
+  }
+
+  /**
+   * Get timeline duration
+   */
+  getDuration(): number {
+    if (!this.compositor) {
+      return 0
+    }
+
+    return this.compositor.getDuration()
+  }
+
+  /**
+   * Check if playing
+   */
+  isPlaying(): boolean {
+    if (!this.compositor) {
+      return false
+    }
+
+    return this.compositor.isPlaying()
+  }
+
+  /**
+   * Get active clips at current time
+   */
+  getActiveClipIds(): string[] {
+    if (!this.compositor) {
+      return []
+    }
+
+    return this.compositor.getActiveClips().map(clip => clip.id)
+  }
+
+  /**
+   * Set callback functions
    */
   setCallbacks(callbacks: {
-    onPlayheadUpdate?: (position: number) => void
-    onClipTransition?: (nextClipId: string) => Promise<void>
+    onTimeUpdate?: (time: number) => void
+    onPlayStateChange?: (isPlaying: boolean) => void
     onPlaybackEnd?: () => void
-    getCurrentTime?: () => number
+    onActiveClipsChange?: (clipIds: string[]) => void
   }): void {
-    this.onPlayheadUpdate = callbacks.onPlayheadUpdate
-    this.onClipTransition = callbacks.onClipTransition
+    this.onTimeUpdate = callbacks.onTimeUpdate
+    this.onPlayStateChange = callbacks.onPlayStateChange
     this.onPlaybackEnd = callbacks.onPlaybackEnd
-    this.getCurrentTime = callbacks.getCurrentTime
+    this.onActiveClipsChange = callbacks.onActiveClipsChange
   }
 
   /**
-   * Start monitoring playback for smooth updates and transitions
-   * Uses requestAnimationFrame for 60fps updates
-   * Reads directly from stores to avoid closure capture bugs
+   * Calculate total timeline duration from tracks
    */
-  startMonitoring(): void {
-    // Stop existing monitoring first to allow fresh starts
-    if (this.isMonitoring) {
-      console.log('[PlaybackOrchestrator] Restarting monitoring with fresh state')
-      this.stopMonitoring()
-    }
+  calculateTimelineDuration(tracks: Track[]): number {
+    let maxEnd = 0
 
-    this.isMonitoring = true
-    console.log('[PlaybackOrchestrator] Started monitoring')
-
-    let hasTriggeredTransition = false
-
-    const monitor = (): void => {
-      // Stop if no longer monitoring
-      if (!this.isMonitoring) {
-        this.rafId = null
-        return
-      }
-
-      // Continue RAF loop
-      this.rafId = requestAnimationFrame(monitor)
-
-      // Read fresh state from stores on every tick (no closures!)
-      const playbackState = usePlaybackStore.getState()
-      const timelineState = useTimelineStore.getState()
-
-      const { isPlaying, currentClipId, nextClipId } = playbackState
-      const { tracks } = timelineState
-
-      // Only process if playing
-      if (!isPlaying) {
-        hasTriggeredTransition = false
-        return
-      }
-
-      // Find current clip in FRESH tracks (no closure capture!)
-      const currentClip = tracks
-        .flatMap(track => track.clips)
-        .find(clip => clip.id === currentClipId)
-
-      const currentTime = this.getCurrentTime?.()
-
-      if (!currentClip || currentTime === undefined) {
-        return
-      }
-
-      // Update playhead position
-      const globalPosition = this.calculateGlobalPosition(currentClip, currentTime)
-      this.onPlayheadUpdate?.(globalPosition)
-
-      // Check for clip transition
-      if (this.isApproachingTrimEnd(currentClip, currentTime)) {
-        // Find next clip in FRESH tracks
-        const nextClip = tracks
-          .flatMap(track => track.clips)
-          .find(clip => clip.id === nextClipId)
-
-        if (nextClip && !hasTriggeredTransition) {
-          hasTriggeredTransition = true
-          console.log('[PlaybackOrchestrator] Approaching trim end, transitioning to next clip:', nextClip.id)
-
-          // Trigger transition
-          this.onClipTransition?.(nextClip.id).then(() => {
-            // Reset flag after transition completes
-            setTimeout(() => {
-              hasTriggeredTransition = false
-            }, 200)
-          }).catch(err => {
-            console.error('[PlaybackOrchestrator] Transition failed:', err)
-            hasTriggeredTransition = false
-          })
-        } else if (!nextClip && !hasTriggeredTransition) {
-          hasTriggeredTransition = true
-          console.log('[PlaybackOrchestrator] Reached end of timeline')
-          this.onPlaybackEnd?.()
-        }
-      } else {
-        hasTriggeredTransition = false
-      }
-
-      // Enforce hard boundary (fallback)
-      if (this.hasReachedTrimEnd(currentClip, currentTime)) {
-        // Check if there's a next clip
-        const nextClip = tracks
-          .flatMap(track => track.clips)
-          .find(clip => clip.id === nextClipId)
-
-        if (!nextClip) {
-          console.log('[PlaybackOrchestrator] Hard boundary reached, stopping playback')
-          this.onPlaybackEnd?.()
+    for (const track of tracks) {
+      for (const clip of track.clips) {
+        const clipEnd = calculateClipEndTime(clip)
+        if (clipEnd > maxEnd) {
+          maxEnd = clipEnd
         }
       }
     }
 
-    // Start the loop
-    this.rafId = requestAnimationFrame(monitor)
-  }
-
-  /**
-   * Stop monitoring playback
-   */
-  stopMonitoring(): void {
-    if (!this.isMonitoring) {
-      return
-    }
-
-    this.isMonitoring = false
-
-    if (this.rafId !== null) {
-      cancelAnimationFrame(this.rafId)
-      this.rafId = null
-    }
-
-    console.log('[PlaybackOrchestrator] Stopped monitoring')
+    return maxEnd
   }
 
   /**
    * Clean up resources
    */
   dispose(): void {
-    this.stopMonitoring()
-    this.onPlayheadUpdate = undefined
-    this.onClipTransition = undefined
+    if (this.compositor) {
+      this.compositor.dispose()
+      this.compositor = null
+    }
+
+    this.onTimeUpdate = undefined
+    this.onPlayStateChange = undefined
     this.onPlaybackEnd = undefined
-    this.getCurrentTime = undefined
+    this.onActiveClipsChange = undefined
+
     console.log('[PlaybackOrchestrator] Disposed')
   }
 }

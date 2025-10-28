@@ -77,27 +77,31 @@ function getEffectiveDuration(clip: Clip): number {
  * - Playhead at 0:00
  * - Default zoom of 50 pixels per second
  */
-export const useTimelineStore = create<TimelineState>((set, get) => ({
-  // State
-  tracks: [
-    {
-      id: 1,
-      clips: [],
-      height: 80
-    },
-    {
-      id: 2,
-      clips: [],
-      height: 80
-    }
-  ],
-  playheadPosition: 0,
-  totalDuration: 0,
-  zoomLevel: DEFAULT_ZOOM_MULTIPLIER,
-  pixelsPerSecond: BASE_PIXELS_PER_SECOND * DEFAULT_ZOOM_MULTIPLIER,
-  selectedClipId: null,
+export const useTimelineStore = create<TimelineState>((set, get) => {
+  // Load saved zoom level from localStorage (Story 4.2: Task 9, AC #5)
+  const initialZoom = loadSavedZoom()
 
-  // Actions
+  return {
+    // State
+    tracks: [
+      {
+        id: 1,
+        clips: [],
+        height: 80
+      },
+      {
+        id: 2,
+        clips: [],
+        height: 80
+      }
+    ],
+    playheadPosition: 0,
+    totalDuration: 0,
+    zoomLevel: initialZoom,
+    pixelsPerSecond: BASE_PIXELS_PER_SECOND * initialZoom,
+    selectedClipId: null,
+
+    // Actions
 
   /**
    * Add a new clip to the timeline
@@ -502,87 +506,106 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
       }
     }),
 
-  /**
-   * Set zoom level with bounds checking (0.1 to 5.0)
-   * Automatically updates pixelsPerSecond based on new zoom level
-   *
-   * @param level - Zoom multiplier (0.1 = 10%, 1.0 = 100%, 5.0 = 500%)
-   */
-  setZoomLevel: (level) =>
-    set(() => {
-      // Clamp zoom level to valid range
-      const clampedLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, level))
-      const newPixelsPerSecond = BASE_PIXELS_PER_SECOND * clampedLevel
+    /**
+     * Set zoom level with bounds checking (0.1 to 5.0)
+     * Automatically updates pixelsPerSecond based on new zoom level
+     * Persists to localStorage (Story 4.2: Task 9, AC #5)
+     *
+     * @param level - Zoom multiplier (0.1 = 10%, 1.0 = 100%, 5.0 = 500%)
+     */
+    setZoomLevel: (level) =>
+      set(() => {
+        // Clamp zoom level to valid range
+        const clampedLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, level))
+        const newPixelsPerSecond = BASE_PIXELS_PER_SECOND * clampedLevel
 
-      return {
-        zoomLevel: clampedLevel,
-        pixelsPerSecond: newPixelsPerSecond
-      }
-    }),
+        // Persist to localStorage
+        saveZoom(clampedLevel)
 
-  /**
-   * Zoom in by 1.2x (Premiere Pro standard)
-   * Maximum zoom level is 5.0
-   */
-  zoomIn: () =>
-    set((state) => {
-      const newZoomLevel = Math.min(MAX_ZOOM, state.zoomLevel * ZOOM_STEP)
-      const newPixelsPerSecond = BASE_PIXELS_PER_SECOND * newZoomLevel
-
-      return {
-        zoomLevel: newZoomLevel,
-        pixelsPerSecond: newPixelsPerSecond
-      }
-    }),
-
-  /**
-   * Zoom out by 1.2x (Premiere Pro standard)
-   * Minimum zoom level is 0.1
-   */
-  zoomOut: () =>
-    set((state) => {
-      const newZoomLevel = Math.max(MIN_ZOOM, state.zoomLevel / ZOOM_STEP)
-      const newPixelsPerSecond = BASE_PIXELS_PER_SECOND * newZoomLevel
-
-      return {
-        zoomLevel: newZoomLevel,
-        pixelsPerSecond: newPixelsPerSecond
-      }
-    }),
-
-  /**
-   * Calculate zoom level to fit all clips in viewport
-   * Assumes viewport width is available from window
-   * Falls back to 1.0 if no clips exist
-   */
-  fitToTimeline: () =>
-    set((state) => {
-      // Get total timeline duration
-      const { totalDuration } = state
-
-      // If no clips, reset to default zoom
-      if (totalDuration === 0) {
         return {
-          zoomLevel: DEFAULT_ZOOM_MULTIPLIER,
-          pixelsPerSecond: BASE_PIXELS_PER_SECOND * DEFAULT_ZOOM_MULTIPLIER
+          zoomLevel: clampedLevel,
+          pixelsPerSecond: newPixelsPerSecond
         }
-      }
+      }),
 
-      // Calculate viewport width (timeline container minus padding)
-      // Assume timeline takes 80% of window width (heuristic)
-      const viewportWidth = window.innerWidth * 0.8
+    /**
+     * Zoom in by 1.2x (Premiere Pro standard)
+     * Maximum zoom level is 5.0
+     * Persists to localStorage (Story 4.2: Task 9, AC #5)
+     */
+    zoomIn: () =>
+      set((state) => {
+        const newZoomLevel = Math.min(MAX_ZOOM, state.zoomLevel * ZOOM_STEP)
+        const newPixelsPerSecond = BASE_PIXELS_PER_SECOND * newZoomLevel
 
-      // Calculate required pixels per second to fit entire timeline
-      const requiredPixelsPerSecond = viewportWidth / totalDuration
+        // Persist to localStorage
+        saveZoom(newZoomLevel)
 
-      // Convert to zoom level and clamp to valid range
-      const calculatedZoomLevel = requiredPixelsPerSecond / BASE_PIXELS_PER_SECOND
-      const clampedZoomLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, calculatedZoomLevel))
-      const newPixelsPerSecond = BASE_PIXELS_PER_SECOND * clampedZoomLevel
+        return {
+          zoomLevel: newZoomLevel,
+          pixelsPerSecond: newPixelsPerSecond
+        }
+      }),
 
-      return {
-        zoomLevel: clampedZoomLevel,
-        pixelsPerSecond: newPixelsPerSecond
-      }
-    })
-}))
+    /**
+     * Zoom out by 1.2x (Premiere Pro standard)
+     * Minimum zoom level is 0.1
+     * Persists to localStorage (Story 4.2: Task 9, AC #5)
+     */
+    zoomOut: () =>
+      set((state) => {
+        const newZoomLevel = Math.max(MIN_ZOOM, state.zoomLevel / ZOOM_STEP)
+        const newPixelsPerSecond = BASE_PIXELS_PER_SECOND * newZoomLevel
+
+        // Persist to localStorage
+        saveZoom(newZoomLevel)
+
+        return {
+          zoomLevel: newZoomLevel,
+          pixelsPerSecond: newPixelsPerSecond
+        }
+      }),
+
+    /**
+     * Calculate zoom level to fit all clips in viewport
+     * Assumes viewport width is available from window
+     * Falls back to 1.0 if no clips exist
+     * Persists to localStorage (Story 4.2: Task 9, AC #5)
+     */
+    fitToTimeline: () =>
+      set((state) => {
+        // Get total timeline duration
+        const { totalDuration } = state
+
+        // If no clips, reset to default zoom
+        if (totalDuration === 0) {
+          const defaultZoom = DEFAULT_ZOOM_MULTIPLIER
+          saveZoom(defaultZoom)
+          return {
+            zoomLevel: defaultZoom,
+            pixelsPerSecond: BASE_PIXELS_PER_SECOND * defaultZoom
+          }
+        }
+
+        // Calculate viewport width (timeline container minus padding)
+        // Assume timeline takes 80% of window width (heuristic)
+        const viewportWidth = window.innerWidth * 0.8
+
+        // Calculate required pixels per second to fit entire timeline
+        const requiredPixelsPerSecond = viewportWidth / totalDuration
+
+        // Convert to zoom level and clamp to valid range
+        const calculatedZoomLevel = requiredPixelsPerSecond / BASE_PIXELS_PER_SECOND
+        const clampedZoomLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, calculatedZoomLevel))
+        const newPixelsPerSecond = BASE_PIXELS_PER_SECOND * clampedZoomLevel
+
+        // Persist to localStorage
+        saveZoom(clampedZoomLevel)
+
+        return {
+          zoomLevel: clampedZoomLevel,
+          pixelsPerSecond: newPixelsPerSecond
+        }
+      })
+  }
+})

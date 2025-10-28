@@ -5,7 +5,6 @@
 
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { usePlaybackStore } from '@/store/playbackStore'
-import { useTimelineStore } from '@/store/timelineStore'
 
 /**
  * Format seconds to MM:SS display
@@ -22,7 +21,6 @@ function formatTime(seconds: number): string {
 export function PlaybackBar(): React.JSX.Element {
   // Playback state
   const isPlaying = usePlaybackStore((state) => state.isPlaying)
-  const currentClipId = usePlaybackStore((state) => state.currentClipId)
   const currentTime = usePlaybackStore((state) => state.currentTime)
   const duration = usePlaybackStore((state) => state.duration)
   const volume = usePlaybackStore((state) => state.volume)
@@ -31,56 +29,36 @@ export function PlaybackBar(): React.JSX.Element {
   // Playback actions
   const play = usePlaybackStore((state) => state.play)
   const pause = usePlaybackStore((state) => state.pause)
-  const loadClip = usePlaybackStore((state) => state.loadClip)
   const stepForward = usePlaybackStore((state) => state.stepForward)
   const stepBackward = usePlaybackStore((state) => state.stepBackward)
   const setVolume = usePlaybackStore((state) => state.setVolume)
   const toggleMute = usePlaybackStore((state) => state.toggleMute)
-  const updatePlaybackQueue = usePlaybackStore((state) => state.updatePlaybackQueue)
 
-  // Timeline state
-  const tracks = useTimelineStore((state) => state.tracks)
-
-  // Check if there are any clips on the timeline
-  const hasClips = tracks.some((track) => track.clips.length > 0)
+  // Check if there's a timeline loaded
+  const hasTimeline = duration > 0
 
   /**
    * Handle play/pause button click
-   * Auto-loads first clip if no clip is currently loaded
+   * Compositor manages all clips automatically
    */
   function handlePlayPause() {
     console.log('[PlaybackBar] Play/Pause button clicked', {
       isPlaying,
-      currentClipId,
-      hasClips,
+      hasTimeline,
       currentTime,
-      duration,
-      timestamp: new Date().toISOString()
+      duration
     })
+
+    if (!hasTimeline) {
+      console.log('[PlaybackBar] No timeline loaded')
+      return
+    }
 
     if (isPlaying) {
       console.log('[PlaybackBar] Pausing playback')
       pause()
     } else {
-      // If no clip is loaded but there are clips on timeline, load the first one
-      if (!currentClipId && hasClips) {
-        const allClips = tracks.flatMap((track) => track.clips)
-        const firstClip = allClips.sort((a, b) => a.startTime - b.startTime)[0]
-
-        if (firstClip) {
-          console.log('[PlaybackBar] No clip loaded, loading first clip:', {
-            clipId: firstClip.id,
-            sourceFile: firstClip.sourceFile,
-            startTime: firstClip.startTime
-          })
-          loadClip(firstClip.id, true) // Auto-play when ready
-          updatePlaybackQueue() // Update queue for continuous playback
-          console.log('[PlaybackBar] Clip load initiated. Video will auto-play when ready.')
-          return
-        }
-      }
-
-      console.log('[PlaybackBar] Triggering play()')
+      console.log('[PlaybackBar] Starting playback')
       play()
     }
   }
@@ -106,10 +84,10 @@ export function PlaybackBar(): React.JSX.Element {
         {/* Play/Pause Button */}
         <button
           onClick={handlePlayPause}
-          disabled={!hasClips}
+          disabled={!hasTimeline}
           className="w-14 h-14 rounded-lg flex items-center justify-center transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed hover:scale-105 active:scale-95 shadow-lg"
           style={{
-            backgroundColor: !hasClips ? 'var(--bg-secondary)' : 'var(--accent)',
+            backgroundColor: !hasTimeline ? 'var(--bg-secondary)' : 'var(--accent)',
             color: 'var(--text-primary)'
           }}
           aria-label={isPlaying ? 'Pause' : 'Play'}
@@ -121,7 +99,7 @@ export function PlaybackBar(): React.JSX.Element {
         {/* Frame Controls */}
         <button
           onClick={stepBackward}
-          disabled={!currentClipId}
+          disabled={!hasTimeline}
           className="w-10 h-10 rounded flex items-center justify-center transition-colors duration-200 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10"
           style={{ color: 'var(--text-primary)' }}
           aria-label="Previous frame"
@@ -132,7 +110,7 @@ export function PlaybackBar(): React.JSX.Element {
 
         <button
           onClick={stepForward}
-          disabled={!currentClipId}
+          disabled={!hasTimeline}
           className="w-10 h-10 rounded flex items-center justify-center transition-colors duration-200 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10"
           style={{ color: 'var(--text-primary)' }}
           aria-label="Next frame"
@@ -158,7 +136,7 @@ export function PlaybackBar(): React.JSX.Element {
         {/* Mute/Unmute Button */}
         <button
           onClick={toggleMute}
-          disabled={!currentClipId}
+          disabled={!hasTimeline}
           className="w-10 h-10 rounded flex items-center justify-center transition-colors duration-200 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10"
           style={{ color: 'var(--text-primary)' }}
           aria-label={isMuted ? 'Unmute' : 'Mute'}
@@ -174,7 +152,7 @@ export function PlaybackBar(): React.JSX.Element {
           max="100"
           value={volume}
           onChange={handleVolumeChange}
-          disabled={!currentClipId}
+          disabled={!hasTimeline}
           className="w-24 h-1 rounded-full appearance-none cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
           style={{
             background: `linear-gradient(to right, var(--accent) 0%, var(--accent) ${volume}%, var(--bg-secondary) ${volume}%, var(--bg-secondary) 100%)`

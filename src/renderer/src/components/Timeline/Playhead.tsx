@@ -79,32 +79,10 @@ export function Playhead({ zoomLevel }: PlayheadProps): React.JSX.Element {
       // Update playhead position
       setPlayhead(newPosition)
 
-      // Sync with video player: find clip at this position and seek
-      const allClips = tracks
-        .flatMap((track) => track.clips)
-        .sort((a, b) => a.startTime - b.startTime)
-
-      const clipAtPosition = allClips.find((clip) => {
-        const clipEnd = clip.startTime + (clip.duration - clip.trimIn - clip.trimOut)
-        return newPosition >= clip.startTime && newPosition < clipEnd
-      })
-
-      if (clipAtPosition) {
-        const playbackStore = usePlaybackStore.getState()
-
-        // Load clip if different
-        if (playbackStore.currentClipId !== clipAtPosition.id) {
-          playbackStore.loadClip(clipAtPosition.id)
-        }
-
-        // Calculate offset within clip and seek
-        const offsetInClip = newPosition - clipAtPosition.startTime
-        const seekTime = clipAtPosition.trimIn + offsetInClip
-        playbackStore.seek(seekTime)
-
-        // Update playback queue to reflect current state
-        playbackStore.updatePlaybackQueue()
-      }
+      // Sync with video player: seek to global timeline position
+      // Compositor automatically handles which clips should be active
+      const playbackStore = usePlaybackStore.getState()
+      playbackStore.seek(newPosition)
     }
 
     function handleMouseUp(): void {

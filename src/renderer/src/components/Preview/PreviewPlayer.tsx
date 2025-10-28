@@ -1,313 +1,90 @@
 /**
- * PreviewPlayer Component
- * Video.js player that renders in the center preview area
- * Subscribes to playbackStore for current clip and playback state
- * Integrates with PlaybackOrchestrator for seamless multi-clip playback
+ * PreviewPlayer Component (Compositor-based)
+ * Canvas-based video player using VideoCompositor for seamless multi-track playback
+ * Replaces Video.js with custom compositor for better control and performance
  */
 
 import { useEffect, useRef } from 'react'
-import videojs from 'video.js'
-import type Player from 'video.js/dist/types/player'
 import { usePlaybackStore } from '@/store/playbackStore'
 import { useTimelineStore } from '@/store/timelineStore'
-import { playbackOrchestrator } from '@/utils/playbackOrchestrator'
 
 /**
  * PreviewPlayer component
- * Renders Video.js player with playback controls
- * Handles video events: timeupdate, ended, loadedmetadata, error
- * Synchronizes playhead position with timeline during playback
+ * Renders canvas for compositor and handles timeline synchronization
  *
- * @returns React component with video player and controls
+ * @returns React component with canvas player
  */
 export function PreviewPlayer(): React.JSX.Element {
-  const videoRef = useRef<HTMLDivElement>(null)
-  const playerRef = useRef<Player | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const isInitialized = useRef(false)
 
   // Playback state
-  const currentClipId = usePlaybackStore((state) => state.currentClipId)
-  const isLoading = usePlaybackStore((state) => state.isLoading)
   const isPlaying = usePlaybackStore((state) => state.isPlaying)
-  const nextClipId = usePlaybackStore((state) => state.nextClipId)
-  const setVideoPlayer = usePlaybackStore((state) => state.setVideoPlayer)
-  const setCurrentTime = usePlaybackStore((state) => state.setCurrentTime)
-  const setLoading = usePlaybackStore((state) => state.setLoading)
+  const currentTime = usePlaybackStore((state) => state.currentTime)
+  const duration = usePlaybackStore((state) => state.duration)
+  const play = usePlaybackStore((state) => state.play)
   const pause = usePlaybackStore((state) => state.pause)
-  const setGlobalTimelinePosition = usePlaybackStore((state) => state.setGlobalTimelinePosition)
-  const updatePlaybackQueue = usePlaybackStore((state) => state.updatePlaybackQueue)
-  const transitionToNextClip = usePlaybackStore((state) => state.transitionToNextClip)
-  const tryPendingPlay = usePlaybackStore((state) => state.tryPendingPlay)
+  const initializeCompositor = usePlaybackStore((state) => state.initializeCompositor)
+  const loadTimeline = usePlaybackStore((state) => state.loadTimeline)
 
   // Timeline state
   const tracks = useTimelineStore((state) => state.tracks)
 
   /**
-   * Initialize Video.js player on mount
+   * Initialize compositor on mount
    */
   useEffect(() => {
-    if (!videoRef.current) return
+    const canvas = canvasRef.current
+    const container = containerRef.current
 
-    // Create video element for Video.js
-    const videoElement = document.createElement('video')
-    videoElement.className = 'video-js vjs-big-play-centered'
-    videoRef.current.appendChild(videoElement)
+    if (!canvas || !container || isInitialized.current) {
+      return
+    }
 
-    // Initialize Video.js player
-    const player = videojs(
-      videoElement,
-      {
-        controls: false, // We use custom controls
-        preload: 'auto',
-        fluid: false,
-        responsive: false,
-        fill: true,
-        aspectRatio: '16:9',
-        errorDisplay: false, // Handle errors ourselves
-        loadingSpinner: false // Use custom loading indicator
-      },
-      function onPlayerReady() {
-        console.log('Video.js player is ready')
-      }
-    )
+    console.log('[PreviewPlayer] Initializing compositor')
 
-    playerRef.current = player
+    // Get container dimensions for canvas sizing
+    const rect = container.getBoundingClientRect()
+    const width = rect.width || 1280
+    const height = rect.height || 720
 
-    // Set up event listeners
-    player.on('timeupdate', handleTimeUpdate)
-    player.on('ended', handleEnded)
-    player.on('loadedmetadata', handleLoadedMetadata)
-    player.on('canplay', handleCanPlay)
-    player.on('error', handleError)
-    player.on('play', () => {
-      console.log('[PreviewPlayer] Video play event fired', {
-        currentTime: player.currentTime(),
-        src: player.currentSrc()
-      })
-    })
-    player.on('pause', () => {
-      console.log('[PreviewPlayer] Video pause event fired', {
-        currentTime: player.currentTime(),
-        src: player.currentSrc()
-      })
-    })
-    player.on('loadstart', () => {
-      console.log('[PreviewPlayer] Video load started', {
-        src: player.currentSrc()
-      })
-    })
-    player.on('loadeddata', () => {
-      console.log('[PreviewPlayer] Video data loaded (first frame)', {
-        readyState: player.readyState(),
-        currentTime: player.currentTime()
-      })
-    })
+    // Initialize compositor
+    initializeCompositor(canvas, width, height)
+    isInitialized.current = true
 
-    // Set player reference in store
-    setVideoPlayer(player)
-
-    // Initialize PlaybackOrchestrator callbacks
-    playbackOrchestrator.setCallbacks({
-      onPlayheadUpdate: (position: number) => {
-        setGlobalTimelinePosition(position)
-      },
-      onClipTransition: async () => {
-        await transitionToNextClip()
-      },
-      onPlaybackEnd: () => {
-        pause()
-        useTimelineStore.getState().setPlayhead(0)
-      },
-      getCurrentTime: () => player.currentTime() || 0
-    })
-
-    console.log('[PreviewPlayer] Orchestrator initialized with callbacks')
+    console.log('[PreviewPlayer] Compositor initialized', { width, height })
 
     // Cleanup on unmount
     return () => {
-      playbackOrchestrator.stopMonitoring()
-      playbackOrchestrator.dispose()
-
-      if (playerRef.current) {
-        playerRef.current.dispose()
-        playerRef.current = null
-      }
-      setVideoPlayer(null)
+      console.log('[PreviewPlayer] Unmounting, compositor will be disposed')
+      isInitialized.current = false
     }
-  }, [setVideoPlayer, setGlobalTimelinePosition, transitionToNextClip, pause])
+  }, [initializeCompositor])
 
   /**
-   * Start/stop orchestrator monitoring based on playback state
-   * Orchestrator reads directly from stores, so no need to pass callbacks
+   * Load timeline into compositor when tracks change
+   * Per user requirement: pause and reload when timeline changes
    */
   useEffect(() => {
-    if (isPlaying) {
-      console.log('[PreviewPlayer] Starting orchestrator monitoring')
-      playbackOrchestrator.startMonitoring()
-    } else {
-      console.log('[PreviewPlayer] Stopping orchestrator monitoring')
-      playbackOrchestrator.stopMonitoring()
+    if (!isInitialized.current) {
+      return
     }
 
-    return () => {
-      playbackOrchestrator.stopMonitoring()
-    }
-  }, [isPlaying])
+    console.log('[PreviewPlayer] Timeline changed, reloading compositor')
 
-  /**
-   * Update playback queue when timeline clips change
-   * This ensures nextClipId is always up-to-date for transitions
-   */
-  useEffect(() => {
-    console.log('[PreviewPlayer] Tracks changed, updating playback queue')
-    updatePlaybackQueue()
-  }, [tracks, updatePlaybackQueue])
-
-  /**
-   * Handle video timeupdate event
-   * Updates playback store current time
-   * Note: Playhead synchronization is now handled by PlaybackOrchestrator
-   */
-  function handleTimeUpdate() {
-    const player = playerRef.current
-    if (!player) return
-
-    const currentTime = player.currentTime() || 0
-
-    // Update current time in store
-    // Note: Orchestrator handles playhead sync and trim enforcement
-    setCurrentTime(currentTime)
-  }
-
-  /**
-   * Handle video ended event
-   * Note: Clip transitions are now handled by PlaybackOrchestrator
-   * This is kept as a fallback for natural video end (should rarely occur)
-   */
-  function handleEnded() {
-    console.log('[PreviewPlayer] Video ended event (fallback)')
-
-    // Check if there's a next clip to transition to
-    if (nextClipId) {
-      console.log('[PreviewPlayer] Transitioning to next clip via ended event')
-      transitionToNextClip()
-    } else {
-      // End of timeline
-      console.log('[PreviewPlayer] End of timeline reached')
-      pause()
-      useTimelineStore.getState().setPlayhead(0)
-    }
-  }
-
-  /**
-   * Handle video loadedmetadata event
-   * Fired when video metadata (duration, dimensions) is available
-   * Note: Duration is already set from clip data in loadClip(), so we don't overwrite it here
-   */
-  function handleLoadedMetadata() {
-    const player = playerRef.current
-    if (!player) return
-
-    const duration = player.duration()
-    const videoWidth = player.videoWidth()
-    const videoHeight = player.videoHeight()
-    const readyState = player.readyState()
-
-    console.log('[PreviewPlayer] Video metadata loaded', {
-      duration,
-      videoWidth,
-      videoHeight,
-      readyState,
-      src: player.currentSrc()
-    })
-
-    // Duration is already set from clip data, just mark as loaded
-    setLoading(false)
-  }
-
-  /**
-   * Handle video canplay event
-   * Fired when video is ready to play
-   * Triggers pending play if user clicked play while video was loading
-   */
-  function handleCanPlay() {
-    const player = playerRef.current
-    if (!player) return
-
-    const readyState = player.readyState()
-    const currentTime = player.currentTime()
-    const buffered = player.buffered()
-    const bufferedEnd = buffered.length > 0 ? buffered.end(0) : 0
-
-    console.log('[PreviewPlayer] Video can play event fired', {
-      readyState,
-      readyStateDescription: ['HAVE_NOTHING', 'HAVE_METADATA', 'HAVE_CURRENT_DATA', 'HAVE_FUTURE_DATA', 'HAVE_ENOUGH_DATA'][readyState] || 'UNKNOWN',
-      currentTime,
-      bufferedEnd,
-      src: player.currentSrc()
-    })
-
-    // Try to play if there's a pending play request
-    console.log('[PreviewPlayer] Checking for pending play...')
-    tryPendingPlay()
-  }
-
-  /**
-   * Handle video error event
-   * Displays user-friendly error message with detailed logging
-   */
-  function handleError() {
-    const player = playerRef.current
-    if (!player) return
-
-    const error = player.error()
-
-    let errorMessage = 'Failed to load video'
-    let errorCode = 'UNKNOWN'
-
-    if (error) {
-      switch (error.code) {
-        case 1: // MEDIA_ERR_ABORTED
-          errorMessage = 'Video loading aborted'
-          errorCode = 'MEDIA_ERR_ABORTED'
-          break
-        case 2: // MEDIA_ERR_NETWORK
-          errorMessage = 'Network error while loading video'
-          errorCode = 'MEDIA_ERR_NETWORK'
-          break
-        case 3: // MEDIA_ERR_DECODE
-          errorMessage = 'Video decoding failed'
-          errorCode = 'MEDIA_ERR_DECODE'
-          break
-        case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
-          errorMessage = 'Video format not supported'
-          errorCode = 'MEDIA_ERR_SRC_NOT_SUPPORTED'
-          break
-      }
-    }
-
-    console.error('[PreviewPlayer] Video error occurred', {
-      errorCode,
-      errorMessage,
-      message: error?.message,
-      src: player.currentSrc(),
-      readyState: player.readyState(),
-      networkState: player.networkState(),
-      fullError: error
-    })
-
-    setLoading(false)
-  }
+    // Load timeline (will pause if playing per store implementation)
+    loadTimeline()
+  }, [tracks, loadTimeline])
 
   /**
    * Handle click on player area to toggle play/pause
    */
   function handlePlayerClick() {
-    const player = playerRef.current
-    if (!player || !currentClipId) return
-
-    const isPlaying = usePlaybackStore.getState().isPlaying
-    const play = usePlaybackStore.getState().play
-    const pause = usePlaybackStore.getState().pause
+    if (duration === 0) {
+      console.log('[PreviewPlayer] No timeline loaded, ignoring click')
+      return
+    }
 
     if (isPlaying) {
       pause()
@@ -316,31 +93,83 @@ export function PreviewPlayer(): React.JSX.Element {
     }
   }
 
+  /**
+   * Handle canvas resize on window resize
+   */
+  useEffect(() => {
+    const handleResize = () => {
+      const canvas = canvasRef.current
+      const container = containerRef.current
+
+      if (!canvas || !container) return
+
+      const rect = container.getBoundingClientRect()
+      canvas.width = rect.width
+      canvas.height = rect.height
+
+      console.log('[PreviewPlayer] Canvas resized', { width: rect.width, height: rect.height })
+    }
+
+    window.addEventListener('resize', handleResize)
+
+    return () => {
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
+
+  const hasTimeline = duration > 0
+
   return (
-    <div className="flex flex-1 flex-col items-center justify-center bg-black">
-      {!currentClipId && !isLoading && (
-        <div style={{ color: 'var(--text-secondary)' }} className="text-center">
-          <p className="text-sm">No clip selected</p>
-          <p className="text-xs mt-1">Drag media to timeline</p>
+    <div className="flex flex-1 flex-col items-center justify-center bg-black" ref={containerRef}>
+      {!hasTimeline && (
+        <div
+          style={{ color: 'var(--text-secondary)', position: 'absolute', zIndex: 10 }}
+          className="text-center pointer-events-none"
+        >
+          <p className="text-sm">No clips on timeline</p>
+          <p className="text-xs mt-1">Drag media to timeline to start</p>
         </div>
       )}
 
-      {isLoading && (
-        <div style={{ color: 'var(--text-secondary)' }} className="text-center">
-          <div
-            className="animate-spin rounded-full h-10 w-10 border-b-2 mx-auto mb-3"
-            style={{ borderColor: 'var(--accent)' }}
-          ></div>
-          <p className="text-sm">Loading...</p>
-        </div>
-      )}
-
-      <div
-        ref={videoRef}
+      <canvas
+        ref={canvasRef}
         onClick={handlePlayerClick}
-        className={`w-full h-full flex items-center justify-center cursor-pointer ${!currentClipId || isLoading ? 'hidden' : ''}`}
-        style={{ maxWidth: '100%', maxHeight: '100%' }}
+        className="cursor-pointer"
+        style={{
+          width: '100%',
+          height: '100%',
+          maxWidth: '100%',
+          maxHeight: '100%',
+          objectFit: 'contain',
+          display: 'block'
+        }}
       />
+
+      {/* Debug info (remove in production) */}
+      {hasTimeline && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 10,
+            left: 10,
+            background: 'rgba(0,0,0,0.7)',
+            color: 'white',
+            padding: '8px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            fontFamily: 'monospace',
+            pointerEvents: 'none',
+            zIndex: 20
+          }}
+        >
+          <div>Time: {currentTime.toFixed(2)}s / {duration.toFixed(2)}s</div>
+          <div>State: {isPlaying ? 'Playing' : 'Paused'}</div>
+          <div>Tracks: {tracks.length}</div>
+          <div>
+            Clips: {tracks.reduce((sum, track) => sum + track.clips.length, 0)}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

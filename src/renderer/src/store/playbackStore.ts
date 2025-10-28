@@ -1,482 +1,265 @@
 /**
- * Playback Store
- * Zustand store for managing video playback state, current clip, and Video.js player control
+ * Playback Store (Compositor-based)
+ * Zustand store for managing video playback state using the VideoCompositor
+ *
+ * Simplified from the Video.js version - the compositor handles:
+ * - Multi-clip sequencing (no need for clip transitions)
+ * - Video loading and buffering (no pendingPlay flag needed)
+ * - Timeline synchronization (no complex RAF monitoring)
  */
 
 import { create } from 'zustand'
-import type Player from 'video.js/dist/types/player'
+import { playbackOrchestrator } from '../utils/playbackOrchestrator'
 import { useTimelineStore } from './timelineStore'
-import type { Clip } from '../components/Timeline/timeline.types'
 
 /**
  * Playback state interface
- * Manages video player state, current clip, playback time, and Video.js player reference
+ * Manages playback state through the compositor
  */
 export interface PlaybackState {
-  /** ID of the currently loaded clip */
-  currentClipId: string | null
   /** Whether video is currently playing */
   isPlaying: boolean
-  /** Current playback time within the clip (in seconds) */
+  /** Current playback time on global timeline (in seconds) */
   currentTime: number
-  /** Total duration of the current clip (in seconds) */
+  /** Total duration of the timeline (in seconds) */
   duration: number
-  /** Reference to the Video.js player instance for direct control */
-  videoPlayer: Player | null
-  /** Whether the video is currently loading */
-  isLoading: boolean
   /** Volume level (0-100) */
   volume: number
   /** Whether audio is muted */
   isMuted: boolean
-  /** Whether playback is pending (waiting for video to be ready) */
-  pendingPlay: boolean
-  /** Global timeline position (in seconds) - differs from currentTime which is clip-specific */
-  globalTimelinePosition: number
-  /** Ordered array of clips for playback */
-  playbackQueue: Clip[]
-  /** ID of the next clip in sequence */
-  nextClipId: string | null
-  /** Whether a clip transition is in progress */
-  isTransitioning: boolean
+  /** IDs of clips currently being rendered */
+  activeClipIds: string[]
 
   // Actions
-  /** Load a clip into the player by ID */
-  loadClip: (clipId: string, autoPlay?: boolean) => void
   /** Start playback */
   play: () => Promise<void>
   /** Pause playback */
   pause: () => void
-  /** Seek to a specific time in the current clip */
-  seek: (time: number) => void
-  /** Update current playback time */
-  setCurrentTime: (time: number) => void
-  /** Set the Video.js player reference */
-  setVideoPlayer: (player: Player | null) => void
-  /** Set loading state */
-  setLoading: (loading: boolean) => void
-  /** Set duration when metadata loads */
-  setDuration: (duration: number) => void
+  /** Seek to a specific time on the global timeline */
+  seek: (time: number) => Promise<void>
   /** Set volume level (0-100) */
   setVolume: (volume: number) => void
   /** Toggle mute state */
   toggleMute: () => void
   /** Step forward one frame (~1/30 second) */
-  stepForward: () => void
+  stepForward: () => Promise<void>
   /** Step backward one frame (~1/30 second) */
-  stepBackward: () => void
-  /** Attempt to play if there's a pending play request */
-  tryPendingPlay: () => void
-  /** Update global timeline position */
-  setGlobalTimelinePosition: (position: number) => void
-  /** Update playback queue from timeline */
-  updatePlaybackQueue: () => void
-  /** Transition to next clip */
-  transitionToNextClip: () => Promise<void>
+  stepBackward: () => Promise<void>
+  /** Initialize the compositor (called by PreviewPlayer) */
+  initializeCompositor: (canvas: HTMLCanvasElement, width: number, height: number) => void
+  /** Load timeline into compositor */
+  loadTimeline: () => Promise<void>
+  /** Internal: Update current time from compositor */
+  _setCurrentTime: (time: number) => void
+  /** Internal: Update playing state from compositor */
+  _setIsPlaying: (isPlaying: boolean) => void
+  /** Internal: Update duration from compositor */
+  _setDuration: (duration: number) => void
+  /** Internal: Update active clips from compositor */
+  _setActiveClips: (clipIds: string[]) => void
 }
 
 /**
  * Playback state store
- * Manages video playback state and controls using Video.js API
- *
- * Initializes with:
- * - No clip loaded
- * - Playback paused
- * - Time at 0:00
- * - No video player reference
+ * Simplified version that delegates to VideoCompositor through PlaybackOrchestrator
  */
-export const usePlaybackStore = create<PlaybackState>((set, get) => ({
-  // State
-  currentClipId: null,
-  isPlaying: false,
-  currentTime: 0,
-  duration: 0,
-  videoPlayer: null,
-  isLoading: false,
-  volume: 100,
-  isMuted: false,
-  pendingPlay: false,
-  globalTimelinePosition: 0,
-  playbackQueue: [],
-  nextClipId: null,
-  isTransitioning: false,
-
-  // Actions
-
-  /**
-   * Load a clip into the player
-   * Looks up clip from timeline store and sets video source to file path
-   * Uses proper file:// URL encoding for Electron
-   */
-  loadClip: (clipId: string, autoPlay = false) => {
-    const { videoPlayer } = get()
-    if (!videoPlayer) {
-      console.warn('Cannot load clip: video player not initialized')
-      return
+export const usePlaybackStore = create<PlaybackState>((set, get) => {
+  // Set up orchestrator callbacks once
+  playbackOrchestrator.setCallbacks({
+    onTimeUpdate: (time: number) => {
+      get()._setCurrentTime(time)
+    },
+    onPlayStateChange: (isPlaying: boolean) => {
+      get()._setIsPlaying(isPlaying)
+    },
+    onPlaybackEnd: () => {
+      console.log('[PlaybackStore] Playback ended')
+      // Keep playhead at end (per user requirement)
+      get()._setIsPlaying(false)
+    },
+    onActiveClipsChange: (clipIds: string[]) => {
+      get()._setActiveClips(clipIds)
     }
+  })
 
-    // Find clip in timeline store
-    const timelineState = useTimelineStore.getState()
-    const clip = timelineState.tracks
-      .flatMap((track) => track.clips)
-      .find((c) => c.id === clipId)
+  return {
+    // State
+    isPlaying: false,
+    currentTime: 0,
+    duration: 0,
+    volume: 100,
+    isMuted: false,
+    activeClipIds: [],
 
-    if (!clip) {
-      console.warn(`Clip not found: ${clipId}`)
-      return
-    }
+    // Actions
 
-    // Set clip duration immediately from timeline data
-    // This ensures duration is correct even before video metadata loads
-    // Effective duration = total duration - trim from start - trim from end
-    const clipDuration = clip.duration - clip.trimIn - clip.trimOut
-    set({
-      isLoading: true,
-      currentClipId: clipId,
-      duration: clipDuration,
-      pendingPlay: autoPlay // Set pending play if autoPlay requested
-    })
+    /**
+     * Initialize compositor with canvas element
+     * Should be called once by PreviewPlayer on mount
+     */
+    initializeCompositor: (canvas: HTMLCanvasElement, width: number, height: number) => {
+      console.log('[PlaybackStore] Initializing compositor', { width, height })
+      playbackOrchestrator.initializeCompositor(canvas, width, height)
+    },
 
-    // Set video source using proper file:// protocol for Electron local files
-    // Normalize path separators for cross-platform compatibility
-    const normalizedPath = clip.sourceFile.replace(/\\/g, '/')
-    const fileUrl = `file://${normalizedPath}`
+    /**
+     * Load timeline from timeline store into compositor
+     * Called when timeline changes or on initial load
+     */
+    loadTimeline: async () => {
+      console.log('[PlaybackStore] Loading timeline into compositor')
 
-    console.log('Loading clip:', { clipId, sourceFile: clip.sourceFile, fileUrl, clipDuration, autoPlay })
-
-    // Determine video type from file extension
-    const extension = clip.sourceFile.split('.').pop()?.toLowerCase()
-    const typeMap: Record<string, string> = {
-      mp4: 'video/mp4',
-      webm: 'video/webm',
-      mov: 'video/quicktime',
-      avi: 'video/x-msvideo',
-      mkv: 'video/x-matroska'
-    }
-    const videoType = extension ? typeMap[extension] || 'video/mp4' : 'video/mp4'
-
-    // Set source with Video.js API
-    videoPlayer.src({
-      src: fileUrl,
-      type: videoType
-    })
-
-    // Set initial current time to trim-in point
-    videoPlayer.currentTime(clip.trimIn)
-
-    // Update playback queue after loading to ensure nextClipId is set
-    // Use setTimeout to ensure state updates have propagated
-    setTimeout(() => {
-      get().updatePlaybackQueue()
-    }, 0)
-  },
-
-  /**
-   * Start video playback
-   * Returns a promise that resolves when playback starts
-   * Uses smart retry mechanism - if video isn't ready, sets pendingPlay flag
-   * and will automatically play once video becomes ready
-   */
-  play: async () => {
-    const { videoPlayer, currentClipId } = get()
-
-    console.log('[PlaybackStore] Play button clicked', {
-      hasVideoPlayer: !!videoPlayer,
-      currentClipId,
-      timestamp: new Date().toISOString()
-    })
-
-    if (!videoPlayer) {
-      console.warn('[PlaybackStore] Cannot play: video player not initialized')
-      return
-    }
-
-    // Update playback queue BEFORE starting playback
-    // This ensures nextClipId is set for continuous playback
-    console.log('[PlaybackStore] Updating playback queue before play')
-    get().updatePlaybackQueue()
-
-    // Log detailed video player state
-    const readyState = videoPlayer.readyState()
-    const currentTime = videoPlayer.currentTime()
-    const duration = videoPlayer.duration()
-    const src = videoPlayer.currentSrc()
-    const paused = videoPlayer.paused()
-    const ended = videoPlayer.ended()
-    const networkState = videoPlayer.networkState()
-
-    console.log('[PlaybackStore] Video player state:', {
-      readyState,
-      readyStateDescription: ['HAVE_NOTHING', 'HAVE_METADATA', 'HAVE_CURRENT_DATA', 'HAVE_FUTURE_DATA', 'HAVE_ENOUGH_DATA'][readyState] || 'UNKNOWN',
-      currentTime,
-      duration,
-      src,
-      paused,
-      ended,
-      networkState,
-      networkStateDescription: ['NETWORK_EMPTY', 'NETWORK_IDLE', 'NETWORK_LOADING', 'NETWORK_NO_SOURCE'][networkState] || 'UNKNOWN'
-    })
-
-    // Check if video is ready to play (readyState >= 2 means we have current frame)
-    if (readyState < 2) {
-      console.log('[PlaybackStore] Video not ready yet, setting pendingPlay=true. Will auto-play when ready.')
-      set({ pendingPlay: true })
-      return
-    }
-
-    try {
-      console.log('[PlaybackStore] Attempting to play video...')
-      await videoPlayer.play()
-      console.log('[PlaybackStore] Playback started successfully')
-      set({ isPlaying: true, pendingPlay: false })
-    } catch (error) {
-      console.error('[PlaybackStore] Playback failed:', error)
-      set({ pendingPlay: false })
-    }
-  },
-
-  /**
-   * Pause video playback
-   */
-  pause: () => {
-    const { videoPlayer } = get()
-    if (!videoPlayer) {
-      console.warn('Cannot pause: video player not initialized')
-      return
-    }
-
-    videoPlayer.pause()
-    set({ isPlaying: false })
-  },
-
-  /**
-   * Seek to a specific time in the current clip
-   * Constrains seeking to trimmed region (Story 3.1 - AC #4)
-   */
-  seek: (time: number) => {
-    const { videoPlayer, currentClipId } = get()
-    if (!videoPlayer) {
-      console.warn('Cannot seek: video player not initialized')
-      return
-    }
-
-    // Clamp seek time to trim bounds
-    let clampedTime = time
-    if (currentClipId) {
       const timelineState = useTimelineStore.getState()
-      const clip = timelineState.tracks
-        .flatMap((track) => track.clips)
-        .find((c) => c.id === currentClipId)
 
-      if (clip) {
-        const trimStart = clip.trimIn
-        const trimEnd = clip.duration - clip.trimOut
-        clampedTime = Math.max(trimStart, Math.min(time, trimEnd))
+      // Pause if playing before reloading (per user requirement)
+      if (get().isPlaying) {
+        get().pause()
       }
-    }
 
-    videoPlayer.currentTime(clampedTime)
-    set({ currentTime: clampedTime })
-  },
+      try {
+        await playbackOrchestrator.loadTimeline(timelineState.tracks)
 
-  /**
-   * Update current playback time
-   * Called by video timeupdate event handler
-   */
-  setCurrentTime: (time: number) => {
-    set({ currentTime: time })
-  },
+        // Update duration
+        const duration = playbackOrchestrator.getDuration()
+        set({ duration })
 
-  /**
-   * Set the Video.js player reference
-   * Called when PreviewPlayer component mounts and initializes Video.js
-   * Syncs initial volume and mute state to the player
-   */
-  setVideoPlayer: (player: Player | null) => {
-    if (player) {
-      const { volume, isMuted } = get()
-      // Sync initial volume and mute state
-      player.volume(volume / 100) // Video.js uses 0-1 range
-      player.muted(isMuted)
-    }
-    set({ videoPlayer: player })
-  },
-
-  /**
-   * Set loading state
-   */
-  setLoading: (loading: boolean) => {
-    set({ isLoading: loading })
-  },
-
-  /**
-   * Set duration when video metadata loads
-   */
-  setDuration: (duration: number) => {
-    set({ duration })
-  },
-
-  /**
-   * Set volume level (0-100)
-   * Also updates the Video.js player volume
-   */
-  setVolume: (volume: number) => {
-    const { videoPlayer } = get()
-    const clampedVolume = Math.max(0, Math.min(100, volume))
-
-    if (videoPlayer) {
-      videoPlayer.volume(clampedVolume / 100) // Video.js uses 0-1 range
-    }
-
-    set({ volume: clampedVolume })
-  },
-
-  /**
-   * Toggle mute state
-   * Mutes/unmutes the Video.js player
-   */
-  toggleMute: () => {
-    const { videoPlayer, isMuted } = get()
-
-    if (videoPlayer) {
-      videoPlayer.muted(!isMuted)
-    }
-
-    set({ isMuted: !isMuted })
-  },
-
-  /**
-   * Step forward one frame (approximately 1/30 second)
-   * Pauses playback if playing
-   */
-  stepForward: () => {
-    const { videoPlayer, isPlaying, pause } = get()
-    if (!videoPlayer) {
-      console.warn('Cannot step forward: video player not initialized')
-      return
-    }
-
-    // Pause if playing
-    if (isPlaying) {
-      pause()
-    }
-
-    // Step forward by 1/30 second (standard frame rate)
-    const currentTime = videoPlayer.currentTime() || 0
-    const newTime = currentTime + 1 / 30
-    videoPlayer.currentTime(newTime)
-  },
-
-  /**
-   * Step backward one frame (approximately 1/30 second)
-   * Pauses playback if playing
-   */
-  stepBackward: () => {
-    const { videoPlayer, isPlaying, pause } = get()
-    if (!videoPlayer) {
-      console.warn('Cannot step backward: video player not initialized')
-      return
-    }
-
-    // Pause if playing
-    if (isPlaying) {
-      pause()
-    }
-
-    // Step backward by 1/30 second (standard frame rate)
-    const currentTime = videoPlayer.currentTime() || 0
-    const newTime = Math.max(0, currentTime - 1 / 30)
-    videoPlayer.currentTime(newTime)
-  },
-
-  /**
-   * Try to play video if there's a pending play request
-   * Called by PreviewPlayer when video becomes ready (canplay event)
-   */
-  tryPendingPlay: () => {
-    const { pendingPlay, play, videoPlayer } = get()
-
-    if (!pendingPlay) {
-      return
-    }
-
-    console.log('[PlaybackStore] Video ready, attempting pending play')
-    const readyState = videoPlayer?.readyState()
-    console.log('[PlaybackStore] Current readyState:', readyState)
-
-    // Trigger play which will clear pendingPlay flag
-    play()
-  },
-
-  /**
-   * Update global timeline position
-   * Called by PlaybackOrchestrator during RAF monitoring
-   */
-  setGlobalTimelinePosition: (position: number) => {
-    set({ globalTimelinePosition: position })
-
-    // Also update timeline store's playhead position for visual sync
-    useTimelineStore.getState().setPlayhead(position)
-  },
-
-  /**
-   * Update playback queue from timeline
-   * Builds ordered list of clips and calculates next clip
-   */
-  updatePlaybackQueue: () => {
-    const { currentClipId } = get()
-    const timelineState = useTimelineStore.getState()
-
-    // Build ordered queue
-    const queue = timelineState.tracks
-      .flatMap(track => track.clips)
-      .sort((a, b) => a.startTime - b.startTime)
-
-    // Find next clip
-    let nextClipId: string | null = null
-    if (currentClipId) {
-      const currentIndex = queue.findIndex(c => c.id === currentClipId)
-      if (currentIndex >= 0 && currentIndex < queue.length - 1) {
-        nextClipId = queue[currentIndex + 1].id
+        console.log('[PlaybackStore] Timeline loaded, duration:', duration)
+      } catch (error) {
+        console.error('[PlaybackStore] Failed to load timeline:', error)
       }
-    }
+    },
 
-    set({ playbackQueue: queue, nextClipId })
-    console.log('[PlaybackStore] Updated playback queue:', { queueLength: queue.length, nextClipId })
-  },
+    /**
+     * Start video playback
+     */
+    play: async () => {
+      console.log('[PlaybackStore] Play')
 
-  /**
-   * Transition to the next clip in the playback queue
-   * Called by PlaybackOrchestrator when approaching trim end
-   */
-  transitionToNextClip: async () => {
-    const { nextClipId, isTransitioning, loadClip } = get()
+      try {
+        await playbackOrchestrator.play()
+        // State will be updated via callback
+      } catch (error) {
+        console.error('[PlaybackStore] Play failed:', error)
+      }
+    },
 
-    if (isTransitioning) {
-      console.log('[PlaybackStore] Transition already in progress, skipping')
-      return
-    }
+    /**
+     * Pause video playback
+     */
+    pause: () => {
+      console.log('[PlaybackStore] Pause')
+      playbackOrchestrator.pause()
+      // State will be updated via callback
+    },
 
-    if (!nextClipId) {
-      console.log('[PlaybackStore] No next clip to transition to')
-      return
-    }
+    /**
+     * Seek to a specific time on the global timeline
+     */
+    seek: async (time: number) => {
+      console.log('[PlaybackStore] Seek to', time)
 
-    set({ isTransitioning: true })
-    console.log('[PlaybackStore] Transitioning to next clip:', nextClipId)
+      const { duration } = get()
+      const clampedTime = Math.max(0, Math.min(time, duration))
 
-    try {
-      // Load next clip with autoPlay
-      loadClip(nextClipId, true)
+      try {
+        await playbackOrchestrator.seek(clampedTime)
+        // State will be updated via callback
+      } catch (error) {
+        console.error('[PlaybackStore] Seek failed:', error)
+      }
+    },
 
-      // Update queue to reflect new current clip
-      get().updatePlaybackQueue()
+    /**
+     * Set volume level (0-100)
+     * Note: Compositor audio control to be implemented
+     */
+    setVolume: (volume: number) => {
+      const clampedVolume = Math.max(0, Math.min(100, volume))
+      set({ volume: clampedVolume })
 
-      console.log('[PlaybackStore] Transition complete')
-    } catch (error) {
-      console.error('[PlaybackStore] Transition failed:', error)
-    } finally {
-      set({ isTransitioning: false })
+      // TODO: Apply volume to compositor's video elements
+      console.log('[PlaybackStore] Volume set to', clampedVolume)
+    },
+
+    /**
+     * Toggle mute state
+     * Note: Compositor audio control to be implemented
+     */
+    toggleMute: () => {
+      const { isMuted } = get()
+      set({ isMuted: !isMuted })
+
+      // TODO: Apply mute to compositor's video elements
+      console.log('[PlaybackStore] Mute toggled to', !isMuted)
+    },
+
+    /**
+     * Step forward one frame (approximately 1/30 second)
+     * Pauses playback if playing
+     */
+    stepForward: async () => {
+      const { currentTime, duration, pause } = get()
+
+      // Pause if playing
+      if (get().isPlaying) {
+        pause()
+      }
+
+      // Step forward by 1/30 second
+      const newTime = Math.min(currentTime + 1 / 30, duration)
+      await get().seek(newTime)
+    },
+
+    /**
+     * Step backward one frame (approximately 1/30 second)
+     * Pauses playback if playing
+     */
+    stepBackward: async () => {
+      const { currentTime, pause } = get()
+
+      // Pause if playing
+      if (get().isPlaying) {
+        pause()
+      }
+
+      // Step backward by 1/30 second
+      const newTime = Math.max(currentTime - 1 / 30, 0)
+      await get().seek(newTime)
+    },
+
+    /**
+     * Internal: Update current time from compositor
+     * Called by orchestrator callback
+     */
+    _setCurrentTime: (time: number) => {
+      set({ currentTime: time })
+
+      // Sync timeline playhead visual
+      useTimelineStore.getState().setPlayhead(time)
+    },
+
+    /**
+     * Internal: Update playing state from compositor
+     * Called by orchestrator callback
+     */
+    _setIsPlaying: (isPlaying: boolean) => {
+      set({ isPlaying })
+    },
+
+    /**
+     * Internal: Update duration from compositor
+     * Called by orchestrator callback
+     */
+    _setDuration: (duration: number) => {
+      set({ duration })
+    },
+
+    /**
+     * Internal: Update active clips from compositor
+     * Called by orchestrator callback
+     */
+    _setActiveClips: (clipIds: string[]) => {
+      set({ activeClipIds: clipIds })
     }
   }
-}))
+})

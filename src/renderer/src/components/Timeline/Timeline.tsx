@@ -273,9 +273,14 @@ export function Timeline(): React.JSX.Element {
         console.warn('[Timeline] Split position too close to clip edge')
       }
     } else {
-      // Select or Trim tool: Select clip and load in preview
+      // Select or Trim tool: Select clip and seek to its start
       selectClip(clipId)
-      usePlaybackStore.getState().loadClip(clipId)
+
+      // Seek to clip's start time in the compositor
+      const clip = tracks.flatMap((track) => track.clips).find((c) => c.id === clipId)
+      if (clip) {
+        usePlaybackStore.getState().seek(clip.startTime)
+      }
     }
   }
 
@@ -353,36 +358,14 @@ export function Timeline(): React.JSX.Element {
    * Now uses effective duration to properly handle trimmed clips
    */
   function handleTimelineSeek(clickedTime: number): void {
-    const allClips = tracks
-      .flatMap((track) => track.clips)
-      .sort((a, b) => a.startTime - b.startTime)
+    const playbackStore = usePlaybackStore.getState()
 
-    // Find clip at this timeline position using effective duration
-    const clip = allClips.find((c) => {
-      const effectiveDuration = c.duration - c.trimIn - c.trimOut
-      const clipEndTime = c.startTime + effectiveDuration
-      return clickedTime >= c.startTime && clickedTime < clipEndTime
-    })
+    // Simply seek to the global timeline position
+    // Compositor automatically handles which clips should be active
+    playbackStore.seek(clickedTime)
 
-    if (clip) {
-      const playbackStore = usePlaybackStore.getState()
-
-      // Load clip if different from current
-      if (playbackStore.currentClipId !== clip.id) {
-        playbackStore.loadClip(clip.id)
-      }
-
-      // Calculate offset within clip and seek
-      const offsetInClip = clickedTime - clip.startTime
-      const seekTime = clip.trimIn + offsetInClip
-      playbackStore.seek(seekTime)
-
-      // Update playhead position
-      useTimelineStore.getState().setPlayhead(clickedTime)
-
-      // Update playback queue to reflect current state
-      playbackStore.updatePlaybackQueue()
-    }
+    // Update playhead position (redundant but keeps UI in sync immediately)
+    useTimelineStore.getState().setPlayhead(clickedTime)
   }
 
   return (
