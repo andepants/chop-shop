@@ -9,7 +9,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        accent: '#06b6d4', // cyan for primary actions
+        accent: '#00d4d4', // CapCut teal for primary actions
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',

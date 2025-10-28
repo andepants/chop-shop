@@ -1,20 +1,19 @@
 /**
  * TopBar Component
- * Top application bar with title and actions
+ * Minimal top application bar
  */
-import { Button } from '../shared'
 
 /**
- * Top bar component displaying app title and Export button
+ * Minimal top bar for application chrome
  */
 export function TopBar(): React.JSX.Element {
   return (
-    <div className="flex items-center justify-between bg-zinc-900 border-b border-zinc-700 px-4 py-3">
-      <h1 className="text-xl font-bold text-zinc-50">Chop Shop</h1>
-
-      <Button variant="primary" size="sm" disabled>
-        Export
-      </Button>
-    </div>
+    <div
+      className="h-10 border-b"
+      style={{
+        backgroundColor: 'var(--bg-primary)',
+        borderColor: 'var(--border-subtle)'
+      }}
+    />
   )
 }

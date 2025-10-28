@@ -11,6 +11,7 @@ export interface API {
     outputPath: string
   ) => Promise<IPCResponse<{ outputPath: string }>>
   importFile: (filePath: string) => Promise<IPCResponse<MediaFile>>
+  importFileFromObject: (file: File) => Promise<IPCResponse<MediaFile>>
   generateThumbnail: (filePath: string, timestamp?: number) => Promise<IPCResponse<string>>
   openFileDialog: () => Promise<IPCResponse<string[]>>
 }

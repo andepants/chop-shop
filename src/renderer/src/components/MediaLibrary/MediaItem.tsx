@@ -1,10 +1,10 @@
 /**
  * MediaItem Component
- * Displays individual media file with thumbnail, metadata, and drag capability
+ * Minimal media file display with thumbnail, duration, and filename
  */
 
 import type { MediaFile } from '../../../../shared/types'
-import { cn, formatFileSize, formatTime } from '../../utils'
+import { cn, formatTime } from '../../utils'
 
 interface MediaItemProps {
   file: MediaFile
@@ -13,7 +13,7 @@ interface MediaItemProps {
 }
 
 /**
- * Renders a single media item with thumbnail, filename, duration, resolution, and file size
+ * Simplified media item showing thumbnail, duration badge, and filename only
  * Supports click selection and drag-to-timeline
  */
 export function MediaItem({ file, isSelected, onSelect }: MediaItemProps): React.JSX.Element {
@@ -31,30 +31,38 @@ export function MediaItem({ file, isSelected, onSelect }: MediaItemProps): React
       onDragStart={handleDragStart}
       onClick={onSelect}
       className={cn(
-        'rounded p-2 mb-2 cursor-pointer hover:bg-zinc-700 transition-colors',
-        isSelected && 'ring-2 ring-cyan-500'
+        'rounded mb-2 cursor-grab active:cursor-grabbing overflow-hidden transition-colors',
+        'hover:opacity-80',
+        isSelected && 'ring-1'
       )}
+      style={{
+        backgroundColor: 'var(--bg-secondary)',
+        borderColor: isSelected ? 'var(--accent)' : 'transparent'
+      }}
     >
-      {/* Thumbnail */}
-      <img
-        src={file.thumbnail || ''}
-        alt={file.name}
-        className="w-full h-16 object-cover rounded bg-zinc-900"
-      />
+      {/* Thumbnail with duration badge */}
+      <div className="relative w-full h-28 bg-black overflow-hidden">
+        <img
+          src={file.thumbnail || ''}
+          alt={file.name}
+          className="w-full h-full object-cover"
+        />
 
-      {/* Filename */}
-      <p className="text-sm truncate mt-2 text-zinc-50">{file.name}</p>
-
-      {/* Duration and Resolution */}
-      <div className="flex justify-between text-xs text-zinc-400 mt-1">
-        <span>{formatTime(file.duration)}</span>
-        <span>
-          {file.resolution.width}×{file.resolution.height}
-        </span>
+        {/* Duration badge */}
+        <div
+          className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded text-xs font-mono"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.75)', color: 'var(--text-primary)' }}
+        >
+          {formatTime(file.duration)}
+        </div>
       </div>
 
-      {/* File Size */}
-      <p className="text-xs text-zinc-500 mt-0.5">{formatFileSize(file.size)}</p>
+      {/* Filename */}
+      <div className="px-2 py-1.5">
+        <p className="text-xs truncate" style={{ color: 'var(--text-primary)' }}>
+          {file.name}
+        </p>
+      </div>
     </div>
   )
 }

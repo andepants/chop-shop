@@ -38,18 +38,18 @@ export function Playhead({ position, zoomLevel }: PlayheadProps): React.JSX.Elem
       }}
       aria-label={`Playhead at ${position.toFixed(2)} seconds`}
     >
-      {/* Vertical line - thicker and brighter for better visibility */}
-      <div className="w-1 h-full bg-cyan-400 shadow-lg shadow-cyan-500/50" />
+      {/* Vertical line */}
+      <div className="w-0.5 h-full" style={{ backgroundColor: 'var(--accent)' }} />
 
-      {/* Triangle indicator at top - larger for better visibility */}
+      {/* Triangle indicator at top */}
       <div
         className="absolute top-0 left-1/2 -translate-x-1/2"
         style={{
           width: 0,
           height: 0,
-          borderLeft: '8px solid transparent',
-          borderRight: '8px solid transparent',
-          borderTop: '10px solid rgb(34 211 238)' // cyan-400
+          borderLeft: '6px solid transparent',
+          borderRight: '6px solid transparent',
+          borderTop: '8px solid var(--accent)'
         }}
       />
     </div>

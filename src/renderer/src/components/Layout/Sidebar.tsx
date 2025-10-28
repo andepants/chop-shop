@@ -6,6 +6,7 @@
 import { ImportZone, MediaLibrary } from '../MediaLibrary'
 import { useMediaStore } from '../../store/mediaStore'
 import { useUIStore } from '../../store/uiStore'
+import { Button } from '@/components/ui/button'
 
 /**
  * Sidebar component for displaying media library
@@ -73,17 +74,29 @@ export function Sidebar(): React.JSX.Element {
   }
 
   return (
-    <aside className="w-[280px] bg-zinc-800 border-r border-zinc-700 flex flex-col">
-      <div className="p-4 space-y-4">
+    <aside
+      className="w-[280px] flex flex-col pb-16"
+      style={{
+        backgroundColor: 'var(--bg-secondary)',
+        borderRight: '1px solid var(--border-subtle)'
+      }}
+    >
+      <div className="p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-zinc-50">Media</h2>
-          <button
+          <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Media
+          </h2>
+          <Button
             onClick={handleImportClick}
             disabled={isImporting}
-            className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 disabled:bg-zinc-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-colors"
+            size="sm"
+            style={{
+              backgroundColor: isImporting ? 'var(--bg-primary)' : 'var(--accent)',
+              color: 'var(--text-primary)'
+            }}
           >
             {isImporting ? 'Importing...' : 'Import'}
-          </button>
+          </Button>
         </div>
         <ImportZone />
       </div>

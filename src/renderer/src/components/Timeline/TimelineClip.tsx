@@ -46,35 +46,38 @@ export function TimelineClip({
   onClick
 }: TimelineClipProps): React.JSX.Element {
   const leftPosition = clip.startTime * zoomLevel
-  const width = clip.duration * zoomLevel
+  // Ensure minimum width of 80px so clips are always visible
+  const calculatedWidth = clip.duration * zoomLevel
+  const width = Math.max(80, calculatedWidth)
 
   return (
     <div
       className={cn(
-        'absolute h-24 rounded border cursor-pointer transition-all duration-200',
-        'bg-zinc-700 border-zinc-600 shadow-md',
-        'hover:bg-zinc-650 hover:border-zinc-500 hover:shadow-lg',
-        isSelected && 'border-cyan-400 border-2 shadow-cyan-500/50 ring-2 ring-cyan-500/20'
+        'absolute rounded cursor-pointer transition-opacity',
+        'hover:opacity-80',
+        isSelected && 'ring-1'
       )}
       style={{
         left: `${leftPosition}px`,
-        width: `${width}px`
+        width: `${width}px`,
+        height: '80px',
+        top: '8px',
+        backgroundColor: isSelected ? 'var(--accent)' : 'rgba(0, 212, 212, 0.6)',
+        borderColor: isSelected ? 'var(--accent)' : 'transparent'
       }}
       onClick={onClick}
       role="button"
       tabIndex={0}
       aria-label={`Clip at ${formatTime(clip.startTime)}, duration ${formatTime(clip.duration)}`}
     >
-      {/* Thumbnail (placeholder for now, will use actual thumbnail in future) */}
+      {/* Minimal clip container with duration only */}
       <div className="h-full w-full relative overflow-hidden rounded">
         {/* Duration label */}
-        <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/70 rounded text-xs font-mono text-white">
+        <div
+          className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded text-xs font-mono"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.75)', color: 'var(--text-primary)' }}
+        >
           {formatTime(clip.duration)}
-        </div>
-
-        {/* File name label */}
-        <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-black/70 rounded text-xs text-white truncate max-w-[calc(100%-8px)]">
-          {clip.sourceFile.split('/').pop() || 'Unknown'}
         </div>
       </div>
     </div>

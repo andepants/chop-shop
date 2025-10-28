@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand'
-import type { Clip, Track, TimelineState } from '@/components/Timeline/timeline.types'
+import type { Clip, TimelineState } from '@/components/Timeline/timeline.types'
 
 /**
  * Default zoom level in pixels per second
@@ -21,7 +21,7 @@ const DEFAULT_ZOOM_LEVEL = 50
  * - Playhead at 0:00
  * - Default zoom of 50 pixels per second
  */
-export const useTimelineStore = create<TimelineState>((set, get) => ({
+export const useTimelineStore = create<TimelineState>((set) => ({
   // State
   tracks: [
     {

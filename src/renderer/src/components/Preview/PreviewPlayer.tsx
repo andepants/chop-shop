@@ -9,7 +9,6 @@ import videojs from 'video.js'
 import type Player from 'video.js/dist/types/player'
 import { usePlaybackStore } from '@/store/playbackStore'
 import { useTimelineStore } from '@/store/timelineStore'
-import { PlaybackControls } from './PlaybackControls'
 
 /**
  * PreviewPlayer component
@@ -29,7 +28,6 @@ export function PreviewPlayer(): React.JSX.Element {
   const setVideoPlayer = usePlaybackStore((state) => state.setVideoPlayer)
   const setCurrentTime = usePlaybackStore((state) => state.setCurrentTime)
   const setLoading = usePlaybackStore((state) => state.setLoading)
-  const setDuration = usePlaybackStore((state) => state.setDuration)
   const pause = usePlaybackStore((state) => state.pause)
   const loadClip = usePlaybackStore((state) => state.loadClip)
 
@@ -144,14 +142,15 @@ export function PreviewPlayer(): React.JSX.Element {
   /**
    * Handle video loadedmetadata event
    * Fired when video metadata (duration, dimensions) is available
+   * Note: Duration is already set from clip data in loadClip(), so we don't overwrite it here
    */
   function handleLoadedMetadata() {
     const player = playerRef.current
     if (!player) return
 
-    const duration = player.duration() || 0
-    setDuration(duration)
+    // Duration is already set from clip data, just mark as loaded
     setLoading(false)
+    console.log('Video metadata loaded, player ready')
   }
 
   /**
@@ -186,29 +185,49 @@ export function PreviewPlayer(): React.JSX.Element {
     setLoading(false)
   }
 
+  /**
+   * Handle click on player area to toggle play/pause
+   */
+  function handlePlayerClick() {
+    const player = playerRef.current
+    if (!player || !currentClipId) return
+
+    const isPlaying = usePlaybackStore.getState().isPlaying
+    const play = usePlaybackStore.getState().play
+    const pause = usePlaybackStore.getState().pause
+
+    if (isPlaying) {
+      pause()
+    } else {
+      play()
+    }
+  }
+
   return (
     <div className="flex flex-1 flex-col items-center justify-center bg-black">
       {!currentClipId && !isLoading && (
-        <div className="text-zinc-500 text-center">
-          <p className="text-lg">No clip selected</p>
-          <p className="text-sm mt-2">Click a clip on the timeline to preview</p>
+        <div style={{ color: 'var(--text-secondary)' }} className="text-center">
+          <p className="text-sm">No clip selected</p>
+          <p className="text-xs mt-1">Drag media to timeline</p>
         </div>
       )}
 
       {isLoading && (
-        <div className="text-zinc-400 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500 mx-auto mb-4"></div>
-          <p>Loading video...</p>
+        <div style={{ color: 'var(--text-secondary)' }} className="text-center">
+          <div
+            className="animate-spin rounded-full h-10 w-10 border-b-2 mx-auto mb-3"
+            style={{ borderColor: 'var(--accent)' }}
+          ></div>
+          <p className="text-sm">Loading...</p>
         </div>
       )}
 
       <div
         ref={videoRef}
-        className={`w-full h-full flex items-center justify-center ${!currentClipId || isLoading ? 'hidden' : ''}`}
+        onClick={handlePlayerClick}
+        className={`w-full h-full flex items-center justify-center cursor-pointer ${!currentClipId || isLoading ? 'hidden' : ''}`}
         style={{ maxWidth: '100%', maxHeight: '100%' }}
       />
-
-      <PlaybackControls />
     </div>
   )
 }

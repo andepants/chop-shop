@@ -68,7 +68,7 @@ describe('file.service', () => {
       })
 
       // Mock exec callback
-      mockExec.mockImplementation((cmd: string, callback: any) => {
+      mockExec.mockImplementation((_cmd: string, callback: any) => {
         callback(null, { stdout: mockFFprobeOutput, stderr: '' })
         return null as any
       })
@@ -148,7 +148,7 @@ describe('file.service', () => {
         streams: [{ codec_type: 'video', width: 1920, height: 1080 }]
       })
 
-      mockExec.mockImplementation((cmd: string, callback: any) => {
+      mockExec.mockImplementation((_cmd: string, callback: any) => {
         callback(null, { stdout: mockFFprobeOutput, stderr: '' })
         return null as any
       })
@@ -169,7 +169,7 @@ describe('file.service', () => {
         streams: [{ codec_type: 'audio' }]
       })
 
-      mockExec.mockImplementation((cmd: string, callback: any) => {
+      mockExec.mockImplementation((_cmd: string, callback: any) => {
         callback(null, { stdout: mockFFprobeOutput, stderr: '' })
         return null as any
       })
@@ -183,7 +183,7 @@ describe('file.service', () => {
       mockAccess.mockResolvedValueOnce(undefined)
       mockStat.mockResolvedValueOnce({ size: 1024 } as Stats)
 
-      mockExec.mockImplementation((cmd: string, callback: any) => {
+      mockExec.mockImplementation((_cmd: string, callback: any) => {
         callback(new Error('ffprobe error'), null)
         return null as any
       })
@@ -210,7 +210,7 @@ describe('file.service', () => {
         ]
       })
 
-      mockExec.mockImplementation((cmd: string, callback: any) => {
+      mockExec.mockImplementation((_cmd: string, callback: any) => {
         callback(null, { stdout: mockFFprobeOutput, stderr: '' })
         return null as any
       })
@@ -235,7 +235,7 @@ describe('file.service', () => {
         ]
       })
 
-      mockExec.mockImplementation((cmd: string, callback: any) => {
+      mockExec.mockImplementation((_cmd: string, callback: any) => {
         callback(null, { stdout: mockFFprobeOutput, stderr: '' })
         return null as any
       })

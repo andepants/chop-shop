@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { IPCResponse, IPC_CHANNELS } from '../shared/types'
 
@@ -31,6 +31,17 @@ const api = {
    * @returns Promise with media file metadata
    */
   importFile: (filePath: string) => ipcRenderer.invoke(IPC_CHANNELS.IMPORT_FILE, { filePath }),
+
+  /**
+   * Import a video file from a File object (e.g., from drag-and-drop)
+   * Uses webUtils.getPathForFile to securely extract the file path
+   * @param file - File object from drag-and-drop or file input
+   * @returns Promise with media file metadata
+   */
+  importFileFromObject: (file: File) => {
+    const filePath = webUtils.getPathForFile(file)
+    return ipcRenderer.invoke(IPC_CHANNELS.IMPORT_FILE, { filePath })
+  },
 
   /**
    * Generate thumbnail from video file

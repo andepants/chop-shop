@@ -10,32 +10,34 @@
 
 @layer base {
   :root {
-    /* Existing project dark theme variables (preserved) */
-    --bg-primary: #18181b;
-    --bg-secondary: #27272a;
+    /* CapCut-inspired dark theme variables */
+    --bg-primary: #0f0f0f;
+    --bg-secondary: #1a1a1a;
+    --bg-timeline: #1e1e1e;
     --text-primary: #fafafa;
     --text-secondary: #a1a1aa;
+    --border-subtle: #2a2a2a;
 
-    /* shadcn/ui dark theme variables (HSL color space) */
-    --background: 240 10% 3.9%;
+    /* shadcn/ui dark theme variables (HSL color space) - CapCut palette */
+    --background: 0 0% 5.9%;
     --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
+    --card: 0 0% 10%;
     --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
+    --popover: 0 0% 10%;
     --popover-foreground: 0 0% 98%;
     --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
+    --primary-foreground: 0 0% 5.9%;
+    --secondary: 0 0% 10%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 0 0% 64.9%;
+    --accent: 180 100% 42%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --border: 0 0% 16%;
+    --input: 0 0% 16%;
+    --ring: 180 100% 42%;
     --radius: 0.5rem;
   }
 }

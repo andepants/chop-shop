@@ -88,14 +88,17 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
       return
     }
 
-    set({ isLoading: true, currentClipId: clipId })
+    // Set clip duration immediately from timeline data
+    // This ensures duration is correct even before video metadata loads
+    const clipDuration = clip.trimOut - clip.trimIn
+    set({ isLoading: true, currentClipId: clipId, duration: clipDuration })
 
     // Set video source using proper file:// protocol for Electron local files
     // Normalize path separators for cross-platform compatibility
     const normalizedPath = clip.sourceFile.replace(/\\/g, '/')
     const fileUrl = `file://${normalizedPath}`
 
-    console.log('Loading clip:', { clipId, sourceFile: clip.sourceFile, fileUrl })
+    console.log('Loading clip:', { clipId, sourceFile: clip.sourceFile, fileUrl, clipDuration })
 
     // Determine video type from file extension
     const extension = clip.sourceFile.split('.').pop()?.toLowerCase()

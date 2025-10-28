@@ -191,7 +191,11 @@ export function Timeline(): React.JSX.Element {
 
   return (
     <div
-      className="h-48 bg-zinc-900 border-t border-zinc-700 flex flex-col overflow-x-auto overflow-y-hidden"
+      className="h-full flex flex-col overflow-x-auto overflow-y-hidden border-t"
+      style={{
+        backgroundColor: 'var(--bg-timeline)',
+        borderColor: 'var(--border-subtle)'
+      }}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
@@ -202,7 +206,11 @@ export function Timeline(): React.JSX.Element {
       />
 
       {/* Track area with playhead */}
-      <div ref={containerRef} className="flex-1 relative">
+      <div
+        ref={containerRef}
+        className="flex-1 relative min-h-[200px]"
+        style={{ backgroundColor: 'var(--bg-timeline)' }}
+      >
         {/* Playhead - AC #7 */}
         <Playhead position={playheadPosition} zoomLevel={zoomLevel} />
 
@@ -217,6 +225,28 @@ export function Timeline(): React.JSX.Element {
             onTrackClick={handleTimelineSeek}
           />
         ))}
+
+        {/* Empty state hint */}
+        {tracks.every((track) => track.clips.length === 0) && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="text-center" style={{ color: 'var(--text-secondary)' }}>
+              <svg
+                className="w-10 h-10 mx-auto mb-2 opacity-40"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
+                />
+              </svg>
+              <p className="text-xs">Drag videos here</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

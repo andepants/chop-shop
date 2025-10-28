@@ -1,0 +1,94 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>1</storyId>
+    <title>Clip Trim with In/Out Points</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/3-1-clip-trim-with-in-out-points.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>content creator</asA>
+    <iWant>set trim points on a clip to remove unwanted sections</iWant>
+    <soThat>I can include only the desired portions of my footage</soThat>
+    <tasks>
+- Extend Clip data model with trim properties (trimIn, trimOut fields)
+- Implement timeline store mutation for trim updates (updateClip action)
+- Create TrimTool component with trim handles UI
+- Integrate trim tool with Timeline component
+- Update preview player to respect trim values
+- Implement non-destructive editing guarantee
+- Add keyboard support and accessibility
+- Test trim functionality end-to-end
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+AC1: User can select a clip on timeline to enable trim mode
+AC2: Trim handles appear at clip start and end positions
+AC3: Dragging trim handles adjusts in/out points with visual feedback
+AC4: Preview updates to show trimmed region during trim adjustment
+AC5: Timeline displays trimmed duration accurately
+AC6: Trimmed clip plays only the selected region in preview
+AC7: Original imported media file remains unchanged (non-destructive editing)
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-3.md" title="Epic 3 Technical Specification" section="AC-3.1 Clip Trim">
+        Epic 3 implements core editing operations including clip trim with in/out points. Trim operations use trimIn/trimOut fields on Clip interface. Non-destructive editing: original source files remain unchanged. Trim handles use GPU-accelerated CSS transforms for 60fps performance per NFR001.
+      </doc>
+      <doc path="docs/tech-spec-epic-3.md" title="Epic 3 Technical Specification" section="Data Models - Clip Interface">
+        Clip interface extended with trimIn: number and trimOut: number fields. Effective duration calculated as: duration - trimIn - trimOut. Preview playback bounds: video.currentTime = clip.trimIn on load, pause at (duration - trimOut).
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture Decision Document" section="Component Structure">
+        EditTools folder at src/renderer/components/EditTools/ for Epic 3 editing components. Shared types in src/renderer/types/timeline.types.ts. State mutations in src/renderer/store/timelineStore.ts. Zustand immutability: use set() with spread operators.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture Decision Document" section="Styling Patterns">
+        Use Tailwind CSS classes. Trim handles: absolute positioned divs with cursor-ew-resize. Selected clip: ring-2 ring-cyan-500. Drag feedback: opacity-75 during drag, transition-opacity.
+      </doc>
+      <doc path="docs/PRD.md" title="Product Requirements Document" section="FR009">
+        Application shall allow users to set in/out trim points on individual clips. NFR001: Timeline UI shall maintain 30+ fps responsiveness with 10 or more clips loaded.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/renderer/src/components/Timeline/timeline.types.ts" kind="type" symbol="Clip" lines="11-26" reason="Clip interface already includes trimIn and trimOut fields - need to ensure they're used correctly">
+        export interface Clip {
+          id: string
+          sourceFile: string
+          startTime: number
+          duration: number
+          trimIn: number    // Already defined
+          trimOut: number   // Already defined
+          trackId: number
+        }
+      </artifact>
+      <artifact path="src/renderer/src/store/timelineStore.ts" kind="store" symbol="useTimelineStore" lines="24-120" reason="Timeline store needs updateClip action to modify trim values. Currently has addClip, removeClip, setPlayhead, setZoomLevel, setSelectedClip actions">
+        Zustand store managing timeline state. Has tracks array, playheadPosition, selectedClipId. Need to add updateClip(clipId, updates) action for trim operations.
+      </artifact>
+      <artifact path="src/renderer/src/components/Timeline/Timeline.tsx" kind="component" symbol="Timeline" reason="Timeline component where TrimTool will be integrated. Handles clip selection via selectedClipId state">
+        Timeline component with clip click handling (handleClipClick), drag-drop support, playhead seeking. Uses selectedClipId from store for clip selection state.
+      </artifact>
+      <artifact path="src/renderer/src/components/Timeline/TimelineClip.tsx" kind="component" symbol="TimelineClip" lines="17-60" reason="Clip visualization component that needs to display trimmed duration and integrate TrimTool handles">
+        Renders individual clip visual on timeline. Uses formatTime utility. Currently displays based on clip duration - needs to calculate effective duration (duration - trimIn - trimOut) for visual width.
+      </artifact>
+      <artifact path="src/renderer/src/components/Preview/PreviewPlayer.tsx" kind="component" symbol="PreviewPlayer" lines="21-160" reason="Video.js preview player that needs to respect trimIn/trimOut values during playback">
+        Video.js player with event handlers (timeupdate, ended, loadedmetadata). Needs to set currentTime = trimIn on clip load and pause at (duration - trimOut).
+      </artifact>
+      <artifact path="src/renderer/src/store/playbackStore.ts" kind="store" reason="Playback store manages current clip playback state, may need trim-aware playback logic">
+        Manages currentClipId, isPlaying, currentTime, videoPlayer reference. Interacts with Video.js player instance.
+      </artifact>
+    </code>
+    <dependencies>{{dependencies_artifacts}}</dependencies>
+  </artifacts>
+
+  <constraints>{{constraints}}</constraints>
+  <interfaces>{{interfaces}}</interfaces>
+  <tests>
+    <standards>{{test_standards}}</standards>
+    <locations>{{test_locations}}</locations>
+    <ideas>{{test_ideas}}</ideas>
+  </tests>
+</story-context>

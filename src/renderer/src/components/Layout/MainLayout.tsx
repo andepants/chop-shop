@@ -3,12 +3,12 @@
  * Main application layout with 3-panel structure:
  * - TopBar (top, full-width)
  * - Sidebar (left, fixed width)
- * - Center area split into Preview (top 60%) and Timeline (bottom 40%)
+ * - Center area split into Preview and Timeline with PlaybackBar
  */
 import { TopBar } from './TopBar'
 import { Sidebar } from './Sidebar'
 import { Timeline } from '@/components/Timeline'
-import { PreviewPlayer } from '@/components/Preview'
+import { PreviewPlayer, PlaybackBar } from '@/components/Preview'
 
 /**
  * Main layout container for the application
@@ -16,7 +16,10 @@ import { PreviewPlayer } from '@/components/Preview'
  */
 export function MainLayout(): React.JSX.Element {
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-zinc-900">
+    <div
+      className="flex flex-col h-screen w-screen overflow-hidden"
+      style={{ backgroundColor: 'var(--bg-primary)' }}
+    >
       {/* Top Bar */}
       <TopBar />
 
@@ -25,15 +28,18 @@ export function MainLayout(): React.JSX.Element {
         {/* Left Sidebar */}
         <Sidebar />
 
-        {/* Center Content (Preview + Timeline) */}
+        {/* Center Content (Preview + PlaybackBar + Timeline) */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Preview Area (60% height) */}
-          <div className="flex-[3] bg-zinc-900 border-b border-zinc-700">
+          {/* Preview Area */}
+          <div className="flex-1 bg-black border-b" style={{ borderColor: 'var(--border-subtle)' }}>
             <PreviewPlayer />
           </div>
 
-          {/* Timeline Area (40% height) */}
-          <div className="flex-[2] overflow-hidden">
+          {/* Playback Bar */}
+          <PlaybackBar />
+
+          {/* Timeline Area - Fixed height to ensure visibility */}
+          <div className="h-64" style={{ backgroundColor: 'var(--bg-timeline)' }}>
             <Timeline />
           </div>
         </div>

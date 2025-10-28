@@ -50,13 +50,14 @@ export function ImportZone(): React.JSX.Element {
   }
 
   /**
-   * Import a single video file via IPC
+   * Import a single video file from a File object via IPC
+   * Uses webUtils.getPathForFile in preload for secure path extraction
    */
-  async function importFile(filePath: string): Promise<void> {
+  async function importFile(file: File): Promise<void> {
     try {
-      console.log('[Renderer] Importing file:', filePath)
+      console.log('[Renderer] Importing file:', file.name)
 
-      const response = await window.api.importFile(filePath)
+      const response = await window.api.importFileFromObject(file)
 
       if (response.success && response.data) {
         addFile(response.data)
@@ -97,9 +98,8 @@ export function ImportZone(): React.JSX.Element {
       }
 
       try {
-        // Electron adds a 'path' property to File objects
-        const filePath = (file as File & { path: string }).path
-        await importFile(filePath)
+        // Pass the File object directly - the preload script will handle path extraction
+        await importFile(file)
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
         showError(`Unable to import ${filename}. ${errorMessage}`, 'Import Failed')
@@ -115,30 +115,50 @@ export function ImportZone(): React.JSX.Element {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`
-        flex flex-col items-center justify-center
-        h-64 rounded-lg border-2 border-dashed
-        transition-all cursor-pointer
-        ${
-          isDragOver
-            ? 'border-cyan-500 bg-cyan-500/10 ring-2 ring-cyan-500'
-            : 'border-zinc-600 hover:border-zinc-500 bg-zinc-900/50'
-        }
-        ${isImporting ? 'opacity-50 pointer-events-none' : ''}
-      `}
+      className="flex flex-col items-center justify-center h-32 rounded border border-dashed transition-colors cursor-pointer"
+      style={{
+        borderColor: isDragOver ? 'var(--accent)' : 'var(--border-subtle)',
+        backgroundColor: isDragOver ? 'rgba(0, 212, 212, 0.05)' : 'transparent',
+        opacity: isImporting ? 0.5 : 1,
+        pointerEvents: isImporting ? 'none' : 'auto'
+      }}
     >
-      <div className="text-center px-6">
-        <div className="mb-3">
+      <div className="text-center">
+        {/* Icon */}
+        <div className="mb-2 flex justify-center">
           {isImporting ? (
-            <div className="text-cyan-400 text-4xl">⏳</div>
+            <div
+              className="animate-spin rounded-full h-8 w-8 border-b-2"
+              style={{ borderColor: 'var(--accent)' }}
+            ></div>
           ) : (
-            <div className="text-zinc-400 text-4xl">📁</div>
+            <svg
+              className="w-8 h-8 transition-colors"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              style={{ color: isDragOver ? 'var(--accent)' : 'var(--text-secondary)' }}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+              />
+            </svg>
           )}
         </div>
-        <p className="text-zinc-300 text-sm font-medium mb-1">
-          {isImporting ? 'Importing files...' : 'Drag video files here'}
+
+        {/* Text */}
+        <p
+          className="text-xs mb-1"
+          style={{ color: isDragOver ? 'var(--accent)' : 'var(--text-primary)' }}
+        >
+          {isImporting ? 'Importing...' : isDragOver ? 'Drop to import' : 'Drag video files here'}
         </p>
-        <p className="text-zinc-500 text-xs">Supported formats: {SUPPORTED_FORMATS_STRING}</p>
+        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+          {SUPPORTED_FORMATS_STRING}
+        </p>
       </div>
     </div>
   )

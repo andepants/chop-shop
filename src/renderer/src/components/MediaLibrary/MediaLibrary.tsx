@@ -32,7 +32,10 @@ export function MediaLibrary(): React.JSX.Element {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-2 scroll-smooth" onClick={handleBackgroundClick}>
+    <div
+      className="flex-1 overflow-y-auto px-3 py-2 scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent"
+      onClick={handleBackgroundClick}
+    >
       {files.map((file) => (
         <MediaItem
           key={file.id}

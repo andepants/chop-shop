@@ -60,17 +60,24 @@ export function TimelineTrack({
   }
 
   return (
-    <div className="flex border-b border-zinc-700">
-      {/* Track label */}
-      <div className="w-20 flex-shrink-0 bg-zinc-900 border-r border-zinc-700 flex items-center justify-center">
-        <span className="text-sm text-zinc-400 font-medium">Track {track.id}</span>
-      </div>
-
+    <div className="border-b" style={{ borderColor: 'var(--border-subtle)' }}>
       {/* Track content area with clips */}
       <div
-        className="flex-1 h-32 bg-zinc-800 relative cursor-pointer hover:bg-zinc-800/80 transition-colors"
+        className="h-24 relative cursor-pointer transition-opacity hover:opacity-90"
         onClick={handleTrackClick}
+        style={{ backgroundColor: 'var(--bg-timeline)' }}
       >
+        {/* Subtle grid lines */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.01) 1px, transparent 1px)',
+              backgroundSize: `${zoomLevel * 5}px 100%`
+            }}
+          />
+        </div>
+
         {track.clips.map((clip) => (
           <TimelineClip
             key={clip.id}
