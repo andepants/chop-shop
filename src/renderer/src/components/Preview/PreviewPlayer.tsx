@@ -2,6 +2,7 @@
  * PreviewPlayer Component
  * Video.js player that renders in the center preview area
  * Subscribes to playbackStore for current clip and playback state
+ * Integrates with PlaybackOrchestrator for seamless multi-clip playback
  */
 
 import { useEffect, useRef } from 'react'
@@ -9,6 +10,7 @@ import videojs from 'video.js'
 import type Player from 'video.js/dist/types/player'
 import { usePlaybackStore } from '@/store/playbackStore'
 import { useTimelineStore } from '@/store/timelineStore'
+import { playbackOrchestrator } from '@/utils/playbackOrchestrator'
 
 /**
  * PreviewPlayer component
@@ -25,15 +27,18 @@ export function PreviewPlayer(): React.JSX.Element {
   // Playback state
   const currentClipId = usePlaybackStore((state) => state.currentClipId)
   const isLoading = usePlaybackStore((state) => state.isLoading)
+  const isPlaying = usePlaybackStore((state) => state.isPlaying)
+  const nextClipId = usePlaybackStore((state) => state.nextClipId)
   const setVideoPlayer = usePlaybackStore((state) => state.setVideoPlayer)
   const setCurrentTime = usePlaybackStore((state) => state.setCurrentTime)
   const setLoading = usePlaybackStore((state) => state.setLoading)
   const pause = usePlaybackStore((state) => state.pause)
-  const loadClip = usePlaybackStore((state) => state.loadClip)
+  const setGlobalTimelinePosition = usePlaybackStore((state) => state.setGlobalTimelinePosition)
+  const updatePlaybackQueue = usePlaybackStore((state) => state.updatePlaybackQueue)
+  const transitionToNextClip = usePlaybackStore((state) => state.transitionToNextClip)
   const tryPendingPlay = usePlaybackStore((state) => state.tryPendingPlay)
 
   // Timeline state
-  const setPlayhead = useTimelineStore((state) => state.setPlayhead)
   const tracks = useTimelineStore((state) => state.tracks)
 
   /**
@@ -100,20 +105,67 @@ export function PreviewPlayer(): React.JSX.Element {
     // Set player reference in store
     setVideoPlayer(player)
 
+    // Initialize PlaybackOrchestrator callbacks
+    playbackOrchestrator.setCallbacks({
+      onPlayheadUpdate: (position: number) => {
+        setGlobalTimelinePosition(position)
+      },
+      onClipTransition: async () => {
+        await transitionToNextClip()
+      },
+      onPlaybackEnd: () => {
+        pause()
+        useTimelineStore.getState().setPlayhead(0)
+      },
+      getCurrentTime: () => player.currentTime() || 0
+    })
+
+    console.log('[PreviewPlayer] Orchestrator initialized with callbacks')
+
     // Cleanup on unmount
     return () => {
+      playbackOrchestrator.stopMonitoring()
+      playbackOrchestrator.dispose()
+
       if (playerRef.current) {
         playerRef.current.dispose()
         playerRef.current = null
       }
       setVideoPlayer(null)
     }
-  }, [setVideoPlayer])
+  }, [setVideoPlayer, setGlobalTimelinePosition, transitionToNextClip, pause])
+
+  /**
+   * Start/stop orchestrator monitoring based on playback state
+   * Orchestrator reads directly from stores, so no need to pass callbacks
+   */
+  useEffect(() => {
+    if (isPlaying) {
+      console.log('[PreviewPlayer] Starting orchestrator monitoring')
+      playbackOrchestrator.startMonitoring()
+    } else {
+      console.log('[PreviewPlayer] Stopping orchestrator monitoring')
+      playbackOrchestrator.stopMonitoring()
+    }
+
+    return () => {
+      playbackOrchestrator.stopMonitoring()
+    }
+  }, [isPlaying])
+
+  /**
+   * Update playback queue when timeline clips change
+   * This ensures nextClipId is always up-to-date for transitions
+   */
+  useEffect(() => {
+    console.log('[PreviewPlayer] Tracks changed, updating playback queue')
+    updatePlaybackQueue()
+  }, [tracks, updatePlaybackQueue])
 
   /**
    * Handle video timeupdate event
-   * Updates playback store current time and synchronizes timeline playhead
-   * Enforces trim bounds by pausing at trimOut point (Story 3.1 - AC #6)
+   * Updates playback store current time
+   * Note: Playhead synchronization is now handled by PlaybackOrchestrator
    */
   function handleTimeUpdate() {
     const player = playerRef.current
@@ -121,49 +173,28 @@ export function PreviewPlayer(): React.JSX.Element {
 
     const currentTime = player.currentTime() || 0
 
+    // Update current time in store
+    // Note: Orchestrator handles playhead sync and trim enforcement
     setCurrentTime(currentTime)
-
-    // Synchronize timeline playhead position and enforce trim bounds
-    if (currentClipId) {
-      const clip = tracks.flatMap((track) => track.clips).find((c) => c.id === currentClipId)
-
-      if (clip) {
-        // Calculate timeline position: clip start time + (current time - trim in)
-        const timelinePosition = clip.startTime + (currentTime - clip.trimIn)
-        setPlayhead(timelinePosition)
-
-        // Enforce trim end boundary: pause when reaching (duration - trimOut)
-        const trimEndTime = clip.duration - clip.trimOut
-        if (currentTime >= trimEndTime) {
-          pause()
-          // Keep currentTime at the boundary (don't let it go beyond)
-          player.currentTime(trimEndTime)
-        }
-      }
-    }
   }
 
   /**
    * Handle video ended event
-   * Transitions to next clip if available, otherwise stops playback
+   * Note: Clip transitions are now handled by PlaybackOrchestrator
+   * This is kept as a fallback for natural video end (should rarely occur)
    */
   function handleEnded() {
-    if (!currentClipId) return
+    console.log('[PreviewPlayer] Video ended event (fallback)')
 
-    // Get all clips sorted by start time
-    const allClips = tracks.flatMap((track) => track.clips).sort((a, b) => a.startTime - b.startTime)
-
-    const currentIndex = allClips.findIndex((c) => c.id === currentClipId)
-
-    // Check if there's a next clip
-    if (currentIndex >= 0 && currentIndex < allClips.length - 1) {
-      const nextClip = allClips[currentIndex + 1]
-      loadClip(nextClip.id)
-      // Play will be triggered by the loadedmetadata event
+    // Check if there's a next clip to transition to
+    if (nextClipId) {
+      console.log('[PreviewPlayer] Transitioning to next clip via ended event')
+      transitionToNextClip()
     } else {
-      // End of timeline - stop playback and reset playhead
+      // End of timeline
+      console.log('[PreviewPlayer] End of timeline reached')
       pause()
-      setPlayhead(0)
+      useTimelineStore.getState().setPlayhead(0)
     }
   }
 

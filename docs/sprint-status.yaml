@@ -60,12 +60,12 @@ development_status:
   3-2-split-clip-at-playhead: done
   3-3-delete-clip-from-timeline: done
   3-4-drag-to-reorder-timeline-clips: done
-  3-5-export-timeline-to-mp4: review
+  3-5-export-timeline-to-mp4: done
   epic-3-retrospective: optional
 
   epic-4: contexted
-  4-1-multi-track-timeline-2-tracks: ready-for-dev
-  4-2-timeline-zoom-controls: ready-for-dev
+  4-1-multi-track-timeline-2-tracks: review
+  4-2-timeline-zoom-controls: in-progress
   4-3-screen-recording-setup: ready-for-dev
   4-4-webcam-recording: ready-for-dev
   4-5-picture-in-picture-recording-screen-webcam: ready-for-dev

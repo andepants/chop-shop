@@ -242,12 +242,30 @@ export async function testExport(
 export type ExportResolution = '720p' | '1080p' | 'source'
 
 /**
+ * PiP position options for multi-track export
+ */
+export type PipPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+
+/**
  * Export options for timeline export
  */
 export interface ExportOptions {
   clips: Clip[]
   resolution: ExportResolution
   outputPath: string
+}
+
+/**
+ * Multi-track export options
+ * Extends ExportOptions with track-specific configuration
+ */
+export interface MultiTrackExportOptions extends Omit<ExportOptions, 'clips'> {
+  tracks: {
+    main: Clip[]       // Track 1 clips (full-screen)
+    overlay: Clip[]    // Track 2 clips (PiP overlay)
+  }
+  pipPosition?: PipPosition  // Position of overlay (default: bottom-right)
+  pipSize?: number           // Size as percentage (default: 25)
 }
 
 /**
@@ -427,6 +445,242 @@ export async function executeExport(
     }
     throw new FFmpegError(
       error instanceof Error ? error.message : 'Export failed',
+      FFmpegErrorCode.EXECUTION_FAILED
+    )
+  }
+}
+
+/**
+ * Build FFmpeg overlay filter string for PiP positioning
+ * @param pipPosition - Position of overlay (top-left, top-right, bottom-left, bottom-right)
+ * @param pipSize - Size as percentage (e.g., 25 for 25%)
+ * @returns FFmpeg overlay filter expression
+ */
+function buildOverlayFilter(pipPosition: PipPosition, pipSize: number): string {
+  const padding = 10 // Padding from edges in pixels
+
+  // Scale overlay to specified size (percentage of main video width)
+  const scaleFilter = `[overlay]scale=iw*${pipSize / 100}:ih*${pipSize / 100}[pip]`
+
+  // Calculate overlay position based on pipPosition
+  let overlayPosition: string
+  switch (pipPosition) {
+    case 'top-left':
+      overlayPosition = `${padding}:${padding}`
+      break
+    case 'top-right':
+      overlayPosition = `W-w-${padding}:${padding}`
+      break
+    case 'bottom-left':
+      overlayPosition = `${padding}:H-h-${padding}`
+      break
+    case 'bottom-right':
+    default:
+      overlayPosition = `W-w-${padding}:H-h-${padding}`
+      break
+  }
+
+  return `${scaleFilter};[main][pip]overlay=${overlayPosition}`
+}
+
+/**
+ * Build FFmpeg command for multi-track export with overlay and audio mixing
+ * @param options - Multi-track export options
+ * @returns FFmpeg command arguments array
+ */
+export function buildMultiTrackFFmpegCommand(options: MultiTrackExportOptions): string[] {
+  const { tracks, resolution, outputPath, pipPosition = 'bottom-right', pipSize = 25 } = options
+  const args: string[] = []
+
+  // Validate both tracks have clips
+  if (tracks.main.length === 0) {
+    throw new FFmpegError('Track 1 (main) must have at least one clip', FFmpegErrorCode.EXECUTION_FAILED)
+  }
+
+  // Build track 1 (main) concatenation
+  const hasOverlay = tracks.overlay.length > 0
+
+  // Add Track 1 inputs with trim
+  tracks.main.forEach((clip) => {
+    if (!existsSync(clip.sourceFile)) {
+      throw new FFmpegError(`Input file not found: ${clip.sourceFile}`, FFmpegErrorCode.FILE_NOT_FOUND)
+    }
+
+    if (clip.trimIn > 0) {
+      args.push('-ss', clip.trimIn.toString())
+    }
+    args.push('-i', clip.sourceFile)
+
+    const trimmedDuration = clip.duration - clip.trimIn - clip.trimOut
+    if (trimmedDuration > 0 && (clip.trimIn > 0 || clip.trimOut > 0)) {
+      args.push('-t', trimmedDuration.toString())
+    }
+  })
+
+  // Track the number of Track 1 inputs for filter indexing
+  const track1InputCount = tracks.main.length
+
+  // Add Track 2 inputs with trim (if overlay exists)
+  if (hasOverlay) {
+    tracks.overlay.forEach((clip) => {
+      if (!existsSync(clip.sourceFile)) {
+        throw new FFmpegError(`Input file not found: ${clip.sourceFile}`, FFmpegErrorCode.FILE_NOT_FOUND)
+      }
+
+      if (clip.trimIn > 0) {
+        args.push('-ss', clip.trimIn.toString())
+      }
+      args.push('-i', clip.sourceFile)
+
+      const trimmedDuration = clip.duration - clip.trimIn - clip.trimOut
+      if (trimmedDuration > 0 && (clip.trimIn > 0 || clip.trimOut > 0)) {
+        args.push('-t', trimmedDuration.toString())
+      }
+    })
+  }
+
+  // Build complex filter
+  let filterComplex = ''
+
+  // Concatenate Track 1 clips if multiple
+  if (tracks.main.length > 1) {
+    for (let i = 0; i < tracks.main.length; i++) {
+      filterComplex += `[${i}:v][${i}:a]`
+    }
+    filterComplex += `concat=n=${tracks.main.length}:v=1:a=1[main][a1]`
+  } else {
+    // Single Track 1 clip - just label it
+    filterComplex += '[0:v]copy[main];[0:a]copy[a1]'
+  }
+
+  // Concatenate Track 2 clips if multiple and overlay exists
+  if (hasOverlay) {
+    filterComplex += ';'
+
+    if (tracks.overlay.length > 1) {
+      for (let i = 0; i < tracks.overlay.length; i++) {
+        const inputIndex = track1InputCount + i
+        filterComplex += `[${inputIndex}:v][${inputIndex}:a]`
+      }
+      filterComplex += `concat=n=${tracks.overlay.length}:v=1:a=1[overlay][a2]`
+    } else {
+      // Single Track 2 clip
+      const overlayInputIndex = track1InputCount
+      filterComplex += `[${overlayInputIndex}:v]copy[overlay];[${overlayInputIndex}:a]copy[a2]`
+    }
+
+    // Apply overlay filter
+    filterComplex += ';'
+    filterComplex += buildOverlayFilter(pipPosition, pipSize)
+    filterComplex += '[outv]'
+
+    // Mix audio: Track 1 @ 100% (0dB), Track 2 @ 50% (-6dB)
+    filterComplex += ';[a1]volume=1.0[a1out];[a2]volume=0.5[a2out];[a1out][a2out]amix=inputs=2:duration=longest[outa]'
+  } else {
+    // No overlay - just use Track 1 video and audio
+    filterComplex += ';[main]copy[outv];[a1]copy[outa]'
+  }
+
+  // Apply resolution scaling if needed
+  if (resolution === '720p') {
+    filterComplex = filterComplex.replace('[outv]', '[outv_temp]')
+    filterComplex += ';[outv_temp]scale=1280:720[outv]'
+  } else if (resolution === '1080p') {
+    filterComplex = filterComplex.replace('[outv]', '[outv_temp]')
+    filterComplex += ';[outv_temp]scale=1920:1080[outv]'
+  }
+
+  args.push('-filter_complex', filterComplex)
+  args.push('-map', '[outv]', '-map', '[outa]')
+
+  // Codec settings
+  args.push('-c:v', 'libx264')
+  args.push('-preset', 'fast')
+  args.push('-c:a', 'aac')
+  args.push('-b:a', '192k')
+
+  // Overwrite output
+  args.push('-y')
+  args.push(outputPath)
+
+  return args
+}
+
+/**
+ * Execute multi-track timeline export to MP4
+ * Composites Track 2 (overlay) over Track 1 (main) with PiP positioning
+ * @param options - Multi-track export options
+ * @param onProgress - Optional callback for progress updates
+ * @returns Promise resolving with output path on success
+ */
+export async function executeMultiTrackExport(
+  options: MultiTrackExportOptions,
+  onProgress?: (percent: number) => void
+): Promise<{ outputPath: string }> {
+  const { tracks, resolution, outputPath } = options
+
+  console.log('[FFmpeg] Starting multi-track export...')
+  console.log('[FFmpeg] Track 1 clips:', tracks.main.length)
+  console.log('[FFmpeg] Track 2 clips:', tracks.overlay.length)
+  console.log('[FFmpeg] Resolution:', resolution)
+  console.log('[FFmpeg] Output:', outputPath)
+
+  // Validate inputs
+  if (!tracks.main || tracks.main.length === 0) {
+    throw new FFmpegError('Track 1 must have at least one clip', FFmpegErrorCode.EXECUTION_FAILED)
+  }
+
+  if (!outputPath) {
+    throw new FFmpegError('Output path is required', FFmpegErrorCode.EXECUTION_FAILED)
+  }
+
+  try {
+    // Build FFmpeg command
+    const args = buildMultiTrackFFmpegCommand(options)
+    console.log('[FFmpeg] Command:', args.join(' '))
+
+    // Calculate total duration (use longest track)
+    const track1Duration = calculateTotalDuration(tracks.main)
+    const track2Duration = tracks.overlay.length > 0 ? calculateTotalDuration(tracks.overlay) : 0
+    const totalDuration = Math.max(track1Duration, track2Duration)
+
+    // Execute FFmpeg with progress callback
+    await executeFFmpegCommand(
+      args,
+      onProgress
+        ? (progress) => {
+            onProgress(Math.round(progress.percent))
+          }
+        : undefined,
+      totalDuration
+    )
+
+    // Verify output file was created
+    if (!existsSync(outputPath)) {
+      throw new FFmpegError('Output file was not created', FFmpegErrorCode.EXECUTION_FAILED)
+    }
+
+    console.log('[FFmpeg] Multi-track export completed successfully')
+    console.log('[FFmpeg] Output file:', outputPath)
+
+    return { outputPath }
+  } catch (error) {
+    // Clean up partial file on error
+    try {
+      if (existsSync(outputPath)) {
+        unlinkSync(outputPath)
+        console.log('[FFmpeg] Cleaned up partial output file')
+      }
+    } catch (cleanupError) {
+      console.error('[FFmpeg] Failed to clean up partial file:', cleanupError)
+    }
+
+    // Re-throw the error
+    if (error instanceof FFmpegError) {
+      throw error
+    }
+    throw new FFmpegError(
+      error instanceof Error ? error.message : 'Multi-track export failed',
       FFmpegErrorCode.EXECUTION_FAILED
     )
   }

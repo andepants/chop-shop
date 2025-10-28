@@ -20,6 +20,16 @@ export interface API {
     resolution: '720p' | '1080p' | 'source'
     outputPath: string
   }) => Promise<unknown>
+  startMultiTrackExport: (options: {
+    tracks: {
+      main: unknown[]
+      overlay: unknown[]
+    }
+    resolution: '720p' | '1080p' | 'source'
+    outputPath: string
+    pipPosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+    pipSize?: number
+  }) => Promise<unknown>
   onExportProgress: (callback: (data: { percent: number }) => void) => () => void
   onExportComplete: (callback: (data: { success: boolean; outputPath: string }) => void) => () => void
   onExportError: (callback: (data: { message: string; code: string }) => void) => () => void

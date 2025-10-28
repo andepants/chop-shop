@@ -398,6 +398,11 @@ export function TimelineClip({
           {formatTime(effectiveDuration)}
         </div>
 
+        {/* Track label - bottom left (visible on hover) */}
+        <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded text-xs font-mono bg-black/75 text-zinc-100 z-10 opacity-0 hover:opacity-100 transition-opacity">
+          Track {clip.trackId}
+        </div>
+
         {/* Trim preview overlay - grey out trimmed area during drag */}
         {isTrimming && trimmingEdge && (() => {
           const trimmedAreaWidth = trimmingEdge === 'start'

@@ -78,6 +78,22 @@ const api = {
   }) => ipcRenderer.invoke('start-export', options),
 
   /**
+   * Start multi-track timeline export to MP4 with overlay compositing
+   * @param options - Multi-track export options
+   * @returns Promise with export result
+   */
+  startMultiTrackExport: (options: {
+    tracks: {
+      main: unknown[]
+      overlay: unknown[]
+    }
+    resolution: '720p' | '1080p' | 'source'
+    outputPath: string
+    pipPosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+    pipSize?: number
+  }) => ipcRenderer.invoke('start-multitrack-export', options),
+
+  /**
    * Subscribe to export progress events
    * @param callback - Callback function receiving progress updates
    * @returns Cleanup function to remove the listener

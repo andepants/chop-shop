@@ -27,8 +27,8 @@ interface TimelineRulerProps {
 function calculateMarkerInterval(zoomLevel: number): number {
   const minPixelSpacing = 60 // Minimum pixels between markers
 
-  // Standard time intervals in seconds
-  const intervals = [5, 10, 30, 60, 120, 300, 600]
+  // Standard time intervals in seconds (Story 4.2: includes 1s, 2s for high zoom)
+  const intervals = [1, 2, 5, 10, 30, 60, 120, 300, 600]
 
   for (const interval of intervals) {
     if (interval * zoomLevel >= minPixelSpacing) {

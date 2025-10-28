@@ -85,18 +85,21 @@ export function Timeline(): React.JSX.Element {
   const { files } = useMediaStore()
   const {
     tracks,
-    playheadPosition,
     totalDuration,
-    zoomLevel,
+    pixelsPerSecond,
     selectedClipId,
     addClip,
+    addClipToTrack,
     selectClip,
     removeClip,
     moveClipToPosition,
-    reorderClips
+    zoomIn,
+    zoomOut,
+    setZoomLevel,
+    fitToTimeline
   } = useTimelineStore()
 
-  // Measure container width for auto-zoom
+  // Measure container width (used for manual Fit to Timeline calculation)
   useEffect(() => {
     if (!containerRef.current) return
 
@@ -110,13 +113,8 @@ export function Timeline(): React.JSX.Element {
     return () => resizeObserver.disconnect()
   }, [])
 
-  // Auto-zoom when clips change or container resizes
-  useEffect(() => {
-    const newZoom = calculateAutoZoom(totalDuration, containerWidth)
-    if (newZoom !== zoomLevel) {
-      useTimelineStore.setState({ zoomLevel: newZoom })
-    }
-  }, [totalDuration, containerWidth])
+  // Note: Auto-zoom removed in Story 4.2 - users now control zoom manually
+  // Use "Fit" button (backslash key) to fit timeline to viewport
 
   /**
    * Handle drag over - allow drop and show drop indicator
@@ -155,7 +153,7 @@ export function Timeline(): React.JSX.Element {
 
     const rect = containerRef.current.getBoundingClientRect()
     const relativeX = e.clientX - rect.left
-    const clickedTime = relativeX / zoomLevel
+    const clickedTime = relativeX / pixelsPerSecond
 
     const clips = tracks[0]?.clips || []
     if (clips.length === 0) return 0
@@ -175,10 +173,10 @@ export function Timeline(): React.JSX.Element {
   }
 
   /**
-   * Handle drop - add clip to timeline or move existing clip to position
-   * Implements AC #2, #3, #5 (library drag) and position-based clip movement (Premiere Pro style)
+   * Handle drop on specific track - adds clip to targeted track
+   * Implements AC #2 (multi-track drag-drop)
    */
-  function handleDrop(e: React.DragEvent): void {
+  function handleTrackDrop(e: React.DragEvent, trackId: number): void {
     e.preventDefault()
 
     // Check for clip reorder/move (Story 3.4 + position-based movement)
@@ -189,7 +187,7 @@ export function Timeline(): React.JSX.Element {
 
       const rect = containerRef.current.getBoundingClientRect()
       const relativeX = e.clientX - rect.left
-      const dropPosition = relativeX / zoomLevel
+      const dropPosition = relativeX / pixelsPerSecond
 
       // Clear drag state
       setDragOverIndex(null)
@@ -202,27 +200,39 @@ export function Timeline(): React.JSX.Element {
     // Clear drag state for library drops
     setDragOverIndex(null)
 
-    // Fallback to library drag (Story 2.4)
+    // Library drag to specific track (Story 4.1)
     const fileId = e.dataTransfer.getData('fileId')
     if (!fileId) return
 
     const file = files.find((f) => f.id === fileId)
     if (!file) return
 
-    // Calculate next available position (sequential placement - AC #5)
-    const allClips = tracks[0]?.clips || []
-    const nextPosition = calculateNextPosition(allClips)
+    // Calculate next available position on target track (sequential placement - AC #5)
+    const targetTrack = tracks.find((t) => t.id === trackId)
+    const trackClips = targetTrack?.clips || []
+    const nextPosition = calculateNextPosition(trackClips)
 
-    // Add clip to timeline (AC #2, #3)
-    addClip({
-      sourceFile: file.path,
-      startTime: nextPosition,
-      duration: file.duration,
-      trimIn: 0, // Trim offset from start (seconds)
-      trimOut: 0, // Trim offset from end (seconds)
-      trackId: 1,
-      thumbnail: file.thumbnail // Pass thumbnail data URL for visual preview
-    })
+    // Add clip to specific track (AC #2)
+    addClipToTrack(
+      {
+        sourceFile: file.path,
+        startTime: nextPosition,
+        duration: file.duration,
+        trimIn: 0,
+        trimOut: 0,
+        thumbnail: file.thumbnail
+      },
+      trackId
+    )
+  }
+
+  /**
+   * Handle drop on timeline container (fallback to Track 1)
+   * Implements AC #2, #3, #5 (library drag)
+   */
+  function handleDrop(e: React.DragEvent): void {
+    // Fallback: if dropped outside tracks, default to Track 1
+    handleTrackDrop(e, 1)
   }
 
   /**
@@ -244,7 +254,7 @@ export function Timeline(): React.JSX.Element {
       const mouseX = e.clientX - rect.left
 
       // Convert mouse X position to timeline time
-      const splitTime = clip.startTime + (mouseX / zoomLevel)
+      const splitTime = clip.startTime + (mouseX / pixelsPerSecond)
 
       // Validate split time is within clip bounds (with small edge margin)
       const clipStart = clip.startTime
@@ -274,6 +284,10 @@ export function Timeline(): React.JSX.Element {
    * - Delete/Backspace: Delete selected clip (Story 3.3)
    * - Escape: Deselect clip (Story 3.1)
    * - V/C: Tool selection (Tool Selection System)
+   * - Cmd/Ctrl + "+": Zoom in (Story 4.2)
+   * - Cmd/Ctrl + "-": Zoom out (Story 4.2)
+   * - Cmd/Ctrl + "0": Reset zoom to 100% (Story 4.2)
+   * - Backslash "\" : Fit timeline to viewport (Story 4.2)
    */
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent): void {
@@ -284,6 +298,24 @@ export function Timeline(): React.JSX.Element {
         return
       } else if (e.key.toLowerCase() === 'c') {
         setTool('split')
+        return
+      }
+
+      // Zoom shortcuts (Story 4.2)
+      if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault() // Prevent browser zoom
+        zoomIn()
+        return
+      } else if ((e.metaKey || e.ctrlKey) && (e.key === '-' || e.key === '_')) {
+        e.preventDefault() // Prevent browser zoom
+        zoomOut()
+        return
+      } else if ((e.metaKey || e.ctrlKey) && e.key === '0') {
+        e.preventDefault()
+        setZoomLevel(1.0) // Reset to 100%
+        return
+      } else if (e.key === '\\') {
+        fitToTimeline()
         return
       }
 
@@ -298,20 +330,37 @@ export function Timeline(): React.JSX.Element {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedClipId, selectClip, removeClip])
+  }, [selectedClipId, selectClip, removeClip, zoomIn, zoomOut, setZoomLevel, fitToTimeline])
+
+  /**
+   * Prevent default browser zoom on Cmd/Ctrl + scroll
+   * Story 4.2: Task 3
+   */
+  useEffect(() => {
+    function handleWheel(e: WheelEvent): void {
+      if (e.metaKey || e.ctrlKey) {
+        e.preventDefault() // Prevent browser zoom
+      }
+    }
+
+    window.addEventListener('wheel', handleWheel, { passive: false })
+    return () => window.removeEventListener('wheel', handleWheel)
+  }, [])
 
   /**
    * Handle timeline seeking (AC #6)
    * Finds clip at clicked time and seeks to offset within clip
+   * Now uses effective duration to properly handle trimmed clips
    */
   function handleTimelineSeek(clickedTime: number): void {
     const allClips = tracks
       .flatMap((track) => track.clips)
       .sort((a, b) => a.startTime - b.startTime)
 
-    // Find clip at this timeline position
+    // Find clip at this timeline position using effective duration
     const clip = allClips.find((c) => {
-      const clipEndTime = c.startTime + c.duration
+      const effectiveDuration = c.duration - c.trimIn - c.trimOut
+      const clipEndTime = c.startTime + effectiveDuration
       return clickedTime >= c.startTime && clickedTime < clipEndTime
     })
 
@@ -330,6 +379,9 @@ export function Timeline(): React.JSX.Element {
 
       // Update playhead position
       useTimelineStore.getState().setPlayhead(clickedTime)
+
+      // Update playback queue to reflect current state
+      playbackStore.updatePlaybackQueue()
     }
   }
 
@@ -347,7 +399,7 @@ export function Timeline(): React.JSX.Element {
       {/* Ruler - AC #4 */}
       <TimelineRuler
         totalDuration={Math.max(totalDuration, 60)} // Show at least 60s
-        zoomLevel={zoomLevel}
+        zoomLevel={pixelsPerSecond}
       />
 
       {/* Track area with playhead */}
@@ -360,11 +412,11 @@ export function Timeline(): React.JSX.Element {
         {/* Grid lines - CapCut/Premiere Pro style */}
         <TimelineGrid
           totalDuration={Math.max(totalDuration, 60)}
-          zoomLevel={zoomLevel}
+          zoomLevel={pixelsPerSecond}
         />
 
         {/* Playhead - AC #7 */}
-        <Playhead zoomLevel={zoomLevel} />
+        <Playhead zoomLevel={pixelsPerSecond} />
 
         {/* Drop indicator - shows where clip will be inserted during drag */}
         {dragOverIndex !== null && tracks[0]?.clips && (
@@ -374,11 +426,11 @@ export function Timeline(): React.JSX.Element {
               left: `${
                 dragOverIndex === 0
                   ? 0
-                  : (tracks[0].clips[dragOverIndex - 1]?.startTime || 0) * zoomLevel +
+                  : (tracks[0].clips[dragOverIndex - 1]?.startTime || 0) * pixelsPerSecond +
                     (tracks[0].clips[dragOverIndex - 1]?.duration -
                       tracks[0].clips[dragOverIndex - 1]?.trimIn -
                       tracks[0].clips[dragOverIndex - 1]?.trimOut || 0) *
-                      zoomLevel
+                      pixelsPerSecond
               }px`,
               backgroundColor: 'var(--accent)',
               opacity: 0.8
@@ -386,15 +438,16 @@ export function Timeline(): React.JSX.Element {
           />
         )}
 
-        {/* Tracks - AC #1 */}
+        {/* Tracks - AC #1, AC #2 (multi-track) */}
         {tracks.map((track) => (
           <TimelineTrack
             key={track.id}
             track={track}
-            zoomLevel={zoomLevel}
+            zoomLevel={pixelsPerSecond}
             selectedClipId={selectedClipId}
             onClipClick={handleClipClick}
             onTrackClick={handleTimelineSeek}
+            onDrop={(e) => handleTrackDrop(e, track.id)}
           />
         ))}
 

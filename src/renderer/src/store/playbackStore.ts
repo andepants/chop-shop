@@ -6,6 +6,7 @@
 import { create } from 'zustand'
 import type Player from 'video.js/dist/types/player'
 import { useTimelineStore } from './timelineStore'
+import type { Clip } from '../components/Timeline/timeline.types'
 
 /**
  * Playback state interface
@@ -30,10 +31,18 @@ export interface PlaybackState {
   isMuted: boolean
   /** Whether playback is pending (waiting for video to be ready) */
   pendingPlay: boolean
+  /** Global timeline position (in seconds) - differs from currentTime which is clip-specific */
+  globalTimelinePosition: number
+  /** Ordered array of clips for playback */
+  playbackQueue: Clip[]
+  /** ID of the next clip in sequence */
+  nextClipId: string | null
+  /** Whether a clip transition is in progress */
+  isTransitioning: boolean
 
   // Actions
   /** Load a clip into the player by ID */
-  loadClip: (clipId: string) => void
+  loadClip: (clipId: string, autoPlay?: boolean) => void
   /** Start playback */
   play: () => Promise<void>
   /** Pause playback */
@@ -58,6 +67,12 @@ export interface PlaybackState {
   stepBackward: () => void
   /** Attempt to play if there's a pending play request */
   tryPendingPlay: () => void
+  /** Update global timeline position */
+  setGlobalTimelinePosition: (position: number) => void
+  /** Update playback queue from timeline */
+  updatePlaybackQueue: () => void
+  /** Transition to next clip */
+  transitionToNextClip: () => Promise<void>
 }
 
 /**
@@ -81,6 +96,10 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
   volume: 100,
   isMuted: false,
   pendingPlay: false,
+  globalTimelinePosition: 0,
+  playbackQueue: [],
+  nextClipId: null,
+  isTransitioning: false,
 
   // Actions
 
@@ -89,7 +108,7 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
    * Looks up clip from timeline store and sets video source to file path
    * Uses proper file:// URL encoding for Electron
    */
-  loadClip: (clipId: string) => {
+  loadClip: (clipId: string, autoPlay = false) => {
     const { videoPlayer } = get()
     if (!videoPlayer) {
       console.warn('Cannot load clip: video player not initialized')
@@ -111,14 +130,19 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
     // This ensures duration is correct even before video metadata loads
     // Effective duration = total duration - trim from start - trim from end
     const clipDuration = clip.duration - clip.trimIn - clip.trimOut
-    set({ isLoading: true, currentClipId: clipId, duration: clipDuration })
+    set({
+      isLoading: true,
+      currentClipId: clipId,
+      duration: clipDuration,
+      pendingPlay: autoPlay // Set pending play if autoPlay requested
+    })
 
     // Set video source using proper file:// protocol for Electron local files
     // Normalize path separators for cross-platform compatibility
     const normalizedPath = clip.sourceFile.replace(/\\/g, '/')
     const fileUrl = `file://${normalizedPath}`
 
-    console.log('Loading clip:', { clipId, sourceFile: clip.sourceFile, fileUrl, clipDuration })
+    console.log('Loading clip:', { clipId, sourceFile: clip.sourceFile, fileUrl, clipDuration, autoPlay })
 
     // Determine video type from file extension
     const extension = clip.sourceFile.split('.').pop()?.toLowerCase()
@@ -139,6 +163,12 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
 
     // Set initial current time to trim-in point
     videoPlayer.currentTime(clip.trimIn)
+
+    // Update playback queue after loading to ensure nextClipId is set
+    // Use setTimeout to ensure state updates have propagated
+    setTimeout(() => {
+      get().updatePlaybackQueue()
+    }, 0)
   },
 
   /**
@@ -160,6 +190,11 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
       console.warn('[PlaybackStore] Cannot play: video player not initialized')
       return
     }
+
+    // Update playback queue BEFORE starting playback
+    // This ensures nextClipId is set for continuous playback
+    console.log('[PlaybackStore] Updating playback queue before play')
+    get().updatePlaybackQueue()
 
     // Log detailed video player state
     const readyState = videoPlayer.readyState()
@@ -371,5 +406,77 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
 
     // Trigger play which will clear pendingPlay flag
     play()
+  },
+
+  /**
+   * Update global timeline position
+   * Called by PlaybackOrchestrator during RAF monitoring
+   */
+  setGlobalTimelinePosition: (position: number) => {
+    set({ globalTimelinePosition: position })
+
+    // Also update timeline store's playhead position for visual sync
+    useTimelineStore.getState().setPlayhead(position)
+  },
+
+  /**
+   * Update playback queue from timeline
+   * Builds ordered list of clips and calculates next clip
+   */
+  updatePlaybackQueue: () => {
+    const { currentClipId } = get()
+    const timelineState = useTimelineStore.getState()
+
+    // Build ordered queue
+    const queue = timelineState.tracks
+      .flatMap(track => track.clips)
+      .sort((a, b) => a.startTime - b.startTime)
+
+    // Find next clip
+    let nextClipId: string | null = null
+    if (currentClipId) {
+      const currentIndex = queue.findIndex(c => c.id === currentClipId)
+      if (currentIndex >= 0 && currentIndex < queue.length - 1) {
+        nextClipId = queue[currentIndex + 1].id
+      }
+    }
+
+    set({ playbackQueue: queue, nextClipId })
+    console.log('[PlaybackStore] Updated playback queue:', { queueLength: queue.length, nextClipId })
+  },
+
+  /**
+   * Transition to the next clip in the playback queue
+   * Called by PlaybackOrchestrator when approaching trim end
+   */
+  transitionToNextClip: async () => {
+    const { nextClipId, isTransitioning, loadClip } = get()
+
+    if (isTransitioning) {
+      console.log('[PlaybackStore] Transition already in progress, skipping')
+      return
+    }
+
+    if (!nextClipId) {
+      console.log('[PlaybackStore] No next clip to transition to')
+      return
+    }
+
+    set({ isTransitioning: true })
+    console.log('[PlaybackStore] Transitioning to next clip:', nextClipId)
+
+    try {
+      // Load next clip with autoPlay
+      loadClip(nextClipId, true)
+
+      // Update queue to reflect new current clip
+      get().updatePlaybackQueue()
+
+      console.log('[PlaybackStore] Transition complete')
+    } catch (error) {
+      console.error('[PlaybackStore] Transition failed:', error)
+    } finally {
+      set({ isTransitioning: false })
+    }
   }
 }))

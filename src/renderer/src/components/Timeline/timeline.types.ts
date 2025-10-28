@@ -32,30 +32,38 @@ export interface Clip {
  * Represents a timeline track containing clips
  */
 export interface Track {
-  /** Track identifier (1 for single-track MVP) */
+  /** Track identifier (1 = main track, 2 = overlay track) */
   id: number
   /** Array of clips positioned on this track, sorted by startTime */
   clips: Clip[]
+  /** Height of track in pixels (default: 80px) */
+  height: number
 }
 
 /**
  * Timeline state managed by Zustand store
  */
 export interface TimelineState {
-  /** Array of tracks (single track for MVP) */
+  /** Array of tracks (2 tracks for multi-track timeline) */
   tracks: Track[]
   /** Current playhead position in seconds */
   playheadPosition: number
   /** Total timeline duration computed from clips */
   totalDuration: number
-  /** Zoom level in pixels per second */
+  /** Zoom level multiplier (0.1 to 5.0, default 1.0) */
   zoomLevel: number
+  /** Computed pixels per second based on zoom level */
+  pixelsPerSecond: number
   /** ID of currently selected clip, null if none selected */
   selectedClipId: string | null
 
   // Actions
   /** Add a new clip to the timeline */
   addClip: (clip: Omit<Clip, 'id'>) => void
+  /** Add a clip to a specific track */
+  addClipToTrack: (clip: Omit<Clip, 'id'>, trackId: number) => void
+  /** Get all clips for a specific track */
+  getClipsForTrack: (trackId: number) => Clip[]
   /** Remove a clip from the timeline */
   removeClip: (clipId: string) => void
   /** Update properties of an existing clip */
@@ -70,4 +78,12 @@ export interface TimelineState {
   moveClipToPosition: (clipId: string, targetPosition: number) => void
   /** Reorder clips by moving clip from sourceIndex to destIndex */
   reorderClips: (sourceIndex: number, destIndex: number) => void
+  /** Set zoom level with bounds checking (0.1 to 5.0) */
+  setZoomLevel: (level: number) => void
+  /** Zoom in by 1.2x, max 5.0 */
+  zoomIn: () => void
+  /** Zoom out by 1.2x, min 0.1 */
+  zoomOut: () => void
+  /** Calculate zoom level to fit all clips in viewport */
+  fitToTimeline: () => void
 }

@@ -36,6 +36,7 @@ export function PlaybackBar(): React.JSX.Element {
   const stepBackward = usePlaybackStore((state) => state.stepBackward)
   const setVolume = usePlaybackStore((state) => state.setVolume)
   const toggleMute = usePlaybackStore((state) => state.toggleMute)
+  const updatePlaybackQueue = usePlaybackStore((state) => state.updatePlaybackQueue)
 
   // Timeline state
   const tracks = useTimelineStore((state) => state.tracks)
@@ -72,7 +73,8 @@ export function PlaybackBar(): React.JSX.Element {
             sourceFile: firstClip.sourceFile,
             startTime: firstClip.startTime
           })
-          loadClip(firstClip.id)
+          loadClip(firstClip.id, true) // Auto-play when ready
+          updatePlaybackQueue() // Update queue for continuous playback
           console.log('[PlaybackBar] Clip load initiated. Video will auto-play when ready.')
           return
         }

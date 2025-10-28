@@ -9,12 +9,16 @@ import type { Clip } from '@/components/Timeline/timeline.types'
 
 describe('timelineStore', () => {
   beforeEach(() => {
-    // Reset store state before each test
+    // Reset store state before each test with 2 tracks
     useTimelineStore.setState({
-      tracks: [{ id: 1, clips: [] }],
+      tracks: [
+        { id: 1, clips: [], height: 80 },
+        { id: 2, clips: [], height: 80 }
+      ],
       playheadPosition: 0,
       totalDuration: 0,
-      zoomLevel: 50,
+      zoomLevel: 1.0,
+      pixelsPerSecond: 50,
       selectedClipId: null
     })
   })
@@ -30,12 +34,241 @@ describe('timelineStore', () => {
 
   it('initializes with empty timeline (AC: #7)', () => {
     const state = useTimelineStore.getState()
-    expect(state.tracks).toHaveLength(1)
+    // Updated for multi-track: now initializes with 2 tracks
+    expect(state.tracks).toHaveLength(2)
     expect(state.tracks[0].id).toBe(1)
     expect(state.tracks[0].clips).toEqual([])
+    expect(state.tracks[1].id).toBe(2)
+    expect(state.tracks[1].clips).toEqual([])
     expect(state.playheadPosition).toBe(0)
     expect(state.totalDuration).toBe(0)
     expect(state.selectedClipId).toBe(null)
+  })
+
+  // Multi-track functionality tests (Story 4.1)
+  describe('Multi-track timeline - Story 4.1', () => {
+    const mockTrack1Clip: Omit<Clip, 'id'> = {
+      sourceFile: '/test/video1.mp4',
+      startTime: 0,
+      duration: 10,
+      trimIn: 0,
+      trimOut: 0,
+      trackId: 1
+    }
+
+    const mockTrack2Clip: Omit<Clip, 'id'> = {
+      sourceFile: '/test/video2.mp4',
+      startTime: 0,
+      duration: 8,
+      trimIn: 0,
+      trimOut: 0,
+      trackId: 2
+    }
+
+    it('initializes with 2 tracks (AC #1)', () => {
+      const state = useTimelineStore.getState()
+      expect(state.tracks).toHaveLength(2)
+      expect(state.tracks[0].id).toBe(1)
+      expect(state.tracks[0].height).toBe(80)
+      expect(state.tracks[0].clips).toEqual([])
+      expect(state.tracks[1].id).toBe(2)
+      expect(state.tracks[1].height).toBe(80)
+      expect(state.tracks[1].clips).toEqual([])
+    })
+
+    it('adds clip to Track 1 using addClipToTrack (AC #2)', () => {
+      const { addClipToTrack } = useTimelineStore.getState()
+
+      addClipToTrack(mockTrack1Clip, 1)
+
+      const state = useTimelineStore.getState()
+      expect(state.tracks[0].clips).toHaveLength(1)
+      expect(state.tracks[0].clips[0].trackId).toBe(1)
+      expect(state.tracks[0].clips[0].sourceFile).toBe('/test/video1.mp4')
+      expect(state.tracks[1].clips).toHaveLength(0)
+    })
+
+    it('adds clip to Track 2 using addClipToTrack (AC #2)', () => {
+      const { addClipToTrack } = useTimelineStore.getState()
+
+      addClipToTrack(mockTrack2Clip, 2)
+
+      const state = useTimelineStore.getState()
+      expect(state.tracks[0].clips).toHaveLength(0)
+      expect(state.tracks[1].clips).toHaveLength(1)
+      expect(state.tracks[1].clips[0].trackId).toBe(2)
+      expect(state.tracks[1].clips[0].sourceFile).toBe('/test/video2.mp4')
+    })
+
+    it('adds clips to both tracks independently (AC #2, #4)', () => {
+      const { addClipToTrack } = useTimelineStore.getState()
+
+      addClipToTrack(mockTrack1Clip, 1)
+      addClipToTrack({ ...mockTrack2Clip, startTime: 2 }, 2)
+      addClipToTrack({ ...mockTrack1Clip, startTime: 10 }, 1)
+
+      const state = useTimelineStore.getState()
+      expect(state.tracks[0].clips).toHaveLength(2)
+      expect(state.tracks[1].clips).toHaveLength(1)
+
+      // Verify clips are sorted by startTime within each track
+      expect(state.tracks[0].clips[0].startTime).toBe(0)
+      expect(state.tracks[0].clips[1].startTime).toBe(10)
+    })
+
+    it('getClipsForTrack returns clips for Track 1', () => {
+      const { addClipToTrack, getClipsForTrack } = useTimelineStore.getState()
+
+      addClipToTrack(mockTrack1Clip, 1)
+      addClipToTrack({ ...mockTrack1Clip, startTime: 10 }, 1)
+      addClipToTrack(mockTrack2Clip, 2)
+
+      const track1Clips = getClipsForTrack(1)
+
+      expect(track1Clips).toHaveLength(2)
+      expect(track1Clips[0].trackId).toBe(1)
+      expect(track1Clips[1].trackId).toBe(1)
+    })
+
+    it('getClipsForTrack returns clips for Track 2', () => {
+      const { addClipToTrack, getClipsForTrack } = useTimelineStore.getState()
+
+      addClipToTrack(mockTrack1Clip, 1)
+      addClipToTrack(mockTrack2Clip, 2)
+      addClipToTrack({ ...mockTrack2Clip, startTime: 8 }, 2)
+
+      const track2Clips = getClipsForTrack(2)
+
+      expect(track2Clips).toHaveLength(2)
+      expect(track2Clips[0].trackId).toBe(2)
+      expect(track2Clips[1].trackId).toBe(2)
+    })
+
+    it('getClipsForTrack returns empty array for non-existent track', () => {
+      const { getClipsForTrack } = useTimelineStore.getState()
+
+      const clips = getClipsForTrack(99)
+
+      expect(clips).toEqual([])
+    })
+
+    it('calculates totalDuration across both tracks (AC #5)', () => {
+      const { addClipToTrack } = useTimelineStore.getState()
+
+      // Track 1: clip ends at 10s
+      addClipToTrack({ ...mockTrack1Clip, startTime: 0, duration: 10 }, 1)
+      // Track 2: clip ends at 20s (longest)
+      addClipToTrack({ ...mockTrack2Clip, startTime: 0, duration: 20 }, 2)
+
+      const state = useTimelineStore.getState()
+      // Total duration should be the maximum end time across all tracks
+      expect(state.totalDuration).toBe(20)
+    })
+
+    it('maintains single playhead across both tracks (AC #5)', () => {
+      const { addClipToTrack, setPlayhead } = useTimelineStore.getState()
+
+      addClipToTrack(mockTrack1Clip, 1)
+      addClipToTrack(mockTrack2Clip, 2)
+
+      setPlayhead(5.5)
+
+      const state = useTimelineStore.getState()
+      // Playhead is track-agnostic (single playhead for all tracks)
+      expect(state.playheadPosition).toBe(5.5)
+    })
+
+    it('addClipToTrack generates UUID and sets trackId correctly', () => {
+      const { addClipToTrack } = useTimelineStore.getState()
+
+      addClipToTrack(mockTrack2Clip, 2)
+
+      const state = useTimelineStore.getState()
+      const clip = state.tracks[1].clips[0]
+
+      expect(clip.id).toBeDefined()
+      expect(clip.trackId).toBe(2)
+      expect(typeof clip.id).toBe('string')
+      expect(clip.id.length).toBeGreaterThan(0)
+    })
+
+    it('sorts clips by startTime within each track independently (AC #4)', () => {
+      const { addClipToTrack } = useTimelineStore.getState()
+
+      // Add clips to Track 1 out of order
+      addClipToTrack({ ...mockTrack1Clip, startTime: 20 }, 1)
+      addClipToTrack({ ...mockTrack1Clip, startTime: 0 }, 1)
+      addClipToTrack({ ...mockTrack1Clip, startTime: 10 }, 1)
+
+      // Add clips to Track 2 out of order
+      addClipToTrack({ ...mockTrack2Clip, startTime: 15 }, 2)
+      addClipToTrack({ ...mockTrack2Clip, startTime: 5 }, 2)
+
+      const state = useTimelineStore.getState()
+
+      // Verify Track 1 clips are sorted
+      expect(state.tracks[0].clips[0].startTime).toBe(0)
+      expect(state.tracks[0].clips[1].startTime).toBe(10)
+      expect(state.tracks[0].clips[2].startTime).toBe(20)
+
+      // Verify Track 2 clips are sorted
+      expect(state.tracks[1].clips[0].startTime).toBe(5)
+      expect(state.tracks[1].clips[1].startTime).toBe(15)
+    })
+
+    it('maintains immutability when adding clips to tracks', () => {
+      const { addClipToTrack } = useTimelineStore.getState()
+
+      const originalState = useTimelineStore.getState()
+      const originalTracks = originalState.tracks
+
+      addClipToTrack(mockTrack1Clip, 1)
+
+      const newState = useTimelineStore.getState()
+      const newTracks = newState.tracks
+
+      // Tracks array should be a new instance
+      expect(newTracks).not.toBe(originalTracks)
+      // Original tracks should be unchanged
+      expect(originalTracks[0].clips).toHaveLength(0)
+      // New tracks should have the clip
+      expect(newTracks[0].clips).toHaveLength(1)
+    })
+
+    it('handles trimmed clips across both tracks when calculating totalDuration', () => {
+      const { addClipToTrack } = useTimelineStore.getState()
+
+      // Track 1: duration 10, trim 2+1 = effective 7s, ends at 7
+      addClipToTrack({ ...mockTrack1Clip, duration: 10, trimIn: 2, trimOut: 1 }, 1)
+      // Track 2: duration 20, trim 3+2 = effective 15s, ends at 15 (longest)
+      addClipToTrack({ ...mockTrack2Clip, duration: 20, trimIn: 3, trimOut: 2 }, 2)
+
+      const state = useTimelineStore.getState()
+      expect(state.totalDuration).toBe(15) // Maximum effective end time
+    })
+
+    it('completes multi-track operations synchronously (NFR001 - Performance)', () => {
+      const { addClipToTrack } = useTimelineStore.getState()
+
+      const startTime = performance.now()
+
+      // Add multiple clips to both tracks
+      for (let i = 0; i < 5; i++) {
+        addClipToTrack({ ...mockTrack1Clip, startTime: i * 10 }, 1)
+        addClipToTrack({ ...mockTrack2Clip, startTime: i * 10 }, 2)
+      }
+
+      const endTime = performance.now()
+      const duration = endTime - startTime
+
+      // Should complete in under 33ms (30fps requirement per NFR001)
+      expect(duration).toBeLessThan(33)
+
+      // Verify all clips added successfully
+      const state = useTimelineStore.getState()
+      expect(state.tracks[0].clips).toHaveLength(5)
+      expect(state.tracks[1].clips).toHaveLength(5)
+    })
   })
 
   it('adds a clip to timeline and generates UUID', () => {
@@ -1116,6 +1349,300 @@ describe('timelineStore', () => {
       expect(clips[0].startTime).toBe(0)
       expect(clips[1].startTime).toBe(4) // 0 + 4
       expect(clips[2].startTime).toBe(9) // 4 + 5
+    })
+  })
+
+  // Zoom functionality tests (Story 4.2)
+  describe('Zoom Controls - Story 4.2', () => {
+    it('initializes with default zoom level 1.0 and pixelsPerSecond 50 (AC #5)', () => {
+      const state = useTimelineStore.getState()
+
+      expect(state.zoomLevel).toBe(1.0)
+      expect(state.pixelsPerSecond).toBe(50)
+    })
+
+    it('setZoomLevel updates both zoomLevel and pixelsPerSecond (AC #2, #3)', () => {
+      const { setZoomLevel } = useTimelineStore.getState()
+
+      setZoomLevel(2.0)
+
+      const state = useTimelineStore.getState()
+      expect(state.zoomLevel).toBe(2.0)
+      expect(state.pixelsPerSecond).toBe(100) // 50 * 2.0
+    })
+
+    it('setZoomLevel clamps to minimum 0.1 (bounds checking)', () => {
+      const { setZoomLevel } = useTimelineStore.getState()
+
+      setZoomLevel(0.05) // Below minimum
+
+      const state = useTimelineStore.getState()
+      expect(state.zoomLevel).toBe(0.1) // Clamped to min
+      expect(state.pixelsPerSecond).toBe(5) // 50 * 0.1
+    })
+
+    it('setZoomLevel clamps to maximum 5.0 (bounds checking)', () => {
+      const { setZoomLevel } = useTimelineStore.getState()
+
+      setZoomLevel(10.0) // Above maximum
+
+      const state = useTimelineStore.getState()
+      expect(state.zoomLevel).toBe(5.0) // Clamped to max
+      expect(state.pixelsPerSecond).toBe(250) // 50 * 5.0
+    })
+
+    it('zoomIn multiplies zoom level by 1.2 (AC #2)', () => {
+      const { zoomIn } = useTimelineStore.getState()
+
+      // Starting from 1.0
+      zoomIn()
+
+      const state = useTimelineStore.getState()
+      expect(state.zoomLevel).toBeCloseTo(1.2, 5)
+      expect(state.pixelsPerSecond).toBeCloseTo(60, 5) // 50 * 1.2
+    })
+
+    it('zoomIn respects maximum bound of 5.0 (bounds checking)', () => {
+      const { setZoomLevel, zoomIn } = useTimelineStore.getState()
+
+      // Set zoom close to max
+      setZoomLevel(4.8)
+
+      // Try to zoom in (would be 5.76)
+      zoomIn()
+
+      const state = useTimelineStore.getState()
+      expect(state.zoomLevel).toBe(5.0) // Clamped to max
+      expect(state.pixelsPerSecond).toBe(250)
+    })
+
+    it('zoomOut divides zoom level by 1.2 (AC #3)', () => {
+      const { zoomOut } = useTimelineStore.getState()
+
+      // Starting from 1.0
+      zoomOut()
+
+      const state = useTimelineStore.getState()
+      expect(state.zoomLevel).toBeCloseTo(1.0 / 1.2, 5)
+      expect(state.pixelsPerSecond).toBeCloseTo(50 / 1.2, 5)
+    })
+
+    it('zoomOut respects minimum bound of 0.1 (bounds checking)', () => {
+      const { setZoomLevel, zoomOut } = useTimelineStore.getState()
+
+      // Set zoom close to min
+      setZoomLevel(0.12)
+
+      // Try to zoom out (would be 0.1)
+      zoomOut()
+
+      const state = useTimelineStore.getState()
+      expect(state.zoomLevel).toBe(0.1) // Clamped to min
+      expect(state.pixelsPerSecond).toBe(5)
+    })
+
+    it('performs multiple zoom operations correctly', () => {
+      const { zoomIn, zoomOut } = useTimelineStore.getState()
+
+      // Zoom in twice
+      zoomIn()
+      zoomIn()
+
+      let state = useTimelineStore.getState()
+      expect(state.zoomLevel).toBeCloseTo(1.44, 5) // 1.0 * 1.2 * 1.2
+
+      // Zoom out once
+      zoomOut()
+
+      state = useTimelineStore.getState()
+      expect(state.zoomLevel).toBeCloseTo(1.2, 5) // 1.44 / 1.2
+    })
+
+    it('fitToTimeline resets to 1.0 when timeline is empty', () => {
+      const { fitToTimeline } = useTimelineStore.getState()
+
+      // Set zoom to something other than 1.0
+      useTimelineStore.setState({ zoomLevel: 3.0, pixelsPerSecond: 150 })
+
+      fitToTimeline()
+
+      const state = useTimelineStore.getState()
+      expect(state.zoomLevel).toBe(1.0)
+      expect(state.pixelsPerSecond).toBe(50)
+    })
+
+    it('fitToTimeline calculates zoom to fit all clips in viewport', () => {
+      const { addClip, fitToTimeline } = useTimelineStore.getState()
+
+      // Add clips to create a 20-second timeline
+      addClip({ ...mockClip, startTime: 0, duration: 10 })
+      addClip({ ...mockClip, startTime: 10, duration: 10 })
+
+      // Mock window.innerWidth (assume 1000px, 80% = 800px viewport)
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        value: 1000
+      })
+
+      fitToTimeline()
+
+      const state = useTimelineStore.getState()
+      // viewport: 800px, duration: 20s
+      // required pixelsPerSecond: 800 / 20 = 40
+      // zoomLevel: 40 / 50 = 0.8
+      expect(state.zoomLevel).toBeCloseTo(0.8, 5)
+      expect(state.pixelsPerSecond).toBeCloseTo(40, 5)
+    })
+
+    it('fitToTimeline respects minimum zoom bound (AC #3)', () => {
+      const { addClip, fitToTimeline } = useTimelineStore.getState()
+
+      // Create very long timeline (1000 seconds)
+      addClip({ ...mockClip, startTime: 0, duration: 1000 })
+
+      // Small viewport
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        value: 800
+      })
+
+      fitToTimeline()
+
+      const state = useTimelineStore.getState()
+      // Would calculate to very small zoom, but should clamp to 0.1
+      expect(state.zoomLevel).toBe(0.1)
+    })
+
+    it('fitToTimeline respects maximum zoom bound (AC #2)', () => {
+      const { addClip, fitToTimeline } = useTimelineStore.getState()
+
+      // Create very short timeline (0.5 seconds)
+      addClip({ ...mockClip, startTime: 0, duration: 0.5 })
+
+      // Large viewport
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        value: 2000
+      })
+
+      fitToTimeline()
+
+      const state = useTimelineStore.getState()
+      // Would calculate to very large zoom, but should clamp to 5.0
+      expect(state.zoomLevel).toBe(5.0)
+      expect(state.pixelsPerSecond).toBe(250)
+    })
+
+    it('zoom operations complete within performance budget (AC #7 - NFR)', () => {
+      const { zoomIn, zoomOut, setZoomLevel } = useTimelineStore.getState()
+
+      // Test zoomIn performance
+      let startTime = performance.now()
+      zoomIn()
+      let endTime = performance.now()
+      expect(endTime - startTime).toBeLessThan(16) // 60fps = 16ms
+
+      // Test zoomOut performance
+      startTime = performance.now()
+      zoomOut()
+      endTime = performance.now()
+      expect(endTime - startTime).toBeLessThan(16)
+
+      // Test setZoomLevel performance
+      startTime = performance.now()
+      setZoomLevel(2.5)
+      endTime = performance.now()
+      expect(endTime - startTime).toBeLessThan(16)
+    })
+
+    it('maintains state immutability during zoom operations', () => {
+      const { zoomIn } = useTimelineStore.getState()
+
+      const originalState = useTimelineStore.getState()
+      const originalZoomLevel = originalState.zoomLevel
+
+      zoomIn()
+
+      const newState = useTimelineStore.getState()
+
+      // Original state should be unchanged
+      expect(originalZoomLevel).toBe(1.0)
+      // New state should have updated zoom
+      expect(newState.zoomLevel).toBeCloseTo(1.2, 5)
+    })
+
+    it('zoom level affects clip positioning calculations', () => {
+      const { addClip, setZoomLevel } = useTimelineStore.getState()
+
+      // Add a clip
+      addClip({ ...mockClip, startTime: 10, duration: 5 })
+
+      // At default zoom (1.0, 50 px/sec), clip at 10s should be at 500px
+      let state = useTimelineStore.getState()
+      let expectedPosition = 10 * state.pixelsPerSecond
+      expect(expectedPosition).toBe(500)
+
+      // Zoom in to 2.0 (100 px/sec)
+      setZoomLevel(2.0)
+
+      state = useTimelineStore.getState()
+      expectedPosition = 10 * state.pixelsPerSecond
+      expect(expectedPosition).toBe(1000) // Clip now at 1000px
+    })
+
+    it('handles rapid zoom changes without errors', () => {
+      const { zoomIn, zoomOut, setZoomLevel } = useTimelineStore.getState()
+
+      // Rapid zoom operations
+      for (let i = 0; i < 10; i++) {
+        zoomIn()
+      }
+
+      for (let i = 0; i < 10; i++) {
+        zoomOut()
+      }
+
+      setZoomLevel(0.5)
+      setZoomLevel(4.5)
+      setZoomLevel(1.0)
+
+      const state = useTimelineStore.getState()
+      // Should end at 1.0
+      expect(state.zoomLevel).toBe(1.0)
+      expect(state.pixelsPerSecond).toBe(50)
+    })
+
+    it('zoom calculations use correct multiplier (1.2x per step)', () => {
+      const { zoomIn } = useTimelineStore.getState()
+
+      const initialZoom = 1.0
+
+      zoomIn()
+      let state = useTimelineStore.getState()
+      expect(state.zoomLevel).toBeCloseTo(initialZoom * 1.2, 5)
+
+      zoomIn()
+      state = useTimelineStore.getState()
+      expect(state.zoomLevel).toBeCloseTo(initialZoom * 1.2 * 1.2, 5)
+
+      zoomIn()
+      state = useTimelineStore.getState()
+      expect(state.zoomLevel).toBeCloseTo(initialZoom * 1.2 * 1.2 * 1.2, 5)
+    })
+
+    it('pixelsPerSecond always equals basePixelsPerSecond * zoomLevel', () => {
+      const { setZoomLevel } = useTimelineStore.getState()
+
+      const testZoomLevels = [0.1, 0.5, 1.0, 2.0, 3.5, 5.0]
+      const basePixelsPerSecond = 50
+
+      testZoomLevels.forEach((zoom) => {
+        setZoomLevel(zoom)
+        const state = useTimelineStore.getState()
+
+        expect(state.zoomLevel).toBe(zoom)
+        expect(state.pixelsPerSecond).toBeCloseTo(basePixelsPerSecond * zoom, 5)
+      })
     })
   })
 })

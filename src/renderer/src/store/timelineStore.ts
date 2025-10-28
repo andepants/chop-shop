@@ -7,10 +7,57 @@ import { create } from 'zustand'
 import type { Clip, TimelineState } from '@/components/Timeline/timeline.types'
 
 /**
- * Default zoom level in pixels per second
- * 50px/sec provides good balance between visibility and timeline length
+ * Base pixels per second for zoom calculations
+ * 50px/sec at 1.0x zoom provides good balance between visibility and timeline length
  */
-const DEFAULT_ZOOM_LEVEL = 50
+const BASE_PIXELS_PER_SECOND = 50
+
+/**
+ * Default zoom level multiplier (range: 0.1 to 5.0)
+ */
+const DEFAULT_ZOOM_MULTIPLIER = 1.0
+
+/**
+ * Zoom bounds
+ */
+const MIN_ZOOM = 0.1
+const MAX_ZOOM = 5.0
+const ZOOM_STEP = 1.2 // Premiere Pro standard
+
+/**
+ * LocalStorage key for persisting zoom level (Story 4.2: Task 9, AC #5)
+ */
+const ZOOM_STORAGE_KEY = 'chop-shop-timeline-zoom'
+
+/**
+ * Load saved zoom level from localStorage
+ * Returns default if not found or invalid
+ */
+function loadSavedZoom(): number {
+  try {
+    const saved = localStorage.getItem(ZOOM_STORAGE_KEY)
+    if (saved) {
+      const parsed = parseFloat(saved)
+      if (!isNaN(parsed) && parsed >= MIN_ZOOM && parsed <= MAX_ZOOM) {
+        return parsed
+      }
+    }
+  } catch (error) {
+    console.warn('[TimelineStore] Failed to load saved zoom:', error)
+  }
+  return DEFAULT_ZOOM_MULTIPLIER
+}
+
+/**
+ * Save zoom level to localStorage
+ */
+function saveZoom(zoomLevel: number): void {
+  try {
+    localStorage.setItem(ZOOM_STORAGE_KEY, zoomLevel.toString())
+  } catch (error) {
+    console.warn('[TimelineStore] Failed to save zoom:', error)
+  }
+}
 
 /**
  * Calculate effective duration of a clip accounting for trim values
@@ -25,21 +72,29 @@ function getEffectiveDuration(clip: Clip): number {
  * Manages clips on tracks, playhead position, zoom level, and selection state
  *
  * Initializes with:
- * - Single track (Track 1) for MVP
+ * - Two tracks: Track 1 (main) and Track 2 (overlay)
+ * - Each track height is 80px
  * - Playhead at 0:00
  * - Default zoom of 50 pixels per second
  */
-export const useTimelineStore = create<TimelineState>((set) => ({
+export const useTimelineStore = create<TimelineState>((set, get) => ({
   // State
   tracks: [
     {
       id: 1,
-      clips: []
+      clips: [],
+      height: 80
+    },
+    {
+      id: 2,
+      clips: [],
+      height: 80
     }
   ],
   playheadPosition: 0,
   totalDuration: 0,
-  zoomLevel: DEFAULT_ZOOM_LEVEL,
+  zoomLevel: DEFAULT_ZOOM_MULTIPLIER,
+  pixelsPerSecond: BASE_PIXELS_PER_SECOND * DEFAULT_ZOOM_MULTIPLIER,
   selectedClipId: null,
 
   // Actions
@@ -77,6 +132,51 @@ export const useTimelineStore = create<TimelineState>((set) => ({
         totalDuration: maxEndTime
       }
     }),
+
+  /**
+   * Add a clip to a specific track
+   * Generates UUID and adds clip to the specified track by trackId
+   */
+  addClipToTrack: (clipData, trackId) =>
+    set((state) => {
+      const newClip: Clip = {
+        id: crypto.randomUUID(),
+        ...clipData,
+        trackId
+      }
+
+      const updatedTracks = state.tracks.map((track) => {
+        if (track.id === trackId) {
+          return {
+            ...track,
+            clips: [...track.clips, newClip].sort((a, b) => a.startTime - b.startTime)
+          }
+        }
+        return track
+      })
+
+      // Recalculate total duration using effective duration (accounts for trimming)
+      const allClips = updatedTracks.flatMap((track) => track.clips)
+      const maxEndTime = allClips.reduce((max, clip) => {
+        const endTime = clip.startTime + getEffectiveDuration(clip)
+        return endTime > max ? endTime : max
+      }, 0)
+
+      return {
+        tracks: updatedTracks,
+        totalDuration: maxEndTime
+      }
+    }),
+
+  /**
+   * Get all clips for a specific track
+   * Returns clips array for the specified track, or empty array if track not found
+   */
+  getClipsForTrack: (trackId) => {
+    const state = get()
+    const track = state.tracks.find((t) => t.id === trackId)
+    return track ? track.clips : []
+  },
 
   /**
    * Remove a clip from the timeline by ID
@@ -399,6 +499,90 @@ export const useTimelineStore = create<TimelineState>((set) => ({
       return {
         tracks: updatedTracks,
         totalDuration: maxEndTime
+      }
+    }),
+
+  /**
+   * Set zoom level with bounds checking (0.1 to 5.0)
+   * Automatically updates pixelsPerSecond based on new zoom level
+   *
+   * @param level - Zoom multiplier (0.1 = 10%, 1.0 = 100%, 5.0 = 500%)
+   */
+  setZoomLevel: (level) =>
+    set(() => {
+      // Clamp zoom level to valid range
+      const clampedLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, level))
+      const newPixelsPerSecond = BASE_PIXELS_PER_SECOND * clampedLevel
+
+      return {
+        zoomLevel: clampedLevel,
+        pixelsPerSecond: newPixelsPerSecond
+      }
+    }),
+
+  /**
+   * Zoom in by 1.2x (Premiere Pro standard)
+   * Maximum zoom level is 5.0
+   */
+  zoomIn: () =>
+    set((state) => {
+      const newZoomLevel = Math.min(MAX_ZOOM, state.zoomLevel * ZOOM_STEP)
+      const newPixelsPerSecond = BASE_PIXELS_PER_SECOND * newZoomLevel
+
+      return {
+        zoomLevel: newZoomLevel,
+        pixelsPerSecond: newPixelsPerSecond
+      }
+    }),
+
+  /**
+   * Zoom out by 1.2x (Premiere Pro standard)
+   * Minimum zoom level is 0.1
+   */
+  zoomOut: () =>
+    set((state) => {
+      const newZoomLevel = Math.max(MIN_ZOOM, state.zoomLevel / ZOOM_STEP)
+      const newPixelsPerSecond = BASE_PIXELS_PER_SECOND * newZoomLevel
+
+      return {
+        zoomLevel: newZoomLevel,
+        pixelsPerSecond: newPixelsPerSecond
+      }
+    }),
+
+  /**
+   * Calculate zoom level to fit all clips in viewport
+   * Assumes viewport width is available from window
+   * Falls back to 1.0 if no clips exist
+   */
+  fitToTimeline: () =>
+    set((state) => {
+      // Get total timeline duration
+      const { totalDuration } = state
+
+      // If no clips, reset to default zoom
+      if (totalDuration === 0) {
+        return {
+          zoomLevel: DEFAULT_ZOOM_MULTIPLIER,
+          pixelsPerSecond: BASE_PIXELS_PER_SECOND * DEFAULT_ZOOM_MULTIPLIER
+        }
+      }
+
+      // Calculate viewport width (timeline container minus padding)
+      // Assume timeline takes 80% of window width (heuristic)
+      const viewportWidth = window.innerWidth * 0.8
+
+      // Calculate required pixels per second to fit entire timeline
+      const requiredPixelsPerSecond = viewportWidth / totalDuration
+
+      // Convert to zoom level and clamp to valid range
+      const calculatedZoomLevel = requiredPixelsPerSecond / BASE_PIXELS_PER_SECOND
+      const clampedZoomLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, calculatedZoomLevel))
+      const newPixelsPerSecond = BASE_PIXELS_PER_SECOND * clampedZoomLevel
+
+      return {
+        zoomLevel: clampedZoomLevel,
+        pixelsPerSecond: newPixelsPerSecond
       }
     })
 }))

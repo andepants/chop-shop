@@ -101,6 +101,9 @@ export function Playhead({ zoomLevel }: PlayheadProps): React.JSX.Element {
         const offsetInClip = newPosition - clipAtPosition.startTime
         const seekTime = clipAtPosition.trimIn + offsetInClip
         playbackStore.seek(seekTime)
+
+        // Update playback queue to reflect current state
+        playbackStore.updatePlaybackQueue()
       }
     }
 

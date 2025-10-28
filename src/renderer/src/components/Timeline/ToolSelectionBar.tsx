@@ -6,10 +6,12 @@
  * Positioned above the timeline for contextual grouping
  */
 
+import * as React from 'react'
 import { MousePointer2, SeparatorHorizontal } from 'lucide-react'
 import { useToolStore } from '@/store/toolStore'
 import type { Tool } from '@/types/tools.types'
 import { DeleteTool } from '@/components/EditTools'
+import { ZoomControls } from './ZoomControls'
 
 /**
  * Tool configuration for UI rendering
@@ -36,7 +38,7 @@ const TOOLS = [
  * ToolSelectionBar component
  * Renders icon-only tool selection buttons with active state
  */
-export function ToolSelectionBar(): JSX.Element {
+export function ToolSelectionBar(): React.JSX.Element {
   const { selectedTool, setTool } = useToolStore()
 
   /**
@@ -109,6 +111,9 @@ export function ToolSelectionBar(): JSX.Element {
 
       {/* Delete Button */}
       <DeleteTool />
+
+      {/* Zoom Controls - Right-aligned */}
+      <ZoomControls />
     </div>
   )
 }
