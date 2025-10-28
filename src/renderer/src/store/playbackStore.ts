@@ -1,15 +1,15 @@
 /**
  * Playback Store
- * Zustand store for managing video playback state, current clip, and video element control
+ * Zustand store for managing video playback state, current clip, and Video.js player control
  */
 
 import { create } from 'zustand'
+import type Player from 'video.js/dist/types/player'
 import { useTimelineStore } from './timelineStore'
-import type { Clip } from '@/components/Timeline/timeline.types'
 
 /**
  * Playback state interface
- * Manages video player state, current clip, playback time, and video element reference
+ * Manages video player state, current clip, playback time, and Video.js player reference
  */
 export interface PlaybackState {
   /** ID of the currently loaded clip */
@@ -20,8 +20,8 @@ export interface PlaybackState {
   currentTime: number
   /** Total duration of the current clip (in seconds) */
   duration: number
-  /** Reference to the HTML5 video element for direct control */
-  videoElement: HTMLVideoElement | null
+  /** Reference to the Video.js player instance for direct control */
+  videoPlayer: Player | null
   /** Whether the video is currently loading */
   isLoading: boolean
 
@@ -36,8 +36,8 @@ export interface PlaybackState {
   seek: (time: number) => void
   /** Update current playback time */
   setCurrentTime: (time: number) => void
-  /** Set the video element reference */
-  setVideoElement: (element: HTMLVideoElement | null) => void
+  /** Set the Video.js player reference */
+  setVideoPlayer: (player: Player | null) => void
   /** Set loading state */
   setLoading: (loading: boolean) => void
   /** Set duration when metadata loads */
@@ -46,13 +46,13 @@ export interface PlaybackState {
 
 /**
  * Playback state store
- * Manages video playback state and controls
+ * Manages video playback state and controls using Video.js API
  *
  * Initializes with:
  * - No clip loaded
  * - Playback paused
  * - Time at 0:00
- * - No video element reference
+ * - No video player reference
  */
 export const usePlaybackStore = create<PlaybackState>((set, get) => ({
   // State
@@ -60,7 +60,7 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
   isPlaying: false,
   currentTime: 0,
   duration: 0,
-  videoElement: null,
+  videoPlayer: null,
   isLoading: false,
 
   // Actions
@@ -68,11 +68,12 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
   /**
    * Load a clip into the player
    * Looks up clip from timeline store and sets video source to file path
+   * Uses proper file:// URL encoding for Electron
    */
   loadClip: (clipId: string) => {
-    const { videoElement } = get()
-    if (!videoElement) {
-      console.warn('Cannot load clip: video element not initialized')
+    const { videoPlayer } = get()
+    if (!videoPlayer) {
+      console.warn('Cannot load clip: video player not initialized')
       return
     }
 
@@ -89,11 +90,32 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
 
     set({ isLoading: true, currentClipId: clipId })
 
-    // Set video source using file:// protocol for local files
-    videoElement.src = `file://${clip.sourceFile}`
+    // Set video source using proper file:// protocol for Electron local files
+    // Normalize path separators for cross-platform compatibility
+    const normalizedPath = clip.sourceFile.replace(/\\/g, '/')
+    const fileUrl = `file://${normalizedPath}`
+
+    console.log('Loading clip:', { clipId, sourceFile: clip.sourceFile, fileUrl })
+
+    // Determine video type from file extension
+    const extension = clip.sourceFile.split('.').pop()?.toLowerCase()
+    const typeMap: Record<string, string> = {
+      mp4: 'video/mp4',
+      webm: 'video/webm',
+      mov: 'video/quicktime',
+      avi: 'video/x-msvideo',
+      mkv: 'video/x-matroska'
+    }
+    const videoType = extension ? typeMap[extension] || 'video/mp4' : 'video/mp4'
+
+    // Set source with Video.js API
+    videoPlayer.src({
+      src: fileUrl,
+      type: videoType
+    })
 
     // Set initial current time to trim-in point
-    videoElement.currentTime = clip.trimIn
+    videoPlayer.currentTime(clip.trimIn)
   },
 
   /**
@@ -101,14 +123,14 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
    * Returns a promise that resolves when playback starts
    */
   play: async () => {
-    const { videoElement } = get()
-    if (!videoElement) {
-      console.warn('Cannot play: video element not initialized')
+    const { videoPlayer } = get()
+    if (!videoPlayer) {
+      console.warn('Cannot play: video player not initialized')
       return
     }
 
     try {
-      await videoElement.play()
+      await videoPlayer.play()
       set({ isPlaying: true })
     } catch (error) {
       console.error('Playback failed:', error)
@@ -119,13 +141,13 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
    * Pause video playback
    */
   pause: () => {
-    const { videoElement } = get()
-    if (!videoElement) {
-      console.warn('Cannot pause: video element not initialized')
+    const { videoPlayer } = get()
+    if (!videoPlayer) {
+      console.warn('Cannot pause: video player not initialized')
       return
     }
 
-    videoElement.pause()
+    videoPlayer.pause()
     set({ isPlaying: false })
   },
 
@@ -133,13 +155,13 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
    * Seek to a specific time in the current clip
    */
   seek: (time: number) => {
-    const { videoElement } = get()
-    if (!videoElement) {
-      console.warn('Cannot seek: video element not initialized')
+    const { videoPlayer } = get()
+    if (!videoPlayer) {
+      console.warn('Cannot seek: video player not initialized')
       return
     }
 
-    videoElement.currentTime = time
+    videoPlayer.currentTime(time)
     set({ currentTime: time })
   },
 
@@ -152,11 +174,11 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
   },
 
   /**
-   * Set the video element reference
-   * Called when PreviewPlayer component mounts
+   * Set the Video.js player reference
+   * Called when PreviewPlayer component mounts and initializes Video.js
    */
-  setVideoElement: (element: HTMLVideoElement | null) => {
-    set({ videoElement: element })
+  setVideoPlayer: (player: Player | null) => {
+    set({ videoPlayer: player })
   },
 
   /**

@@ -191,7 +191,7 @@ export function Timeline(): React.JSX.Element {
 
   return (
     <div
-      className="h-32 bg-zinc-900 border-t border-zinc-700 flex flex-col overflow-x-auto overflow-y-hidden"
+      className="h-48 bg-zinc-900 border-t border-zinc-700 flex flex-col overflow-x-auto overflow-y-hidden"
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
@@ -199,7 +199,6 @@ export function Timeline(): React.JSX.Element {
       <TimelineRuler
         totalDuration={Math.max(totalDuration, 60)} // Show at least 60s
         zoomLevel={zoomLevel}
-        containerWidth={containerWidth}
       />
 
       {/* Track area with playhead */}

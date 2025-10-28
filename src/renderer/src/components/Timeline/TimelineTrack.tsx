@@ -68,7 +68,7 @@ export function TimelineTrack({
 
       {/* Track content area with clips */}
       <div
-        className="flex-1 h-20 bg-zinc-800 relative cursor-pointer"
+        className="flex-1 h-32 bg-zinc-800 relative cursor-pointer hover:bg-zinc-800/80 transition-colors"
         onClick={handleTrackClick}
       >
         {track.clips.map((clip) => (

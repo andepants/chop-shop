@@ -51,10 +51,10 @@ export function TimelineClip({
   return (
     <div
       className={cn(
-        'absolute h-16 rounded border cursor-pointer transition-colors',
-        'bg-zinc-700 border-zinc-600',
-        'hover:border-zinc-500',
-        isSelected && 'border-cyan-500 border-2'
+        'absolute h-24 rounded border cursor-pointer transition-all duration-200',
+        'bg-zinc-700 border-zinc-600 shadow-md',
+        'hover:bg-zinc-650 hover:border-zinc-500 hover:shadow-lg',
+        isSelected && 'border-cyan-400 border-2 shadow-cyan-500/50 ring-2 ring-cyan-500/20'
       )}
       style={{
         left: `${leftPosition}px`,

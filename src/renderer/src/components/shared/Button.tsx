@@ -1,16 +1,17 @@
 /**
  * Button Component
- * Reusable button with variants and states
+ * Migrated to shadcn/ui with backward compatibility for existing variants
  */
-import { cn } from '../../utils/cn.util'
+import { Button as ShadcnButton, type ButtonProps as ShadcnButtonProps } from '../ui/button'
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends Omit<ShadcnButtonProps, 'variant' | 'size'> {
   variant?: 'primary' | 'secondary' | 'ghost'
   size?: 'sm' | 'md' | 'lg'
 }
 
 /**
- * Reusable button component with support for different variants and sizes
+ * Reusable button component using shadcn/ui with backward compatibility
+ * Maintains original variant names (primary, secondary, ghost) for existing code
  * @param variant - Button style variant (primary, secondary, ghost)
  * @param size - Button size (sm, md, lg)
  * @param className - Additional CSS classes
@@ -24,33 +25,16 @@ export function Button({
   children,
   ...props
 }: ButtonProps): React.JSX.Element {
+  // Map old variants to shadcn variants
+  const shadcnVariant: ShadcnButtonProps['variant'] =
+    variant === 'primary' ? 'default' : variant === 'secondary' ? 'secondary' : 'ghost'
+
+  // Map sizes - shadcn uses 'default' instead of 'md'
+  const shadcnSize: ShadcnButtonProps['size'] = size === 'md' ? 'default' : size
+
   return (
-    <button
-      className={cn(
-        // Base styles
-        'rounded font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-zinc-900',
-        // Variant styles
-        {
-          'bg-cyan-500 text-white hover:bg-cyan-600 disabled:bg-cyan-800 disabled:text-cyan-400':
-            variant === 'primary',
-          'bg-zinc-700 text-zinc-100 hover:bg-zinc-600 disabled:bg-zinc-800 disabled:text-zinc-500':
-            variant === 'secondary',
-          'bg-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 disabled:text-zinc-600':
-            variant === 'ghost'
-        },
-        // Size styles
-        {
-          'px-3 py-1.5 text-sm': size === 'sm',
-          'px-4 py-2 text-base': size === 'md',
-          'px-6 py-3 text-lg': size === 'lg'
-        },
-        // Disabled styles
-        'disabled:cursor-not-allowed disabled:opacity-60',
-        className
-      )}
-      {...props}
-    >
+    <ShadcnButton variant={shadcnVariant} size={shadcnSize} className={className} {...props}>
       {children}
-    </button>
+    </ShadcnButton>
   )
 }

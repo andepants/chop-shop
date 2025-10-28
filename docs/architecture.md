@@ -44,7 +44,7 @@ Configure Tailwind for renderer process (see Styling section below).
 | **FFmpeg Integration** | ffmpeg-static                       | 5.2.0 (FFmpeg 6.0) | Epic 3, 4     | Bundles FFmpeg binaries, no external dependencies                               |
 | **IPC Architecture**   | Main: FFmpeg/File I/O, Renderer: UI | N/A                | All           | Security best practice, prevents UI freezing                                    |
 | **Screen Recording**   | desktopCapturer + getUserMedia      | Native Electron    | Epic 4        | Native API, no external libraries needed                                        |
-| **Preview Rendering**  | HTML5 video + Canvas overlay        | Native             | Epic 2, 4     | Simple, performant, meets 30fps requirement                                     |
+| **Preview Rendering**  | Video.js + Canvas overlay           | 8.x                | Epic 2, 4     | Professional player with better UX, hardware-accelerated, meets 30fps requirement |
 | **Styling**            | Tailwind CSS                        | 3.x                | All           | Co-located styles, faster development, fewer files                              |
 | **Testing**            | Jest                                | From boilerplate   | All           | Pre-configured, unit tests for logic                                            |
 | **File Management**    | OS temp directory                   | Node.js os module  | Epic 3, 4     | Standard approach, automatic cleanup                                            |
@@ -265,7 +265,7 @@ chop-shop/
 - ffmpeg-static 5.2.0 - FFmpeg binaries (FFmpeg 6.0)
 - Native Electron APIs - Screen/webcam capture
 - MediaRecorder API - Recording to WebM
-- HTML5 Video API - Playback
+- Video.js 8.x - Professional video player with enhanced UX
 - Canvas API - Multi-track compositing
 
 ### Integration Points
@@ -961,7 +961,7 @@ ipcMain.handle('start-export', async (event, options) => {
 
 ### Video Preview
 
-- HTML5 video for main track (hardware accelerated)
+- Video.js for main track (hardware accelerated HTML5 video under the hood)
 - Canvas compositing only for multi-track (PiP)
 - RequestAnimationFrame for smooth playhead updates
 - Maintain 30fps minimum requirement
@@ -1097,12 +1097,12 @@ npm run package
 **Rationale:** Co-located styles, fewer files, faster development, excellent for AI agents
 **Alternatives Considered:** CSS Modules (more files), Styled Components (runtime cost)
 
-### ADR-004: HTML5 Video + Canvas for Preview
+### ADR-004: Video.js + Canvas for Preview
 
-**Decision:** Use HTML5 video for single track, Canvas for multi-track compositing
-**Context:** Need 30fps video preview with multi-track support
-**Rationale:** Native performance, hardware accelerated, meets NFR requirements
-**Alternatives Considered:** Full canvas rendering (complex), WebGL (overkill)
+**Decision:** Use Video.js for single track video playback, Canvas for multi-track compositing
+**Context:** Need 30fps video preview with multi-track support and professional UX
+**Rationale:** Video.js provides hardware-accelerated playback (HTML5 video under the hood), professional controls, better UX, excellent TypeScript support, while maintaining native performance and meeting NFR requirements
+**Alternatives Considered:** Plain HTML5 video (basic controls, less polished UX), Full canvas rendering (complex), WebGL (overkill)
 
 ### ADR-005: OS Temp Directory for Recordings
 

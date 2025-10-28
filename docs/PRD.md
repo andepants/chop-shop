@@ -38,7 +38,7 @@ Chop Shop addresses this gap by providing a focused desktop video editor that co
 **Timeline & Preview**
 
 - FR005: Application shall provide a visual timeline interface showing imported clips with playhead/scrubber
-- FR006: Application shall display video preview with HTML5 video player supporting play/pause controls
+- FR006: Application shall display video preview with Video.js player supporting play/pause controls
 - FR007: Application shall synchronize playhead position between timeline and preview player
 - FR008: Application shall support timeline scrubbing with real-time preview updates
 

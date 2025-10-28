@@ -213,7 +213,7 @@ So that I can review my video sequence.
 
 **Acceptance Criteria:**
 
-1. HTML5 video player renders in center preview area
+1. Video.js player renders in center preview area
 2. Clicking timeline clip loads it in preview player
 3. Play/pause button controls playback
 4. Playhead moves along timeline synchronized with playback

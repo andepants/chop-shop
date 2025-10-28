@@ -1,29 +1,32 @@
 /**
  * PreviewPlayer Component
- * HTML5 video player that renders in the center preview area
+ * Video.js player that renders in the center preview area
  * Subscribes to playbackStore for current clip and playback state
  */
 
 import { useEffect, useRef } from 'react'
+import videojs from 'video.js'
+import type Player from 'video.js/dist/types/player'
 import { usePlaybackStore } from '@/store/playbackStore'
 import { useTimelineStore } from '@/store/timelineStore'
 import { PlaybackControls } from './PlaybackControls'
 
 /**
  * PreviewPlayer component
- * Renders HTML5 video element with playback controls
+ * Renders Video.js player with playback controls
  * Handles video events: timeupdate, ended, loadedmetadata, error
  * Synchronizes playhead position with timeline during playback
  *
  * @returns React component with video player and controls
  */
 export function PreviewPlayer(): React.JSX.Element {
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const videoRef = useRef<HTMLDivElement>(null)
+  const playerRef = useRef<Player | null>(null)
 
   // Playback state
   const currentClipId = usePlaybackStore((state) => state.currentClipId)
   const isLoading = usePlaybackStore((state) => state.isLoading)
-  const setVideoElement = usePlaybackStore((state) => state.setVideoElement)
+  const setVideoPlayer = usePlaybackStore((state) => state.setVideoPlayer)
   const setCurrentTime = usePlaybackStore((state) => state.setCurrentTime)
   const setLoading = usePlaybackStore((state) => state.setLoading)
   const setDuration = usePlaybackStore((state) => state.setDuration)
@@ -35,25 +38,70 @@ export function PreviewPlayer(): React.JSX.Element {
   const tracks = useTimelineStore((state) => state.tracks)
 
   /**
-   * Initialize video element reference on mount
+   * Initialize Video.js player on mount
    */
   useEffect(() => {
-    if (videoRef.current) {
-      setVideoElement(videoRef.current)
-    }
+    if (!videoRef.current) return
 
+    // Create video element for Video.js
+    const videoElement = document.createElement('video-js')
+    videoElement.className = 'vjs-big-play-centered'
+    videoRef.current.appendChild(videoElement)
+
+    // Initialize Video.js player
+    const player = videojs(
+      videoElement,
+      {
+        controls: false, // We use custom controls
+        preload: 'auto',
+        fluid: false,
+        responsive: false,
+        fill: true,
+        aspectRatio: '16:9',
+        errorDisplay: false, // Handle errors ourselves
+        loadingSpinner: false // Use custom loading indicator
+      },
+      function onPlayerReady() {
+        console.log('Video.js player is ready')
+      }
+    )
+
+    playerRef.current = player
+
+    // Set up event listeners
+    player.on('timeupdate', handleTimeUpdate)
+    player.on('ended', handleEnded)
+    player.on('loadedmetadata', handleLoadedMetadata)
+    player.on('error', handleError)
+    player.on('play', () => {
+      console.log('Video playing')
+    })
+    player.on('pause', () => {
+      console.log('Video paused')
+    })
+
+    // Set player reference in store
+    setVideoPlayer(player)
+
+    // Cleanup on unmount
     return () => {
-      setVideoElement(null)
+      if (playerRef.current) {
+        playerRef.current.dispose()
+        playerRef.current = null
+      }
+      setVideoPlayer(null)
     }
-  }, [setVideoElement])
+  }, [setVideoPlayer])
 
   /**
    * Handle video timeupdate event
    * Updates playback store current time and synchronizes timeline playhead
    */
-  function handleTimeUpdate(e: React.SyntheticEvent<HTMLVideoElement>) {
-    const video = e.currentTarget
-    const currentTime = video.currentTime
+  function handleTimeUpdate() {
+    const player = playerRef.current
+    if (!player) return
+
+    const currentTime = player.currentTime() || 0
 
     setCurrentTime(currentTime)
 
@@ -97,9 +145,12 @@ export function PreviewPlayer(): React.JSX.Element {
    * Handle video loadedmetadata event
    * Fired when video metadata (duration, dimensions) is available
    */
-  function handleLoadedMetadata(e: React.SyntheticEvent<HTMLVideoElement>) {
-    const video = e.currentTarget
-    setDuration(video.duration)
+  function handleLoadedMetadata() {
+    const player = playerRef.current
+    if (!player) return
+
+    const duration = player.duration() || 0
+    setDuration(duration)
     setLoading(false)
   }
 
@@ -107,29 +158,31 @@ export function PreviewPlayer(): React.JSX.Element {
    * Handle video error event
    * Displays user-friendly error message
    */
-  function handleError(e: React.SyntheticEvent<HTMLVideoElement>) {
-    const video = e.currentTarget
-    const error = video.error
+  function handleError() {
+    const player = playerRef.current
+    if (!player) return
+
+    const error = player.error()
 
     let errorMessage = 'Failed to load video'
     if (error) {
       switch (error.code) {
-        case error.MEDIA_ERR_ABORTED:
+        case 1: // MEDIA_ERR_ABORTED
           errorMessage = 'Video loading aborted'
           break
-        case error.MEDIA_ERR_NETWORK:
+        case 2: // MEDIA_ERR_NETWORK
           errorMessage = 'Network error while loading video'
           break
-        case error.MEDIA_ERR_DECODE:
+        case 3: // MEDIA_ERR_DECODE
           errorMessage = 'Video decoding failed'
           break
-        case error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+        case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
           errorMessage = 'Video format not supported'
           break
       }
     }
 
-    console.error('Video error:', errorMessage)
+    console.error('Video error:', errorMessage, error)
     setLoading(false)
   }
 
@@ -149,13 +202,10 @@ export function PreviewPlayer(): React.JSX.Element {
         </div>
       )}
 
-      <video
+      <div
         ref={videoRef}
-        className={`max-w-full max-h-full ${!currentClipId || isLoading ? 'hidden' : ''}`}
-        onTimeUpdate={handleTimeUpdate}
-        onEnded={handleEnded}
-        onLoadedMetadata={handleLoadedMetadata}
-        onError={handleError}
+        className={`w-full h-full flex items-center justify-center ${!currentClipId || isLoading ? 'hidden' : ''}`}
+        style={{ maxWidth: '100%', maxHeight: '100%' }}
       />
 
       <PlaybackControls />
