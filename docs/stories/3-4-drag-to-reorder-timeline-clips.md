@@ -1,6 +1,6 @@
 # Story 3.4: Drag-to-Reorder Timeline Clips
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -279,7 +279,7 @@ Following architecture.md:
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- `docs/stories/3-4-drag-to-reorder-timeline-clips.context.xml`
 
 ### Agent Model Used
 

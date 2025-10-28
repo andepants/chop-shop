@@ -1,6 +1,6 @@
 # Story 3.3: Delete Clip from Timeline
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -237,7 +237,7 @@ Following architecture.md:
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- `docs/stories/3-3-delete-clip-from-timeline.context.xml`
 
 ### Agent Model Used
 

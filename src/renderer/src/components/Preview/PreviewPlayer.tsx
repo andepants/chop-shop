@@ -30,6 +30,7 @@ export function PreviewPlayer(): React.JSX.Element {
   const setLoading = usePlaybackStore((state) => state.setLoading)
   const pause = usePlaybackStore((state) => state.pause)
   const loadClip = usePlaybackStore((state) => state.loadClip)
+  const tryPendingPlay = usePlaybackStore((state) => state.tryPendingPlay)
 
   // Timeline state
   const setPlayhead = useTimelineStore((state) => state.setPlayhead)
@@ -42,8 +43,8 @@ export function PreviewPlayer(): React.JSX.Element {
     if (!videoRef.current) return
 
     // Create video element for Video.js
-    const videoElement = document.createElement('video-js')
-    videoElement.className = 'vjs-big-play-centered'
+    const videoElement = document.createElement('video')
+    videoElement.className = 'video-js vjs-big-play-centered'
     videoRef.current.appendChild(videoElement)
 
     // Initialize Video.js player
@@ -70,12 +71,30 @@ export function PreviewPlayer(): React.JSX.Element {
     player.on('timeupdate', handleTimeUpdate)
     player.on('ended', handleEnded)
     player.on('loadedmetadata', handleLoadedMetadata)
+    player.on('canplay', handleCanPlay)
     player.on('error', handleError)
     player.on('play', () => {
-      console.log('Video playing')
+      console.log('[PreviewPlayer] Video play event fired', {
+        currentTime: player.currentTime(),
+        src: player.currentSrc()
+      })
     })
     player.on('pause', () => {
-      console.log('Video paused')
+      console.log('[PreviewPlayer] Video pause event fired', {
+        currentTime: player.currentTime(),
+        src: player.currentSrc()
+      })
+    })
+    player.on('loadstart', () => {
+      console.log('[PreviewPlayer] Video load started', {
+        src: player.currentSrc()
+      })
+    })
+    player.on('loadeddata', () => {
+      console.log('[PreviewPlayer] Video data loaded (first frame)', {
+        readyState: player.readyState(),
+        currentTime: player.currentTime()
+      })
     })
 
     // Set player reference in store
@@ -94,6 +113,7 @@ export function PreviewPlayer(): React.JSX.Element {
   /**
    * Handle video timeupdate event
    * Updates playback store current time and synchronizes timeline playhead
+   * Enforces trim bounds by pausing at trimOut point (Story 3.1 - AC #6)
    */
   function handleTimeUpdate() {
     const player = playerRef.current
@@ -103,7 +123,7 @@ export function PreviewPlayer(): React.JSX.Element {
 
     setCurrentTime(currentTime)
 
-    // Synchronize timeline playhead position
+    // Synchronize timeline playhead position and enforce trim bounds
     if (currentClipId) {
       const clip = tracks.flatMap((track) => track.clips).find((c) => c.id === currentClipId)
 
@@ -111,6 +131,14 @@ export function PreviewPlayer(): React.JSX.Element {
         // Calculate timeline position: clip start time + (current time - trim in)
         const timelinePosition = clip.startTime + (currentTime - clip.trimIn)
         setPlayhead(timelinePosition)
+
+        // Enforce trim end boundary: pause when reaching (duration - trimOut)
+        const trimEndTime = clip.duration - clip.trimOut
+        if (currentTime >= trimEndTime) {
+          pause()
+          // Keep currentTime at the boundary (don't let it go beyond)
+          player.currentTime(trimEndTime)
+        }
       }
     }
   }
@@ -148,14 +176,53 @@ export function PreviewPlayer(): React.JSX.Element {
     const player = playerRef.current
     if (!player) return
 
+    const duration = player.duration()
+    const videoWidth = player.videoWidth()
+    const videoHeight = player.videoHeight()
+    const readyState = player.readyState()
+
+    console.log('[PreviewPlayer] Video metadata loaded', {
+      duration,
+      videoWidth,
+      videoHeight,
+      readyState,
+      src: player.currentSrc()
+    })
+
     // Duration is already set from clip data, just mark as loaded
     setLoading(false)
-    console.log('Video metadata loaded, player ready')
+  }
+
+  /**
+   * Handle video canplay event
+   * Fired when video is ready to play
+   * Triggers pending play if user clicked play while video was loading
+   */
+  function handleCanPlay() {
+    const player = playerRef.current
+    if (!player) return
+
+    const readyState = player.readyState()
+    const currentTime = player.currentTime()
+    const buffered = player.buffered()
+    const bufferedEnd = buffered.length > 0 ? buffered.end(0) : 0
+
+    console.log('[PreviewPlayer] Video can play event fired', {
+      readyState,
+      readyStateDescription: ['HAVE_NOTHING', 'HAVE_METADATA', 'HAVE_CURRENT_DATA', 'HAVE_FUTURE_DATA', 'HAVE_ENOUGH_DATA'][readyState] || 'UNKNOWN',
+      currentTime,
+      bufferedEnd,
+      src: player.currentSrc()
+    })
+
+    // Try to play if there's a pending play request
+    console.log('[PreviewPlayer] Checking for pending play...')
+    tryPendingPlay()
   }
 
   /**
    * Handle video error event
-   * Displays user-friendly error message
+   * Displays user-friendly error message with detailed logging
    */
   function handleError() {
     const player = playerRef.current
@@ -164,24 +231,39 @@ export function PreviewPlayer(): React.JSX.Element {
     const error = player.error()
 
     let errorMessage = 'Failed to load video'
+    let errorCode = 'UNKNOWN'
+
     if (error) {
       switch (error.code) {
         case 1: // MEDIA_ERR_ABORTED
           errorMessage = 'Video loading aborted'
+          errorCode = 'MEDIA_ERR_ABORTED'
           break
         case 2: // MEDIA_ERR_NETWORK
           errorMessage = 'Network error while loading video'
+          errorCode = 'MEDIA_ERR_NETWORK'
           break
         case 3: // MEDIA_ERR_DECODE
           errorMessage = 'Video decoding failed'
+          errorCode = 'MEDIA_ERR_DECODE'
           break
         case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
           errorMessage = 'Video format not supported'
+          errorCode = 'MEDIA_ERR_SRC_NOT_SUPPORTED'
           break
       }
     }
 
-    console.error('Video error:', errorMessage, error)
+    console.error('[PreviewPlayer] Video error occurred', {
+      errorCode,
+      errorMessage,
+      message: error?.message,
+      src: player.currentSrc(),
+      readyState: player.readyState(),
+      networkState: player.networkState(),
+      fullError: error
+    })
+
     setLoading(false)
   }
 

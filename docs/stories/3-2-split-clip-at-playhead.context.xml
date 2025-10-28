@@ -1,0 +1,129 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>2</storyId>
+    <title>Split Clip at Playhead</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/3-2-split-clip-at-playhead.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>content creator</asA>
+    <iWant>split a clip at the playhead position</iWant>
+    <soThat>I can separate sections and remove unwanted parts</soThat>
+    <tasks>
+- Add splitClip action to timelineStore (calculate split position, create two new clips with UUIDs, preserve trim values)
+- Create SplitTool component with Split button UI
+- Implement split handler logic (validate playhead on clip, call splitClip action)
+- Update Timeline component to display split clips
+- Handle edge cases and validation (prevent split at start/end, handle trimmed clips)
+- Test split functionality end-to-end
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+AC1: "Split" button available in timeline toolbar
+AC2: User positions playhead on a clip and clicks Split
+AC3: Selected clip splits into two separate clips at playhead position
+AC4: Both resulting clips appear on timeline with correct durations
+AC5: Split clips can be individually selected, moved, or deleted
+AC6: Split operation is immediate (no loading delay)
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-3.md" title="Epic 3 Technical Specification" section="AC-3.2 Split Clip">
+        Split operation divides clip at playhead. Creates two new clips with unique UUIDs. Clip A: original start → playhead. Clip B: playhead → original end. Original clip removed. Must complete synchronously (&lt;16ms per NFR001).
+      </doc>
+      <doc path="docs/tech-spec-epic-3.md" title="Epic 3 Technical Specification" section="Workflows - Split Operation Sequence">
+        User positions playhead on clip → clicks Split button → splitClip(clipId, playheadPosition) called → Store creates two clips at same timeline position → Timeline re-renders with both clips visible.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture Decision Document" section="Component Structure">
+        EditTools folder at src/renderer/components/EditTools/ for Epic 3 editing components. SplitTool.tsx is new component. State mutations in src/renderer/store/timelineStore.ts with Zustand immutability patterns.
+      </doc>
+      <doc path="docs/PRD.md" title="Product Requirements Document" section="FR011">
+        Application shall support split operation at playhead position to divide clips. NFR001: Timeline UI shall maintain 30+ fps responsiveness with 10 or more clips loaded.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/renderer/src/store/timelineStore.ts" kind="store" symbol="useTimelineStore" reason="Need to add splitClip action that creates two new clips from one">
+        Zustand timeline store. Has addClip, removeClip actions. Need to add: splitClip(clipId, position) that finds clip, calculates split point, creates two new clips with UUIDs, removes original.
+      </artifact>
+      <artifact path="src/renderer/src/store/playbackStore.ts" kind="store" reason="Provides playheadPosition for split calculation">
+        Playback store manages playheadPosition (currentTime). SplitTool needs to read this to determine where to split the clip.
+      </artifact>
+      <artifact path="src/renderer/src/components/Timeline/Timeline.tsx" kind="component" symbol="Timeline" reason="Timeline toolbar where Split button will be integrated">
+        Timeline component with toolbar. SplitTool component will be added to toolbar alongside other edit tools.
+      </artifact>
+      <artifact path="src/renderer/src/components/Timeline/timeline.types.ts" kind="type" symbol="Clip" lines="11-26" reason="Clip interface defines structure. splitClip will create two new Clip objects preserving trimIn/trimOut">
+        Clip interface with id, sourceFile, startTime, duration, trimIn, trimOut, trackId. Split creates two clips from one, preserving all fields appropriately.
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="zustand" version="^5.0.8">State management for timeline mutations</package>
+        <package name="uuid" version="installed">UUID generation for new clip IDs (crypto.randomUUID)</package>
+        <package name="lucide-react" version="^0.548.0">Icons for Split button</package>
+      </node>
+      <frameworks>
+        <framework name="React">UI framework with TypeScript</framework>
+        <framework name="Tailwind CSS">Styling for Split button</framework>
+        <framework name="Vitest">Testing framework for splitClip action</framework>
+      </frameworks>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="state-management">Zustand immutability: splitClip creates new clips array, never mutates existing clips</constraint>
+    <constraint type="performance">NFR001: Split operation must complete within 16ms (synchronous, UI remains 60fps)</constraint>
+    <constraint type="uuid">Use crypto.randomUUID() for new clip IDs (native browser API)</constraint>
+    <constraint type="architecture">Renderer-only operation: No IPC calls, pure state mutation in renderer process</constraint>
+    <constraint type="validation">Split position must be within clip bounds (not at start or end, respect trim boundaries)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="splitClip" kind="Zustand store action (to be added)">
+      <signature>
+splitClip: (clipId: string, position: number) =&gt; void
+// position: absolute timeline position (playheadPosition)
+// Calculates splitPoint = position - clip.startTime
+// Creates two new clips with UUIDs, removes original
+      </signature>
+      <path>src/renderer/src/store/timelineStore.ts</path>
+    </interface>
+
+    <interface name="playheadPosition" kind="Zustand state (exists)">
+      <signature>playheadPosition: number</signature>
+      <path>src/renderer/src/store/playbackStore.ts</path>
+    </interface>
+
+    <interface name="selectedClipId" kind="Zustand state (exists)">
+      <signature>selectedClipId: string | null</signature>
+      <path>src/renderer/src/store/timelineStore.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Use Vitest testing framework. Unit tests for splitClip action in timelineStore.test.ts. Test state immutability (original state not mutated). Test UUID generation for new clips. Use describe/it/expect pattern.
+    </standards>
+    <locations>
+      <location>src/renderer/src/store/__tests__/timelineStore.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Manual test: Verify Split button appears in timeline toolbar</idea>
+      <idea ac="AC2,AC3">Test splitClip action: pass clip at position 5s, split at 3s → creates two clips (0-3s, 3-5s)</idea>
+      <idea ac="AC3">Test splitClip generates unique UUIDs for both new clips (not same ID as original)</idea>
+      <idea ac="AC4">Test split clips have correct durations: Clip A duration = splitPoint, Clip B duration = original duration - splitPoint</idea>
+      <idea ac="AC4">Test split clips have correct startTimes: Clip A startTime = original, Clip B startTime = original + splitPoint</idea>
+      <idea ac="AC5">Manual test: After split, select each clip individually, verify selection works</idea>
+      <idea ac="AC5">Manual test: After split, delete one clip, verify other remains</idea>
+      <idea ac="AC6">Performance test: Measure splitClip execution time, verify &lt;16ms</idea>
+      <idea ac="Edge Cases">Test split at clip start (position === clip.startTime) → should error/prevent</idea>
+      <idea ac="Edge Cases">Test split at clip end (position === clip.endTime) → should error/prevent</idea>
+      <idea ac="Edge Cases">Test split on trimmed clip → verify trim values preserved correctly in both clips</idea>
+    </ideas>
+  </tests>
+</story-context>

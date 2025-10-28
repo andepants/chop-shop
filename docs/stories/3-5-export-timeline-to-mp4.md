@@ -1,6 +1,6 @@
 # Story 3.5: Export Timeline to MP4
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -403,7 +403,7 @@ Following architecture.md:
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- `docs/stories/3-5-export-timeline-to-mp4.context.xml`
 
 ### Agent Model Used
 

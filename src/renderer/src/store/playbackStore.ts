@@ -24,6 +24,12 @@ export interface PlaybackState {
   videoPlayer: Player | null
   /** Whether the video is currently loading */
   isLoading: boolean
+  /** Volume level (0-100) */
+  volume: number
+  /** Whether audio is muted */
+  isMuted: boolean
+  /** Whether playback is pending (waiting for video to be ready) */
+  pendingPlay: boolean
 
   // Actions
   /** Load a clip into the player by ID */
@@ -42,6 +48,16 @@ export interface PlaybackState {
   setLoading: (loading: boolean) => void
   /** Set duration when metadata loads */
   setDuration: (duration: number) => void
+  /** Set volume level (0-100) */
+  setVolume: (volume: number) => void
+  /** Toggle mute state */
+  toggleMute: () => void
+  /** Step forward one frame (~1/30 second) */
+  stepForward: () => void
+  /** Step backward one frame (~1/30 second) */
+  stepBackward: () => void
+  /** Attempt to play if there's a pending play request */
+  tryPendingPlay: () => void
 }
 
 /**
@@ -62,6 +78,9 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
   duration: 0,
   videoPlayer: null,
   isLoading: false,
+  volume: 100,
+  isMuted: false,
+  pendingPlay: false,
 
   // Actions
 
@@ -90,7 +109,8 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
 
     // Set clip duration immediately from timeline data
     // This ensures duration is correct even before video metadata loads
-    const clipDuration = clip.trimOut - clip.trimIn
+    // Effective duration = total duration - trim from start - trim from end
+    const clipDuration = clip.duration - clip.trimIn - clip.trimOut
     set({ isLoading: true, currentClipId: clipId, duration: clipDuration })
 
     // Set video source using proper file:// protocol for Electron local files
@@ -124,19 +144,59 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
   /**
    * Start video playback
    * Returns a promise that resolves when playback starts
+   * Uses smart retry mechanism - if video isn't ready, sets pendingPlay flag
+   * and will automatically play once video becomes ready
    */
   play: async () => {
-    const { videoPlayer } = get()
+    const { videoPlayer, currentClipId } = get()
+
+    console.log('[PlaybackStore] Play button clicked', {
+      hasVideoPlayer: !!videoPlayer,
+      currentClipId,
+      timestamp: new Date().toISOString()
+    })
+
     if (!videoPlayer) {
-      console.warn('Cannot play: video player not initialized')
+      console.warn('[PlaybackStore] Cannot play: video player not initialized')
+      return
+    }
+
+    // Log detailed video player state
+    const readyState = videoPlayer.readyState()
+    const currentTime = videoPlayer.currentTime()
+    const duration = videoPlayer.duration()
+    const src = videoPlayer.currentSrc()
+    const paused = videoPlayer.paused()
+    const ended = videoPlayer.ended()
+    const networkState = videoPlayer.networkState()
+
+    console.log('[PlaybackStore] Video player state:', {
+      readyState,
+      readyStateDescription: ['HAVE_NOTHING', 'HAVE_METADATA', 'HAVE_CURRENT_DATA', 'HAVE_FUTURE_DATA', 'HAVE_ENOUGH_DATA'][readyState] || 'UNKNOWN',
+      currentTime,
+      duration,
+      src,
+      paused,
+      ended,
+      networkState,
+      networkStateDescription: ['NETWORK_EMPTY', 'NETWORK_IDLE', 'NETWORK_LOADING', 'NETWORK_NO_SOURCE'][networkState] || 'UNKNOWN'
+    })
+
+    // Check if video is ready to play (readyState >= 2 means we have current frame)
+    if (readyState < 2) {
+      console.log('[PlaybackStore] Video not ready yet, setting pendingPlay=true. Will auto-play when ready.')
+      set({ pendingPlay: true })
       return
     }
 
     try {
+      console.log('[PlaybackStore] Attempting to play video...')
       await videoPlayer.play()
-      set({ isPlaying: true })
+      console.log('[PlaybackStore] Playback started successfully')
+      set({ isPlaying: true, pendingPlay: false })
     } catch (error) {
-      console.error('Playback failed:', error)
+      console.error('[PlaybackStore] Playback failed:', error)
+      set({ pendingPlay: false })
     }
   },
 
@@ -156,16 +216,32 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
 
   /**
    * Seek to a specific time in the current clip
+   * Constrains seeking to trimmed region (Story 3.1 - AC #4)
    */
   seek: (time: number) => {
-    const { videoPlayer } = get()
+    const { videoPlayer, currentClipId } = get()
     if (!videoPlayer) {
       console.warn('Cannot seek: video player not initialized')
       return
     }
 
-    videoPlayer.currentTime(time)
-    set({ currentTime: time })
+    // Clamp seek time to trim bounds
+    let clampedTime = time
+    if (currentClipId) {
+      const timelineState = useTimelineStore.getState()
+      const clip = timelineState.tracks
+        .flatMap((track) => track.clips)
+        .find((c) => c.id === currentClipId)
+
+      if (clip) {
+        const trimStart = clip.trimIn
+        const trimEnd = clip.duration - clip.trimOut
+        clampedTime = Math.max(trimStart, Math.min(time, trimEnd))
+      }
+    }
+
+    videoPlayer.currentTime(clampedTime)
+    set({ currentTime: clampedTime })
   },
 
   /**
@@ -179,8 +255,15 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
   /**
    * Set the Video.js player reference
    * Called when PreviewPlayer component mounts and initializes Video.js
+   * Syncs initial volume and mute state to the player
    */
   setVideoPlayer: (player: Player | null) => {
+    if (player) {
+      const { volume, isMuted } = get()
+      // Sync initial volume and mute state
+      player.volume(volume / 100) // Video.js uses 0-1 range
+      player.muted(isMuted)
+    }
     set({ videoPlayer: player })
   },
 
@@ -196,5 +279,97 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
    */
   setDuration: (duration: number) => {
     set({ duration })
+  },
+
+  /**
+   * Set volume level (0-100)
+   * Also updates the Video.js player volume
+   */
+  setVolume: (volume: number) => {
+    const { videoPlayer } = get()
+    const clampedVolume = Math.max(0, Math.min(100, volume))
+
+    if (videoPlayer) {
+      videoPlayer.volume(clampedVolume / 100) // Video.js uses 0-1 range
+    }
+
+    set({ volume: clampedVolume })
+  },
+
+  /**
+   * Toggle mute state
+   * Mutes/unmutes the Video.js player
+   */
+  toggleMute: () => {
+    const { videoPlayer, isMuted } = get()
+
+    if (videoPlayer) {
+      videoPlayer.muted(!isMuted)
+    }
+
+    set({ isMuted: !isMuted })
+  },
+
+  /**
+   * Step forward one frame (approximately 1/30 second)
+   * Pauses playback if playing
+   */
+  stepForward: () => {
+    const { videoPlayer, isPlaying, pause } = get()
+    if (!videoPlayer) {
+      console.warn('Cannot step forward: video player not initialized')
+      return
+    }
+
+    // Pause if playing
+    if (isPlaying) {
+      pause()
+    }
+
+    // Step forward by 1/30 second (standard frame rate)
+    const currentTime = videoPlayer.currentTime() || 0
+    const newTime = currentTime + 1 / 30
+    videoPlayer.currentTime(newTime)
+  },
+
+  /**
+   * Step backward one frame (approximately 1/30 second)
+   * Pauses playback if playing
+   */
+  stepBackward: () => {
+    const { videoPlayer, isPlaying, pause } = get()
+    if (!videoPlayer) {
+      console.warn('Cannot step backward: video player not initialized')
+      return
+    }
+
+    // Pause if playing
+    if (isPlaying) {
+      pause()
+    }
+
+    // Step backward by 1/30 second (standard frame rate)
+    const currentTime = videoPlayer.currentTime() || 0
+    const newTime = Math.max(0, currentTime - 1 / 30)
+    videoPlayer.currentTime(newTime)
+  },
+
+  /**
+   * Try to play video if there's a pending play request
+   * Called by PreviewPlayer when video becomes ready (canplay event)
+   */
+  tryPendingPlay: () => {
+    const { pendingPlay, play, videoPlayer } = get()
+
+    if (!pendingPlay) {
+      return
+    }
+
+    console.log('[PlaybackStore] Video ready, attempting pending play')
+    const readyState = videoPlayer?.readyState()
+    console.log('[PlaybackStore] Current readyState:', readyState)
+
+    // Trigger play which will clear pendingPlay flag
+    play()
   }
 }))

@@ -1,0 +1,125 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>4</storyId>
+    <title>Drag-to-Reorder Timeline Clips</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/3-4-drag-to-reorder-timeline-clips.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>content creator</asA>
+    <iWant>drag clips to reorder them on the timeline</iWant>
+    <soThat>I can arrange my video sequence in any order</soThat>
+    <tasks>
+- Add reorderClips action to timelineStore (reorder array, recalculate startTime)
+- Implement drag handlers in TimelineClip component (draggable, onDragStart/End)
+- Implement drop target logic in Timeline component (calculate drop position)
+- Add visual feedback during drag operation (ghost, drop indicator)
+- Recalculate timeline after reorder (sequential startTime updates)
+- Update preview player for reordered sequence (test playback)
+- Handle edge cases for drag-to-reorder
+- Test drag-to-reorder functionality end-to-end
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+AC1: User can click and drag a timeline clip to a new position
+AC2: Clips automatically shift to make space during drag operation
+AC3: Drop clip between other clips to insert at that position
+AC4: Timeline updates time markers after reordering
+AC5: Preview updates to show reordered sequence during playback
+AC6: Drag operation is smooth with visual feedback (ghost/preview)
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-3.md" title="Epic 3 Technical Specification" section="AC-3.4 Drag-to-Reorder">
+        Drag-to-reorder allows clip repositioning. Visual feedback shows drop target. Clips array reordered, then startTime recalculated sequentially. Must maintain 30fps smooth animation per NFR001.
+      </doc>
+      <doc path="docs/tech-spec-epic-3.md" title="Epic 3 Technical Specification" section="Workflows - Drag-to-Reorder Sequence">
+        User drags clip → Timeline calculates drop index → Visual feedback shows drop target → On drop → reorderClips(sourceIndex, destIndex) → Store reorders array → Timeline re-renders.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture Decision Document" section="Component Structure">
+        Timeline components in src/renderer/components/Timeline/. TimelineClip.tsx handles drag handlers. Timeline.tsx handles drop targets. State mutations in timelineStore.ts.
+      </doc>
+      <doc path="docs/PRD.md" title="Product Requirements Document" section="FR010">
+        Application shall support multi-clip arrangement on timeline with drag-to-reorder functionality. NFR001: Timeline UI shall maintain 30+ fps responsiveness.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/renderer/src/store/timelineStore.ts" kind="store" symbol="useTimelineStore" reason="Need to add reorderClips action">
+        Timeline store manages clips array. Need to add: reorderClips(sourceIndex, destIndex) that reorders array immutably and recalculates all clip startTimes sequentially.
+      </artifact>
+      <artifact path="src/renderer/src/components/Timeline/TimelineClip.tsx" kind="component" symbol="TimelineClip" reason="Clip component where drag handlers will be added">
+        TimelineClip component renders individual clip visual. Need to add: draggable={true}, onDragStart, onDrag, onDragEnd handlers for drag functionality.
+      </artifact>
+      <artifact path="src/renderer/src/components/Timeline/Timeline.tsx" kind="component" symbol="Timeline" reason="Timeline component where drop targets will be implemented">
+        Timeline component with existing handleDragOver and handleDrop. May need enhancement to calculate drop index and show drop indicator visual feedback.
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="zustand" version="^5.0.8">State management for timeline mutations</package>
+      </node>
+      <frameworks>
+        <framework name="React">UI framework with TypeScript, HTML5 drag-and-drop API</framework>
+        <framework name="Tailwind CSS">Styling for drag ghost and drop indicator</framework>
+        <framework name="Vitest">Testing framework for reorderClips action</framework>
+      </frameworks>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="state-management">Zustand immutability: reorderClips creates new clips array, recalculates startTime for all clips</constraint>
+    <constraint type="performance">NFR001: Drag operation must maintain 30fps smooth animation using CSS transitions (not JS animations)</constraint>
+    <constraint type="architecture">Renderer-only operation: No IPC calls, pure state mutation in renderer process</constraint>
+    <constraint type="drag-api">Use HTML5 native drag-and-drop API (draggable attribute, onDragStart/onDrop events)</constraint>
+    <constraint type="positioning">After reorder, clips must be sequentially positioned (no gaps): Clip N startTime = sum of all previous clip durations</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="reorderClips" kind="Zustand store action (to be added)">
+      <signature>
+reorderClips: (sourceIndex: number, destIndex: number) =&gt; void
+// Reorders clips array from sourceIndex to destIndex
+// Recalculates startTime for ALL clips after reorder
+// Ensures clips remain sorted by startTime
+      </signature>
+      <path>src/renderer/src/store/timelineStore.ts</path>
+    </interface>
+
+    <interface name="drag handlers" kind="React event handlers (to be added)">
+      <signature>
+onDragStart: (e: React.DragEvent) =&gt; void
+onDragEnd: (e: React.DragEvent) =&gt; void
+onDragOver: (e: React.DragEvent) =&gt; void  // already exists in Timeline
+onDrop: (e: React.DragEvent) =&gt; void      // already exists in Timeline
+      </signature>
+      <path>src/renderer/src/components/Timeline/TimelineClip.tsx and Timeline.tsx</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Use Vitest testing framework. Unit tests for reorderClips action in timelineStore.test.ts. Test array reordering immutability, startTime recalculation. Use describe/it/expect pattern. Manual testing for drag-and-drop UI interactions.
+    </standards>
+    <locations>
+      <location>src/renderer/src/store/__tests__/timelineStore.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Manual test: Click and drag a clip → verify draggable attribute works, cursor changes to "grabbing"</idea>
+      <idea ac="AC2,AC6">Manual test: During drag, verify visual feedback (ghost clip, drop indicator line)</idea>
+      <idea ac="AC3">Test reorderClips: [A, B, C], move C to position 0 → result [C, A, B]</idea>
+      <idea ac="AC3">Test reorderClips: [A, B, C], move A to position 2 → result [B, C, A]</idea>
+      <idea ac="AC4">Test startTime recalculation after reorder: verify sequential positioning (Clip 0 at 0s, Clip 1 at Clip 0 duration, etc.)</idea>
+      <idea ac="AC5">Manual test: Reorder clips, then play timeline → verify preview plays in new sequence</idea>
+      <idea ac="AC6">Performance test: Drag clip rapidly → verify smooth 30fps animation, no jank</idea>
+      <idea ac="Edge Case">Test reorder with only 2 clips → verify positions swap correctly</idea>
+      <idea ac="Edge Case">Test drag clip to same position (sourceIndex === destIndex) → verify no state update (no-op)</idea>
+      <idea ac="Edge Case">Test reorder with trimmed clips → verify effective duration used for positioning</idea>
+    </ideas>
+  </tests>
+</story-context>

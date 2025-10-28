@@ -13,6 +13,14 @@ import type { Clip, TimelineState } from '@/components/Timeline/timeline.types'
 const DEFAULT_ZOOM_LEVEL = 50
 
 /**
+ * Calculate effective duration of a clip accounting for trim values
+ * Effective duration = total duration - trim from start - trim from end
+ */
+function getEffectiveDuration(clip: Clip): number {
+  return clip.duration - clip.trimIn - clip.trimOut
+}
+
+/**
  * Timeline state store
  * Manages clips on tracks, playhead position, zoom level, and selection state
  *
@@ -57,10 +65,10 @@ export const useTimelineStore = create<TimelineState>((set) => ({
         return track
       })
 
-      // Recalculate total duration
+      // Recalculate total duration using effective duration (accounts for trimming)
       const allClips = updatedTracks.flatMap((track) => track.clips)
       const maxEndTime = allClips.reduce((max, clip) => {
-        const endTime = clip.startTime + clip.duration
+        const endTime = clip.startTime + getEffectiveDuration(clip)
         return endTime > max ? endTime : max
       }, 0)
 
@@ -80,10 +88,10 @@ export const useTimelineStore = create<TimelineState>((set) => ({
         clips: track.clips.filter((clip) => clip.id !== clipId)
       }))
 
-      // Recalculate total duration
+      // Recalculate total duration using effective duration (accounts for trimming)
       const allClips = updatedTracks.flatMap((track) => track.clips)
       const maxEndTime = allClips.reduce((max, clip) => {
-        const endTime = clip.startTime + clip.duration
+        const endTime = clip.startTime + getEffectiveDuration(clip)
         return endTime > max ? endTime : max
       }, 0)
 
@@ -106,16 +114,85 @@ export const useTimelineStore = create<TimelineState>((set) => ({
           .sort((a, b) => a.startTime - b.startTime)
       }))
 
-      // Recalculate total duration
+      // Recalculate total duration using effective duration (accounts for trimming)
       const allClips = updatedTracks.flatMap((track) => track.clips)
       const maxEndTime = allClips.reduce((max, clip) => {
-        const endTime = clip.startTime + clip.duration
+        const endTime = clip.startTime + getEffectiveDuration(clip)
         return endTime > max ? endTime : max
       }, 0)
 
       return {
         tracks: updatedTracks,
         totalDuration: maxEndTime
+      }
+    }),
+
+  /**
+   * Split a clip at a specific time position (Tool Selection System)
+   * Creates two clips from one: before splitTime and after splitTime
+   * Non-destructive: uses trimIn/trimOut to define playback regions
+   */
+  splitClip: (clipId, splitTime) =>
+    set((state) => {
+      const updatedTracks = state.tracks.map((track) => {
+        const clipIndex = track.clips.findIndex((c) => c.id === clipId)
+        if (clipIndex === -1) return track
+
+        const originalClip = track.clips[clipIndex]
+
+        // Validate split time is within clip bounds
+        const clipStart = originalClip.startTime
+        const clipEnd = originalClip.startTime + getEffectiveDuration(originalClip)
+        if (splitTime <= clipStart || splitTime >= clipEnd) {
+          console.warn(`Split time ${splitTime}s is outside clip bounds (${clipStart}s-${clipEnd}s)`)
+          return track
+        }
+
+        // Calculate offset from clip start (accounting for existing trimIn)
+        const offsetFromStart = splitTime - clipStart
+
+        // Create two new clips using trim offsets
+        // Clip A: from original start to split point
+        // Plays source from trimIn to (trimIn + offsetFromStart)
+        const clipA: Clip = {
+          ...originalClip,
+          id: crypto.randomUUID(),
+          trimOut: originalClip.duration - (originalClip.trimIn + offsetFromStart)
+        }
+
+        // Clip B: from split point to original end
+        const clipB: Clip = {
+          ...originalClip,
+          id: crypto.randomUUID(),
+          startTime: splitTime,
+          trimIn: originalClip.trimIn + offsetFromStart
+        }
+
+        // Replace original clip with two new clips
+        const newClips = [
+          ...track.clips.slice(0, clipIndex),
+          clipA,
+          clipB,
+          ...track.clips.slice(clipIndex + 1)
+        ].sort((a, b) => a.startTime - b.startTime)
+
+        return {
+          ...track,
+          clips: newClips
+        }
+      })
+
+      // Recalculate total duration using effective duration (accounts for trimming)
+      const allClips = updatedTracks.flatMap((track) => track.clips)
+      const maxEndTime = allClips.reduce((max, clip) => {
+        const endTime = clip.startTime + getEffectiveDuration(clip)
+        return endTime > max ? endTime : max
+      }, 0)
+
+      return {
+        tracks: updatedTracks,
+        totalDuration: maxEndTime,
+        selectedClipId: null
       }
     }),
 

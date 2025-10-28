@@ -58,6 +58,8 @@ export interface TimelineState {
   removeClip: (clipId: string) => void
   /** Update properties of an existing clip */
   updateClip: (clipId: string, updates: Partial<Clip>) => void
+  /** Split a clip at a specific time position */
+  splitClip: (clipId: string, splitTime: number) => void
   /** Set the playhead position */
   setPlayhead: (position: number) => void
   /** Select a clip by ID */

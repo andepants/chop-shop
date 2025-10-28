@@ -52,15 +52,15 @@ development_status:
   2-3-media-library-display: done
   2-4-timeline-clip-placement-and-display: done
   2-5-video-preview-player-and-playback-controls: done
-  2-6-ui-component-library-setup: review
+  2-6-ui-component-library-setup: done
   epic-2-retrospective: optional
 
   epic-3: contexted
-  3-1-clip-trim-with-in-out-points: drafted
-  3-2-split-clip-at-playhead: drafted
-  3-3-delete-clip-from-timeline: drafted
-  3-4-drag-to-reorder-timeline-clips: drafted
-  3-5-export-timeline-to-mp4: drafted
+  3-1-clip-trim-with-in-out-points: in-progress
+  3-2-split-clip-at-playhead: in-progress
+  3-3-delete-clip-from-timeline: ready-for-dev
+  3-4-drag-to-reorder-timeline-clips: ready-for-dev
+  3-5-export-timeline-to-mp4: ready-for-dev
   epic-3-retrospective: optional
 
   epic-4: backlog

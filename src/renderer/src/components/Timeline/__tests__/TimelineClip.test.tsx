@@ -15,7 +15,7 @@ describe('TimelineClip', () => {
     startTime: 10,
     duration: 30,
     trimIn: 0,
-    trimOut: 30,
+    trimOut: 0, // Trim offset from end (0 = no trim)
     trackId: 1
   }
 

@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useMediaStore } from '@/store/mediaStore'
 import { useTimelineStore } from '@/store/timelineStore'
 import { usePlaybackStore } from '@/store/playbackStore'
+import { useToolStore } from '@/store/toolStore'
 import { TimelineRuler } from './TimelineRuler'
 import { TimelineTrack } from './TimelineTrack'
 import { Playhead } from './Playhead'
@@ -141,20 +142,74 @@ export function Timeline(): React.JSX.Element {
       sourceFile: file.path,
       startTime: nextPosition,
       duration: file.duration,
-      trimIn: 0,
-      trimOut: file.duration,
+      trimIn: 0, // Trim offset from start (seconds)
+      trimOut: 0, // Trim offset from end (seconds)
       trackId: 1
     })
   }
 
   /**
-   * Handle clip selection
-   * Loads clip in preview player (AC #2)
+   * Handle clip click - Tool-aware routing (Tool Selection System)
+   * Routes to different handlers based on active tool
    */
   function handleClipClick(clipId: string): void {
-    selectClip(clipId)
-    usePlaybackStore.getState().loadClip(clipId)
+    const { selectedTool } = useToolStore.getState()
+    const { splitClip } = useTimelineStore.getState()
+
+    if (selectedTool === 'split') {
+      // Split tool: Split clip at playhead if playhead is over this clip
+      const clip = tracks.flatMap((track) => track.clips).find((c) => c.id === clipId)
+      if (!clip) return
+
+      const clipStart = clip.startTime
+      const clipEnd = clip.startTime + (clip.duration - clip.trimIn - clip.trimOut)
+
+      // Check if playhead is within clip bounds
+      if (playheadPosition > clipStart && playheadPosition < clipEnd) {
+        splitClip(clipId, playheadPosition)
+        console.log(`[Timeline] Split clip ${clipId} at ${playheadPosition}s`)
+      } else {
+        console.warn('[Timeline] Playhead not within clip bounds for split operation')
+      }
+    } else {
+      // Select or Trim tool: Select clip and load in preview
+      selectClip(clipId)
+      usePlaybackStore.getState().loadClip(clipId)
+    }
   }
+
+  /**
+   * Handle keyboard shortcuts
+   * - Delete/Backspace: Clear selection (Story 3.1)
+   * - Escape: Deselect clip (Story 3.1)
+   * - V/B/C: Tool selection (Tool Selection System)
+   */
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent): void {
+      // Tool selection shortcuts (V/B/C)
+      const { setTool } = useToolStore.getState()
+      if (e.key.toLowerCase() === 'v') {
+        setTool('select')
+        return
+      } else if (e.key.toLowerCase() === 'b') {
+        setTool('trim')
+        return
+      } else if (e.key.toLowerCase() === 'c') {
+        setTool('split')
+        return
+      }
+
+      // Clip selection shortcuts
+      if (e.key === 'Escape') {
+        selectClip(null)
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedClipId) {
+        selectClip(null)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedClipId, selectClip])
 
   /**
    * Handle timeline seeking (AC #6)

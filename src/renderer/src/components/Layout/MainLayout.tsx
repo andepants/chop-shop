@@ -7,7 +7,7 @@
  */
 import { TopBar } from './TopBar'
 import { Sidebar } from './Sidebar'
-import { Timeline } from '@/components/Timeline'
+import { Timeline, ToolSelectionBar } from '@/components/Timeline'
 import { PreviewPlayer, PlaybackBar } from '@/components/Preview'
 
 /**
@@ -30,13 +30,16 @@ export function MainLayout(): React.JSX.Element {
 
         {/* Center Content (Preview + PlaybackBar + Timeline) */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Preview Area */}
-          <div className="flex-1 bg-black border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+          {/* Preview Area - Minimum height to ensure video player and controls are visible */}
+          <div className="flex-1 min-h-[400px] bg-black border-b" style={{ borderColor: 'var(--border-subtle)' }}>
             <PreviewPlayer />
           </div>
 
           {/* Playback Bar */}
           <PlaybackBar />
+
+          {/* Tool Selection Bar */}
+          <ToolSelectionBar />
 
           {/* Timeline Area - Fixed height to ensure visibility */}
           <div className="h-64" style={{ backgroundColor: 'var(--bg-timeline)' }}>

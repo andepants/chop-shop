@@ -1,8 +1,7 @@
 /**
  * Preview Components
- * Exports for video preview player and playback controls
+ * Exports for video preview player and playback bar
  */
 
 export { PreviewPlayer } from './PreviewPlayer'
-export { PlaybackControls } from './PlaybackControls'
 export { PlaybackBar } from './PlaybackBar'

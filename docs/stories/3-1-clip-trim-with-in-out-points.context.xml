@@ -81,14 +81,85 @@ AC7: Original imported media file remains unchanged (non-destructive editing)
         Manages currentClipId, isPlaying, currentTime, videoPlayer reference. Interacts with Video.js player instance.
       </artifact>
     </code>
-    <dependencies>{{dependencies_artifacts}}</dependencies>
+    <dependencies>
+      <node>
+        <package name="zustand" version="^5.0.8">State management</package>
+        <package name="video.js" version="^8.23.4">Video preview player</package>
+        <package name="@types/video.js" version="^7.3.58">Video.js TypeScript types</package>
+        <package name="@radix-ui/react-slot" version="^1.2.3">UI component primitives</package>
+        <package name="lucide-react" version="^0.548.0">Icons</package>
+        <package name="class-variance-authority" version="^0.7.1">Class utilities</package>
+      </node>
+      <frameworks>
+        <framework name="Electron">Desktop application framework</framework>
+        <framework name="React">UI framework with TypeScript</framework>
+        <framework name="Tailwind CSS">Utility-first CSS framework</framework>
+        <framework name="Vitest">Testing framework</framework>
+      </frameworks>
+    </dependencies>
   </artifacts>
 
-  <constraints>{{constraints}}</constraints>
-  <interfaces>{{interfaces}}</interfaces>
+  <constraints>
+    <constraint type="architecture">Main/renderer process separation: Trim operations are pure renderer-side state mutations (no IPC calls to main process)</constraint>
+    <constraint type="state-management">Zustand immutability: All clip updates must use set() with spread operators, never mutate state directly</constraint>
+    <constraint type="performance">NFR001: Trim handle dragging must maintain 60fps (16ms update cycle) using GPU-accelerated CSS transforms</constraint>
+    <constraint type="editing">Non-destructive editing: trimIn/trimOut are playback metadata only, source files must remain untouched</constraint>
+    <constraint type="component">TrimTool component must be created in src/renderer/src/components/EditTools/ folder (new for Epic 3)</constraint>
+    <constraint type="types">Clip interface in src/renderer/src/components/Timeline/timeline.types.ts already has trimIn/trimOut fields defined</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="Clip" kind="TypeScript interface">
+      <signature>
+interface Clip {
+  id: string
+  sourceFile: string
+  startTime: number
+  duration: number
+  trimIn: number
+  trimOut: number
+  trackId: number
+}
+      </signature>
+      <path>src/renderer/src/components/Timeline/timeline.types.ts</path>
+    </interface>
+
+    <interface name="updateClip" kind="Zustand store action (to be added)">
+      <signature>
+updateClip: (clipId: string, updates: Partial&lt;Clip&gt;) =&gt; void
+      </signature>
+      <path>src/renderer/src/store/timelineStore.ts</path>
+    </interface>
+
+    <interface name="selectedClipId" kind="Zustand state (exists)">
+      <signature>selectedClipId: string | null</signature>
+      <path>src/renderer/src/store/timelineStore.ts</path>
+    </interface>
+
+    <interface name="effectiveDuration calculation" kind="Computed value">
+      <signature>const effectiveDuration = clip.duration - clip.trimIn - clip.trimOut</signature>
+      <path>Multiple locations (TimelineClip display, preview playback)</path>
+    </interface>
+  </interfaces>
+
   <tests>
-    <standards>{{test_standards}}</standards>
-    <locations>{{test_locations}}</locations>
-    <ideas>{{test_ideas}}</ideas>
+    <standards>
+      Use Vitest testing framework (configured in project). Unit tests for store actions in timelineStore.test.ts. Test state immutability (original state not mutated). Use describe/it/expect pattern. Manual integration testing for UI interactions and Video.js playback.
+    </standards>
+    <locations>
+      <location>src/renderer/src/store/__tests__/timelineStore.test.ts</location>
+      <location>src/renderer/src/components/Timeline/__tests__/ (if created)</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Test clip selection sets selectedClipId in store</idea>
+      <idea ac="AC2">Test TrimTool component renders handles only when clip selected</idea>
+      <idea ac="AC3">Test updateClip action updates trimIn/trimOut values immutably</idea>
+      <idea ac="AC3">Test trim handle drag calculates correct new trim values with clamping (0 to duration)</idea>
+      <idea ac="AC4,AC6">Manual test: Verify preview player sets currentTime = trimIn on load and stops at (duration - trimOut)</idea>
+      <idea ac="AC5">Test TimelineClip calculates effectiveDuration and displays correct width</idea>
+      <idea ac="AC5">Test timeline ruler updates to reflect trimmed clip duration</idea>
+      <idea ac="AC7">Manual test: Verify source file unchanged after trim operations (check file modification time)</idea>
+      <idea ac="Performance">Manual test: Drag trim handles rapidly, verify 60fps smooth update (no jank)</idea>
+    </ideas>
   </tests>
 </story-context>

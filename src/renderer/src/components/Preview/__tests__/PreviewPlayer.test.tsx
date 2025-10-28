@@ -37,7 +37,7 @@ describe('PreviewPlayer', () => {
               startTime: 0,
               duration: 10,
               trimIn: 0,
-              trimOut: 10,
+              trimOut: 0, // Trim offset from end (0 = no trim)
               trackId: 1
             },
             {
@@ -46,7 +46,7 @@ describe('PreviewPlayer', () => {
               startTime: 10,
               duration: 5,
               trimIn: 2,
-              trimOut: 7,
+              trimOut: 1, // Trim 1s from end
               trackId: 1
             }
           ]

@@ -18,7 +18,7 @@ describe('TimelineTrack', () => {
         startTime: 0,
         duration: 10,
         trimIn: 0,
-        trimOut: 10,
+        trimOut: 0, // Trim offset from end (0 = no trim)
         trackId: 1
       },
       {
@@ -27,7 +27,7 @@ describe('TimelineTrack', () => {
         startTime: 15,
         duration: 5,
         trimIn: 0,
-        trimOut: 5,
+        trimOut: 0, // Trim offset from end (0 = no trim)
         trackId: 1
       }
     ]

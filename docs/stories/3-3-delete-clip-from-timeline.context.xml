@@ -1,0 +1,135 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>3</storyId>
+    <title>Delete Clip from Timeline</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/3-3-delete-clip-from-timeline.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>content creator</asA>
+    <iWant>delete clips I don't need from the timeline</iWant>
+    <soThat>I can remove mistakes or unwanted footage</soThat>
+    <tasks>
+- Add removeClip action to timelineStore (filter clip, recalculate gaps, update duration)
+- Create DeleteTool component with Delete button UI
+- Implement keyboard shortcut handlers (Delete/Backspace keys)
+- Implement gap-closing logic for remaining clips
+- Handle playhead position after deletion
+- Verify media library persistence (clip remains in library)
+- Add visual feedback for delete operation
+- Test delete functionality end-to-end
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+AC1: User can select a clip on timeline
+AC2: Delete button or keyboard shortcut (Delete/Backspace key) removes selected clip
+AC3: Remaining clips automatically shift left to close gap
+AC4: Timeline updates playhead position if it was on deleted clip
+AC5: Deleted clip disappears from timeline but remains in media library
+AC6: User can delete multiple clips sequentially
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-3.md" title="Epic 3 Technical Specification" section="AC-3.3 Delete Clip">
+        Delete operation removes clip from timeline. Remaining clips automatically shift left to close gap. Deleted clip remains in media library (timeline and media library are independent). Must support keyboard shortcuts (Delete/Backspace).
+      </doc>
+      <doc path="docs/tech-spec-epic-3.md" title="Epic 3 Technical Specification" section="Workflows - Delete Operation Sequence">
+        User selects clip → clicks Delete button or presses Delete/Backspace → removeClip(clipId) called → Store removes clip from array → Remaining clips shift left → Timeline re-renders.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture Decision Document" section="Component Structure">
+        EditTools folder at src/renderer/components/EditTools/ for DeleteTool.tsx component. State mutations in src/renderer/store/timelineStore.ts. Keyboard event handlers in Timeline.tsx.
+      </doc>
+      <doc path="docs/PRD.md" title="Product Requirements Document" section="FR012">
+        Application shall allow deletion of clips from timeline. NFR001: Timeline UI shall maintain 30+ fps responsiveness with 10 or more clips loaded.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/renderer/src/store/timelineStore.ts" kind="store" symbol="removeClip" lines="76-95" reason="removeClip action already exists - may need enhancement for gap-closing logic">
+        removeClip action filters out clip by ID. Need to verify it recalculates startTime for remaining clips to close gaps, and updates totalDuration.
+      </artifact>
+      <artifact path="src/renderer/src/components/Timeline/Timeline.tsx" kind="component" symbol="Timeline" reason="Timeline component where keyboard shortcuts will be added and DeleteTool integrated">
+        Timeline component with toolbar. Need to add keyboard event listener for Delete/Backspace keys and integrate DeleteTool button.
+      </artifact>
+      <artifact path="src/renderer/src/store/mediaStore.ts" kind="store" reason="Media library store - verify it's independent from timelineStore">
+        Media library maintains imported media files separately from timeline clips. Verify removeClip doesn't affect mediaStore.
+      </artifact>
+      <artifact path="src/renderer/src/store/playbackStore.ts" kind="store" reason="Playback store manages playhead position - may need update after delete">
+        Playback store with playheadPosition. May need to adjust playhead if it was positioned on deleted clip.
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="zustand" version="^5.0.8">State management for timeline mutations</package>
+        <package name="lucide-react" version="^0.548.0">Icons for Delete button (Trash icon)</package>
+      </node>
+      <frameworks>
+        <framework name="React">UI framework with TypeScript</framework>
+        <framework name="Tailwind CSS">Styling for Delete button</framework>
+        <framework name="Vitest">Testing framework for removeClip action</framework>
+      </frameworks>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="state-management">Zustand immutability: removeClip creates new clips array, never mutates existing array</constraint>
+    <constraint type="performance">NFR001: Delete operation must complete within 16ms (synchronous, UI remains 60fps)</constraint>
+    <constraint type="architecture">Renderer-only operation: No IPC calls, pure state mutation in renderer process</constraint>
+    <constraint type="separation">Timeline and media library are independent: deleting from timeline doesn't remove from media library</constraint>
+    <constraint type="gap-closing">After deletion, remaining clips must shift left to close gap (recalculate startTime sequentially)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="removeClip" kind="Zustand store action (exists, may need enhancement)">
+      <signature>
+removeClip: (clipId: string) =&gt; void
+// Filters out clip from array
+// Recalculates startTime for remaining clips (gap-closing)
+// Updates totalDuration
+// Clears selectedClipId if deleted clip was selected
+      </signature>
+      <path>src/renderer/src/store/timelineStore.ts</path>
+    </interface>
+
+    <interface name="selectedClipId" kind="Zustand state (exists)">
+      <signature>selectedClipId: string | null</signature>
+      <path>src/renderer/src/store/timelineStore.ts</path>
+    </interface>
+
+    <interface name="keyboard event handler" kind="Event handler (to be added)">
+      <signature>
+handleKeyDown: (e: KeyboardEvent) =&gt; void
+// Listen for Delete (key === 'Delete') and Backspace (key === 'Backspace')
+// Call removeClip(selectedClipId) if clip selected
+      </signature>
+      <path>src/renderer/src/components/Timeline/Timeline.tsx</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Use Vitest testing framework. Unit tests for removeClip action in timelineStore.test.ts. Test state immutability, gap-closing logic, totalDuration recalculation. Use describe/it/expect pattern. Manual testing for keyboard shortcuts.
+    </standards>
+    <locations>
+      <location>src/renderer/src/store/__tests__/timelineStore.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Test clip selection sets selectedClipId</idea>
+      <idea ac="AC2">Test removeClip action removes clip from array immutably</idea>
+      <idea ac="AC2">Manual test: Click Delete button → verify selected clip removed</idea>
+      <idea ac="AC2">Manual test: Press Delete key → verify selected clip removed</idea>
+      <idea ac="AC2">Manual test: Press Backspace key → verify selected clip removed</idea>
+      <idea ac="AC3">Test gap-closing: Timeline [0, 5, 10], delete middle clip → result [0, 5] (second clip startTime shifts from 10 to 5)</idea>
+      <idea ac="AC4">Test playhead adjustment: if playhead on deleted clip, move to clip's startTime</idea>
+      <idea ac="AC5">Manual test: Delete clip from timeline, verify it still appears in media library</idea>
+      <idea ac="AC5">Manual test: Re-add deleted clip from media library to timeline → verify it works</idea>
+      <idea ac="AC6">Manual test: Delete multiple clips sequentially → verify each deletion works correctly</idea>
+      <idea ac="Edge Case">Test delete last clip → timeline becomes empty, totalDuration = 0, playhead = 0</idea>
+    </ideas>
+  </tests>
+</story-context>

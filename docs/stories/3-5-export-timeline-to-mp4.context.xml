@@ -1,0 +1,174 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>5</storyId>
+    <title>Export Timeline to MP4</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/3-5-export-timeline-to-mp4.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>content creator</asA>
+    <iWant>export my edited timeline as an MP4 file</iWant>
+    <soThat>I can share my video or upload it to platforms</soThat>
+    <tasks>
+- Create FFmpeg service for export operations (main process)
+- Implement FFmpeg progress parsing
+- Create IPC handlers for export operations (start-export, export-progress, export-complete, export-error)
+- Create ExportModal component (resolution picker, file location)
+- Create ExportProgress component (progress bar, success/error notifications)
+- Integrate Export button in TopBar
+- Implement FFmpeg command building logic (concat, trim, resolution scaling)
+- Handle export errors gracefully
+- Add export state management to uiStore
+- Test export functionality end-to-end
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+AC1: Export button in top bar becomes enabled when timeline has clips
+AC2: Clicking Export opens export dialog with settings (720p, 1080p, Source quality, output file location)
+AC3: Export process starts and displays progress bar with percentage
+AC4: FFmpeg processes timeline clips in sequence with proper encoding
+AC5: Exported MP4 file plays correctly in external player (QuickTime, VLC)
+AC6: Audio and video remain synchronized in exported file
+AC7: Export completes without memory leaks or crashes
+AC8: User receives success notification with file location
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-3.md" title="Epic 3 Technical Specification" section="AC-3.5 Export Timeline">
+        FFmpeg export processes timeline clips to MP4. Resolution options: 720p, 1080p, source. Progress updates sent via IPC (max 10Hz). Export runs in main process (child_process.spawn). Renderer shows progress bar. Must complete without memory leaks.
+      </doc>
+      <doc path="docs/tech-spec-epic-3.md" title="Epic 3 Technical Specification" section="Services and Modules">
+        ffmpeg.service.ts implements export pipeline: command building, child process execution, progress parsing. IPC handlers in ffmpeg.handlers.ts bridge renderer export requests to main process FFmpeg execution. Export options include clips array, resolution, output path.
+      </doc>
+      <doc path="docs/tech-spec-epic-3.md" title="Epic 3 Technical Specification" section="Workflows - Export Operation Sequence">
+        User clicks Export → ExportModal opens → User selects resolution and output path → start-export IPC sent → Main process builds FFmpeg command → FFmpeg processes clips → Progress events sent to renderer → On complete: export-complete event → Success notification shown.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture Decision Document" section="IPC Architecture">
+        Main process handles FFmpeg/File I/O. Renderer handles UI. IPC channels: start-export (request), export-progress (event), export-complete (event), export-error (event). Prevents UI freezing during long operations.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture Decision Document" section="FFmpeg Integration">
+        Use ffmpeg-static package (version 5.2.0, FFmpeg 6.0). Bundles FFmpeg binaries with app, no external dependencies. Execute via child_process.spawn in main process. Parse progress from stderr.
+      </doc>
+      <doc path="docs/PRD.md" title="Product Requirements Document" section="FR016, FR017, FR018">
+        FR016: Export edited timeline to MP4 format using FFmpeg. FR017: Provide resolution options (720p, 1080p, source quality). FR018: Display real-time export progress indicator with percentage complete.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/main/services/file.service.ts" kind="service" symbol="FileService" reason="File service for path validation and file operations - may be reused for export output validation">
+        File service handles file operations in main process. May need methods for validating export output path, checking disk space, or cleaning up temp files.
+      </artifact>
+      <artifact path="src/main/ipc" kind="directory" reason="IPC handlers directory where ffmpeg.handlers.ts will be created">
+        IPC handlers directory. Need to create ffmpeg.handlers.ts for export operations (start-export, progress events, complete/error events).
+      </artifact>
+      <artifact path="src/renderer/src/components/Layout/TopBar.tsx" kind="component" symbol="TopBar" reason="Top bar where Export button will be added">
+        TopBar component in app layout. Need to add Export button that opens ExportModal when timeline has clips.
+      </artifact>
+      <artifact path="src/renderer/src/store/timelineStore.ts" kind="store" symbol="tracks" reason="Timeline clips needed for export - passed to FFmpeg service">
+        Timeline store has tracks with clips array. Export functionality needs to read all clips and pass to IPC for FFmpeg processing.
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="ffmpeg-static" version="^5.2.0">FFmpeg 6.0 binaries bundled with app</package>
+        <package name="zustand" version="^5.0.8">State management for export UI state</package>
+        <package name="@radix-ui/react-dialog" version="^1.1.15">Modal dialog for ExportModal</package>
+        <package name="@radix-ui/react-progress" version="^1.1.7">Progress bar component</package>
+        <package name="lucide-react" version="^0.548.0">Icons for Export button</package>
+      </node>
+      <frameworks>
+        <framework name="Electron">Desktop framework, IPC communication, dialog.showSaveDialog, child_process.spawn</framework>
+        <framework name="FFmpeg 6.0">Video processing via ffmpeg-static package</framework>
+        <framework name="React">UI framework for ExportModal and ExportProgress components</framework>
+        <framework name="Node.js child_process">FFmpeg execution in main process</framework>
+      </frameworks>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">Main/renderer separation: FFmpeg runs ONLY in main process (ADR-002). Export commands sent via IPC. Progress events sent back to renderer.</constraint>
+    <constraint type="security">FFmpeg command injection prevention: Use argument array (not shell string concatenation). Validate output paths to prevent arbitrary file system writes.</constraint>
+    <constraint type="performance">Progress updates sent at maximum 10Hz (every 100ms) to avoid IPC flooding. Export runs asynchronously, main window remains responsive.</constraint>
+    <constraint type="error-handling">Export failures must be caught and reported to user with actionable messages. No partial/corrupted MP4 files left on error. FFmpeg stderr captured and logged.</constraint>
+    <constraint type="encoding">Use libx264 codec for video, aac for audio. Preset: fast (balance between speed and quality). Audio bitrate: 192k.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="ExportOptions" kind="TypeScript interface (to be created)">
+      <signature>
+interface ExportOptions {
+  clips: Clip[]
+  resolution: '720p' | '1080p' | 'source'
+  outputPath: string
+}
+      </signature>
+      <path>src/shared/types.ts or src/main/services/ffmpeg.service.ts</path>
+    </interface>
+
+    <interface name="IPC: start-export" kind="IPC channel">
+      <signature>
+Request: { clips: Clip[], resolution: '720p'|'1080p'|'source', outputPath: string }
+Response: IPCResponse&lt;{ outputPath: string }&gt;
+      </signature>
+      <path>Main handler: src/main/ipc/ffmpeg.handlers.ts, Renderer: src/renderer/src/components/Export/ExportModal.tsx</path>
+    </interface>
+
+    <interface name="IPC: export-progress" kind="IPC event (Main → Renderer)">
+      <signature>
+Payload: { percent: number, currentFile: string }
+      </signature>
+      <path>Emitted from: src/main/services/ffmpeg.service.ts, Listened in: src/renderer/src/components/Export/ExportProgress.tsx</path>
+    </interface>
+
+    <interface name="IPC: export-complete" kind="IPC event (Main → Renderer)">
+      <signature>
+Payload: { success: boolean, outputPath: string }
+      </signature>
+      <path>Emitted from: src/main/ipc/ffmpeg.handlers.ts, Listened in: src/renderer/src/components/Export/ExportProgress.tsx</path>
+    </interface>
+
+    <interface name="IPC: export-error" kind="IPC event (Main → Renderer)">
+      <signature>
+Payload: { message: string, code: string }
+      </signature>
+      <path>Emitted from: src/main/ipc/ffmpeg.handlers.ts, Listened in: src/renderer/src/components/Export/ExportProgress.tsx</path>
+    </interface>
+
+    <interface name="FFmpegService.executeExport" kind="Main process service method">
+      <signature>
+async executeExport(options: ExportOptions): Promise&lt;{ outputPath: string }&gt;
+// Builds FFmpeg command, spawns child process, parses progress, returns output path
+      </signature>
+      <path>src/main/services/ffmpeg.service.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Use Vitest for unit tests (FFmpeg command building logic). Manual integration testing for full export workflow (FFmpeg execution, IPC communication, UI). Test exported MP4 files in QuickTime and VLC for playback correctness and audio sync.
+    </standards>
+    <locations>
+      <location>src/main/services/__tests__/ffmpeg.service.test.ts</location>
+      <location>Manual testing: Full export workflow from UI to MP4 playback</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Test Export button enabled/disabled state based on clips.length</idea>
+      <idea ac="AC2">Manual test: Click Export → verify ExportModal opens with resolution options and file picker</idea>
+      <idea ac="AC3">Manual test: Start export → verify progress bar updates from 0% to 100%</idea>
+      <idea ac="AC4">Test buildFFmpegCommand: verify correct concat filter, trim parameters, resolution scaling</idea>
+      <idea ac="AC4">Test FFmpeg command security: verify argument array used (not shell string)</idea>
+      <idea ac="AC5,AC6">Manual test: Export timeline with 3 clips → open output MP4 in QuickTime → verify playback correct, audio synced</idea>
+      <idea ac="AC5,AC6">Manual test: Export timeline with 3 clips → open output MP4 in VLC → verify playback correct, audio synced</idea>
+      <idea ac="AC7">Memory leak test: Export 5 times consecutively → monitor Activity Monitor for memory growth</idea>
+      <idea ac="AC8">Manual test: Export completes → verify success notification with output file path shown</idea>
+      <idea ac="Error Handling">Test export to read-only directory → verify error message shown</idea>
+      <idea ac="Error Handling">Test export with disk full → verify actionable error message (check disk space)</idea>
+      <idea ac="Progress Parsing">Test parseProgress with sample FFmpeg stderr output → verify percentage calculation correct</idea>
+    </ideas>
+  </tests>
+</story-context>
