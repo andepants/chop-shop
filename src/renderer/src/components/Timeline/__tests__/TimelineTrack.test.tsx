@@ -15,6 +15,7 @@ describe('TimelineTrack', () => {
       {
         id: 'clip-1',
         sourceFile: '/test/video1.mp4',
+        intermediatePath: '/cache/video1-intermediate.mov',
         startTime: 0,
         duration: 10,
         trimIn: 0,
@@ -24,7 +25,8 @@ describe('TimelineTrack', () => {
       {
         id: 'clip-2',
         sourceFile: '/test/video2.mp4',
-        startTime: 15,
+        intermediatePath: '/cache/video2-intermediate.mov',
+        startTime: 10,
         duration: 5,
         trimIn: 0,
         trimOut: 0, // Trim offset from end (0 = no trim)

@@ -34,6 +34,8 @@ export interface CompositorClip {
   trackIndex: number
   /** Absolute file path to source video */
   sourceFile: string
+  /** Path to intermediate ProRes file (used for playback) */
+  intermediatePath: string
   /** Global timeline start time in seconds */
   startTime: number
   /** Clip duration in timeline (after trim applied) */

@@ -14,6 +14,8 @@ export interface Clip {
   id: string
   /** Absolute path to the source video file */
   sourceFile: string
+  /** Path to intermediate ProRes file (used for playback and editing) */
+  intermediatePath: string
   /** Position on timeline in seconds (when the clip starts playing) */
   startTime: number
   /** Total duration of the clip in seconds */

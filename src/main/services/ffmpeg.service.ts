@@ -282,6 +282,7 @@ function calculateTotalDuration(clips: Clip[]): number {
 
 /**
  * Build FFmpeg command for timeline export with concat and trim support
+ * Reads from intermediate ProRes files for frame-accurate export
  * @param clips - Array of timeline clips to export
  * @param resolution - Target resolution (720p, 1080p, or source)
  * @param outputPath - Absolute path for output MP4 file
@@ -297,10 +298,13 @@ export function buildFFmpegCommand(
   // Add input files with trim parameters
   // Each input needs its own -ss and -t positioned correctly
   clips.forEach((clip) => {
+    // Use intermediate path for export (ProRes provides better quality)
+    const inputFile = clip.intermediatePath
+
     // Validate input file exists
-    if (!existsSync(clip.sourceFile)) {
+    if (!existsSync(inputFile)) {
       throw new FFmpegError(
-        `Input file not found: ${clip.sourceFile}`,
+        `Intermediate file not found: ${inputFile}`,
         FFmpegErrorCode.FILE_NOT_FOUND
       )
     }
@@ -310,8 +314,8 @@ export function buildFFmpegCommand(
       args.push('-ss', clip.trimIn.toString())
     }
 
-    // Add input file
-    args.push('-i', clip.sourceFile)
+    // Add input file (intermediate ProRes file)
+    args.push('-i', inputFile)
 
     // Calculate and apply duration limit after trim
     const trimmedDuration = clip.duration - clip.trimIn - clip.trimOut
@@ -356,9 +360,10 @@ export function buildFFmpegCommand(
     // For 'source', no scaling is applied
   }
 
-  // Video codec settings
+  // Video codec settings - H.264 with high quality (CRF 18-20)
   args.push('-c:v', 'libx264')
-  args.push('-preset', 'fast')
+  args.push('-crf', '18') // High quality constant rate factor (lower = better quality)
+  args.push('-preset', 'slow') // Slower preset for better compression/quality balance
 
   // Audio codec settings
   args.push('-c:a', 'aac')
@@ -500,16 +505,18 @@ export function buildMultiTrackFFmpegCommand(options: MultiTrackExportOptions): 
   // Build track 1 (main) concatenation
   const hasOverlay = tracks.overlay.length > 0
 
-  // Add Track 1 inputs with trim
+  // Add Track 1 inputs with trim (using intermediate files)
   tracks.main.forEach((clip) => {
-    if (!existsSync(clip.sourceFile)) {
-      throw new FFmpegError(`Input file not found: ${clip.sourceFile}`, FFmpegErrorCode.FILE_NOT_FOUND)
+    const inputFile = clip.intermediatePath
+
+    if (!existsSync(inputFile)) {
+      throw new FFmpegError(`Intermediate file not found: ${inputFile}`, FFmpegErrorCode.FILE_NOT_FOUND)
     }
 
     if (clip.trimIn > 0) {
       args.push('-ss', clip.trimIn.toString())
     }
-    args.push('-i', clip.sourceFile)
+    args.push('-i', inputFile)
 
     const trimmedDuration = clip.duration - clip.trimIn - clip.trimOut
     if (trimmedDuration > 0 && (clip.trimIn > 0 || clip.trimOut > 0)) {
@@ -520,17 +527,19 @@ export function buildMultiTrackFFmpegCommand(options: MultiTrackExportOptions): 
   // Track the number of Track 1 inputs for filter indexing
   const track1InputCount = tracks.main.length
 
-  // Add Track 2 inputs with trim (if overlay exists)
+  // Add Track 2 inputs with trim (if overlay exists, using intermediate files)
   if (hasOverlay) {
     tracks.overlay.forEach((clip) => {
-      if (!existsSync(clip.sourceFile)) {
-        throw new FFmpegError(`Input file not found: ${clip.sourceFile}`, FFmpegErrorCode.FILE_NOT_FOUND)
+      const inputFile = clip.intermediatePath
+
+      if (!existsSync(inputFile)) {
+        throw new FFmpegError(`Intermediate file not found: ${inputFile}`, FFmpegErrorCode.FILE_NOT_FOUND)
       }
 
       if (clip.trimIn > 0) {
         args.push('-ss', clip.trimIn.toString())
       }
-      args.push('-i', clip.sourceFile)
+      args.push('-i', inputFile)
 
       const trimmedDuration = clip.duration - clip.trimIn - clip.trimOut
       if (trimmedDuration > 0 && (clip.trimIn > 0 || clip.trimOut > 0)) {
@@ -593,9 +602,10 @@ export function buildMultiTrackFFmpegCommand(options: MultiTrackExportOptions): 
   args.push('-filter_complex', filterComplex)
   args.push('-map', '[outv]', '-map', '[outa]')
 
-  // Codec settings
+  // Codec settings - H.264 with high quality (CRF 18-20)
   args.push('-c:v', 'libx264')
-  args.push('-preset', 'fast')
+  args.push('-crf', '18') // High quality constant rate factor
+  args.push('-preset', 'slow') // Better compression/quality balance
   args.push('-c:a', 'aac')
   args.push('-b:a', '192k')
 

@@ -12,7 +12,8 @@ describe('TimelineClip', () => {
   const mockClip: Clip = {
     id: 'clip-123',
     sourceFile: '/test/videos/sample-video.mp4',
-    startTime: 10,
+              intermediatePath: '/cache/sample-intermediate.mov',
+              startTime: 0,
     duration: 30,
     trimIn: 0,
     trimOut: 0, // Trim offset from end (0 = no trim)

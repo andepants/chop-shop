@@ -25,6 +25,7 @@ describe('timelineStore', () => {
 
   const mockClip: Omit<Clip, 'id'> = {
     sourceFile: '/test/video.mp4',
+    intermediatePath: '/test/video-intermediate.mov',
     startTime: 0,
     duration: 10,
     trimIn: 0, // Trim offset from start (default: 0)
@@ -49,6 +50,7 @@ describe('timelineStore', () => {
   describe('Multi-track timeline - Story 4.1', () => {
     const mockTrack1Clip: Omit<Clip, 'id'> = {
       sourceFile: '/test/video1.mp4',
+      intermediatePath: '/test/video1-intermediate.mov',
       startTime: 0,
       duration: 10,
       trimIn: 0,
@@ -58,6 +60,7 @@ describe('timelineStore', () => {
 
     const mockTrack2Clip: Omit<Clip, 'id'> = {
       sourceFile: '/test/video2.mp4',
+      intermediatePath: '/test/video2-intermediate.mov',
       startTime: 0,
       duration: 8,
       trimIn: 0,
@@ -953,7 +956,6 @@ describe('timelineStore', () => {
       const { addClip, removeClip } = useTimelineStore.getState()
 
       addClip({ ...mockClip, sourceFile: '/test/video.mp4', startTime: 0, duration: 10 })
-      const clipId = useTimelineStore.getState().tracks[0].clips[0].id
 
       // Remove from timeline
       removeClip(clipId)
@@ -1231,8 +1233,6 @@ describe('timelineStore', () => {
       const { addClip, reorderClips } = useTimelineStore.getState()
 
       addClip({ ...mockClip, sourceFile: '/video1.mp4', startTime: 0, duration: 10, trimIn: 1, trimOut: 2 })
-      addClip({ ...mockClip, sourceFile: '/video2.mp4', startTime: 7, duration: 5, trimIn: 0, trimOut: 0 })
-
       const originalClipAId = useTimelineStore.getState().tracks[0].clips[0].id
       const originalClipBId = useTimelineStore.getState().tracks[0].clips[1].id
 

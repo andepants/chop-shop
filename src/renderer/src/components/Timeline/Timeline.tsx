@@ -186,6 +186,7 @@ export function Timeline(): React.JSX.Element {
     addClipToTrack(
       {
         sourceFile: file.path,
+        intermediatePath: file.intermediatePath || file.path, // Use intermediate if available, fallback to source
         startTime: nextPosition,
         duration: file.duration,
         trimIn: 0,

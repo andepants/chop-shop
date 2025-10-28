@@ -11,6 +11,12 @@ import path from 'path'
 import ffprobeStatic from 'ffprobe-static'
 import type { VideoMetadata } from '../../shared/types'
 import { MAX_FILE_SIZE } from '../../shared/constants'
+import {
+  detectVFR,
+  getIntermediatePath,
+  transcodeToProRes,
+  type TranscodeProgressCallback
+} from './transcode.service'
 
 const execAsync = promisify(exec)
 
@@ -76,7 +82,10 @@ export async function validateVideoFile(filePath: string): Promise<VideoMetadata
       format,
       size,
       hasVideo: !!videoStream,
-      hasAudio: !!audioStream
+      hasAudio: !!audioStream,
+      intermediatePath: null,
+      isVFR: false,
+      transcodeStatus: 'pending'
     }
   } catch (error) {
     if (error instanceof Error) {
@@ -84,4 +93,58 @@ export async function validateVideoFile(filePath: string): Promise<VideoMetadata
     }
     throw new Error('Failed to process video. File may be corrupted.')
   }
+}
+
+/**
+ * Import video file with validation and transcode to intermediate codec
+ * Performs full import workflow: validate → detect VFR → transcode to ProRes
+ * @param filePath - Absolute path to video file
+ * @param onProgress - Optional callback for transcode progress updates
+ * @returns Video metadata including intermediate file path
+ * @throws Error if validation or transcode fails
+ */
+export async function importVideoFile(
+  filePath: string,
+  onProgress?: TranscodeProgressCallback
+): Promise<VideoMetadata> {
+  console.log('[FileService] Starting video import:', filePath)
+
+  // Step 1: Validate and extract metadata
+  const metadata = await validateVideoFile(filePath)
+  console.log('[FileService] Validation complete:', metadata)
+
+  // Step 2: Detect VFR
+  const isVFR = await detectVFR(filePath)
+  console.log('[FileService] VFR detection:', isVFR ? 'Variable frame rate' : 'Constant frame rate')
+
+  // Step 3: Generate intermediate path
+  const intermediatePath = getIntermediatePath(filePath)
+  console.log('[FileService] Intermediate path:', intermediatePath)
+
+  // Step 4: Update metadata with VFR status and intermediate path
+  const updatedMetadata: VideoMetadata = {
+    ...metadata,
+    isVFR,
+    intermediatePath,
+    transcodeStatus: 'in-progress'
+  }
+
+  // Step 5: Trigger transcode (async, but wait for completion)
+  try {
+    console.log('[FileService] Starting transcode to ProRes...')
+    await transcodeToProRes(filePath, intermediatePath, onProgress)
+
+    // Transcode succeeded
+    updatedMetadata.transcodeStatus = 'complete'
+    console.log('[FileService] Import complete:', updatedMetadata)
+  } catch (error) {
+    console.error('[FileService] Transcode failed:', error)
+    updatedMetadata.transcodeStatus = 'failed'
+    updatedMetadata.intermediatePath = null
+    throw new Error(
+      `Failed to optimize video for editing: ${error instanceof Error ? error.message : 'Unknown error'}`
+    )
+  }
+
+  return updatedMetadata
 }

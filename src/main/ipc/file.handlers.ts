@@ -5,7 +5,7 @@
 
 import { ipcMain, dialog, shell } from 'electron'
 import path from 'path'
-import { validateVideoFile } from '../services/file.service'
+import { importVideoFile } from '../services/file.service'
 import { generateThumbnail } from '../services/thumbnail.service'
 import { IPC_CHANNELS, type IPCResponse, type MediaFile } from '../../shared/types'
 import { SUPPORTED_FORMATS } from '../../shared/constants'
@@ -27,8 +27,8 @@ ipcMain.handle(
     try {
       console.log('[Main] Importing file:', filePath)
 
-      // Validate file and extract metadata
-      const metadata = await validateVideoFile(filePath)
+      // Import file with validation and transcoding to ProRes intermediate
+      const metadata = await importVideoFile(filePath)
 
       // Generate thumbnail
       let thumbnail: string | undefined
@@ -39,7 +39,7 @@ ipcMain.handle(
         // Continue without thumbnail - not critical
       }
 
-      // Create media file object
+      // Create media file object with intermediate path
       const mediaFile: MediaFile = {
         id: generateId(),
         path: filePath,
@@ -49,6 +49,7 @@ ipcMain.handle(
         resolution: metadata.resolution,
         size: metadata.size,
         thumbnail,
+        intermediatePath: metadata.intermediatePath || undefined,
         createdAt: Date.now()
       }
 

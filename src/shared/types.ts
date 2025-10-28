@@ -45,6 +45,7 @@ export interface MediaFile {
   size: number // in bytes
   thumbnail?: string // data URL or file path
   createdAt: number // timestamp
+  intermediatePath?: string // Path to ProRes intermediate file for editing
 }
 
 /**
@@ -60,4 +61,8 @@ export interface VideoMetadata {
   size: number
   hasVideo: boolean
   hasAudio: boolean
+  // Intermediate codec fields for frame-accurate editing
+  intermediatePath: string | null
+  isVFR: boolean
+  transcodeStatus: 'pending' | 'in-progress' | 'complete' | 'failed'
 }

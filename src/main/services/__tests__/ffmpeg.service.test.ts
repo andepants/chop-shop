@@ -355,6 +355,7 @@ describe('ffmpeg.service', () => {
         {
           id: '1',
           sourceFile: '/videos/clip1.mp4',
+          intermediatePath: '/cache/clip-intermediate.mov',
           duration: 10,
           trimIn: 0,
           trimOut: 0,
@@ -382,6 +383,7 @@ describe('ffmpeg.service', () => {
         {
           id: '1',
           sourceFile: '/videos/clip1.mp4',
+          intermediatePath: '/cache/clip-intermediate.mov',
           duration: 10,
           trimIn: 2,
           trimOut: 1,
@@ -405,6 +407,7 @@ describe('ffmpeg.service', () => {
         {
           id: '1',
           sourceFile: '/videos/clip1.mp4',
+          intermediatePath: '/cache/clip-intermediate.mov',
           duration: 5,
           trimIn: 0,
           trimOut: 0,
@@ -414,6 +417,7 @@ describe('ffmpeg.service', () => {
         {
           id: '2',
           sourceFile: '/videos/clip2.mp4',
+          intermediatePath: '/cache/clip-intermediate.mov',
           duration: 5,
           trimIn: 0,
           trimOut: 0,
@@ -436,6 +440,7 @@ describe('ffmpeg.service', () => {
         {
           id: '1',
           sourceFile: '/videos/clip1.mp4',
+          intermediatePath: '/cache/clip-intermediate.mov',
           duration: 10,
           trimIn: 0,
           trimOut: 0,
@@ -456,6 +461,7 @@ describe('ffmpeg.service', () => {
         {
           id: '1',
           sourceFile: '/videos/clip1.mp4',
+          intermediatePath: '/cache/clip-intermediate.mov',
           duration: 10,
           trimIn: 0,
           trimOut: 0,
@@ -476,6 +482,7 @@ describe('ffmpeg.service', () => {
         {
           id: '1',
           sourceFile: '/videos/clip1.mp4',
+          intermediatePath: '/cache/clip-intermediate.mov',
           duration: 10,
           trimIn: 0,
           trimOut: 0,
@@ -496,6 +503,7 @@ describe('ffmpeg.service', () => {
         {
           id: '1',
           sourceFile: '/videos/clip1.mp4',
+          intermediatePath: '/cache/clip-intermediate.mov',
           duration: 5,
           trimIn: 0,
           trimOut: 0,
@@ -505,6 +513,7 @@ describe('ffmpeg.service', () => {
         {
           id: '2',
           sourceFile: '/videos/clip2.mp4',
+          intermediatePath: '/cache/clip-intermediate.mov',
           duration: 5,
           trimIn: 0,
           trimOut: 0,
@@ -542,6 +551,7 @@ describe('ffmpeg.service', () => {
         {
           id: '1',
           sourceFile: '/videos/clip1.mp4',
+          intermediatePath: '/cache/clip-intermediate.mov',
           duration: 5,
           trimIn: 0,
           trimOut: 0,
@@ -551,6 +561,7 @@ describe('ffmpeg.service', () => {
         {
           id: '2',
           sourceFile: '/videos/clip2.mp4',
+          intermediatePath: '/cache/clip-intermediate.mov',
           duration: 5,
           trimIn: 0,
           trimOut: 0,
@@ -579,6 +590,7 @@ describe('ffmpeg.service', () => {
         {
           id: '1',
           sourceFile: '/videos/missing.mp4',
+          intermediatePath: '/cache/missing-intermediate.mov',
           duration: 10,
           trimIn: 0,
           trimOut: 0,
@@ -602,6 +614,7 @@ describe('ffmpeg.service', () => {
         {
           id: '1',
           sourceFile: '/videos/clip1.mp4',
+          intermediatePath: '/cache/clip-intermediate.mov',
           duration: 10,
           trimIn: 0,
           trimOut: 0,
@@ -631,6 +644,7 @@ describe('ffmpeg.service', () => {
         {
           id: '1',
           sourceFile: '/videos/clip1.mp4',
+          intermediatePath: '/cache/clip-intermediate.mov',
           duration: 5,
           trimIn: 0,
           trimOut: 0,
@@ -640,6 +654,7 @@ describe('ffmpeg.service', () => {
         {
           id: '2',
           sourceFile: '/videos/clip2.mp4',
+          intermediatePath: '/cache/clip-intermediate.mov',
           duration: 5,
           trimIn: 1,
           trimOut: 1,
@@ -670,6 +685,7 @@ describe('ffmpeg.service', () => {
         {
           id: '1',
           sourceFile: '/videos/clip1.mp4',
+          intermediatePath: '/cache/clip-intermediate.mov',
           duration: 10,
           trimIn: 0,
           trimOut: 0,
@@ -720,6 +736,7 @@ describe('ffmpeg.service', () => {
         {
           id: '1',
           sourceFile: '/videos/clip1.mp4',
+          intermediatePath: '/cache/clip-intermediate.mov',
           duration: 10,
           trimIn: 0,
           trimOut: 0,

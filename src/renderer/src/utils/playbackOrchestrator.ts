@@ -35,13 +35,15 @@ export function calculateClipEndTime(clip: Clip): number {
 
 /**
  * Convert timeline clip to compositor clip format
+ * Uses intermediatePath (ProRes) for playback to enable frame-accurate editing
  */
 function convertToCompositorClip(clip: Clip, trackId: string, trackIndex: number): CompositorClip {
   return {
     id: clip.id,
     trackId,
     trackIndex,
-    sourceFile: clip.sourceFile,
+    sourceFile: clip.sourceFile, // Original file (kept for reference)
+    intermediatePath: clip.intermediatePath, // ProRes intermediate (used for playback)
     startTime: clip.startTime,
     duration: calculateEffectiveDuration(clip),
     trimIn: clip.trimIn,

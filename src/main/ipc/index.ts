@@ -4,6 +4,7 @@
  */
 import { registerFFmpegHandlers } from './ffmpeg.handlers'
 import './file.handlers' // File import/export handlers (self-registering)
+import './transcode.handlers' // Transcode handlers (self-registering)
 
 /**
  * Register all IPC handlers

@@ -34,6 +34,7 @@ describe('PreviewPlayer', () => {
             {
               id: 'clip-1',
               sourceFile: '/path/to/video1.mp4',
+              intermediatePath: '/cache/video-intermediate.mov',
               startTime: 0,
               duration: 10,
               trimIn: 0,
@@ -43,7 +44,8 @@ describe('PreviewPlayer', () => {
             {
               id: 'clip-2',
               sourceFile: '/path/to/video2.mp4',
-              startTime: 10,
+              intermediatePath: '/cache/video-intermediate.mov',
+              startTime: 0,
               duration: 5,
               trimIn: 2,
               trimOut: 1, // Trim 1s from end

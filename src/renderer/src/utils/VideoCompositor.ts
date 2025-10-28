@@ -115,11 +115,12 @@ export class VideoCompositor {
 
     console.log('[VideoCompositor] Timeline duration:', this.timelineDuration)
 
-    // Collect unique source files
+    // Collect unique intermediate files for playback
     const sourceFiles = new Set<string>()
     for (const track of this.tracks) {
       for (const clip of track.clips) {
-        sourceFiles.add(clip.sourceFile)
+        // Use intermediate path for playback (ProRes optimized for editing)
+        sourceFiles.add(clip.intermediatePath)
       }
     }
 
@@ -160,7 +161,7 @@ export class VideoCompositor {
     // Start all active video elements
     const playPromises: Promise<void>[] = []
     for (const clip of this.state.activeClips) {
-      const source = this.sources.get(clip.sourceFile)
+      const source = this.sources.get(clip.intermediatePath)
       if (source && source.isLoaded) {
         // Calculate offset within source video
         const clipElapsed = this.state.currentTime - clip.startTime
@@ -169,7 +170,7 @@ export class VideoCompositor {
         source.element.currentTime = sourceTime
         playPromises.push(
           source.element.play().catch((err) => {
-            console.error('[VideoCompositor] Play failed for', clip.sourceFile, err)
+            console.error('[VideoCompositor] Play failed for', clip.intermediatePath, err)
           })
         )
       }
@@ -232,7 +233,7 @@ export class VideoCompositor {
 
     // Seek all active video elements
     for (const clip of this.state.activeClips) {
-      const source = this.sources.get(clip.sourceFile)
+      const source = this.sources.get(clip.intermediatePath)
       if (source && source.isLoaded) {
         const clipElapsed = time - clip.startTime
         const sourceTime = clip.trimIn + clipElapsed
@@ -501,7 +502,7 @@ export class VideoCompositor {
     const sortedClips = [...this.state.activeClips].sort((a, b) => a.trackIndex - b.trackIndex)
 
     for (const clip of sortedClips) {
-      const source = this.sources.get(clip.sourceFile)
+      const source = this.sources.get(clip.intermediatePath)
       if (!source || !source.isLoaded) continue
 
       const video = source.element
@@ -579,7 +580,7 @@ export class VideoCompositor {
     let maxTime = this.state.currentTime
 
     for (const clip of this.state.activeClips) {
-      const source = this.sources.get(clip.sourceFile)
+      const source = this.sources.get(clip.intermediatePath)
       if (!source || !source.isLoaded) continue
 
       const videoTime = source.element.currentTime
@@ -629,7 +630,7 @@ export class VideoCompositor {
       // Start playing new clips if in playback mode
       if (this.state.isPlaying) {
         for (const clip of newActiveClips) {
-          const source = this.sources.get(clip.sourceFile)
+          const source = this.sources.get(clip.intermediatePath)
           if (source && source.isLoaded) {
             const clipElapsed = this.state.currentTime - clip.startTime
             const sourceTime = clip.trimIn + clipElapsed
@@ -644,15 +645,16 @@ export class VideoCompositor {
   }
 
   /**
-   * Get the primary track index for a source file
-   * Returns the lowest trackIndex that uses this source
+   * Get the primary track index for an intermediate file
+   * Returns the lowest trackIndex that uses this intermediate file
    */
   private getTrackIndexForSource(filePath: string): number {
     let minTrackIndex = 999
 
     for (const track of this.tracks) {
       for (const clip of track.clips) {
-        if (clip.sourceFile === filePath && clip.trackIndex < minTrackIndex) {
+        // Compare with intermediate path since we load intermediate files for playback
+        if (clip.intermediatePath === filePath && clip.trackIndex < minTrackIndex) {
           minTrackIndex = clip.trackIndex
         }
       }
@@ -673,8 +675,9 @@ export class VideoCompositor {
       for (const clip of track.clips) {
         const clipEnd = clip.startTime + clip.duration
         // Include if clip overlaps with [time, preloadEnd]
+        // Use intermediate path for playback (ProRes optimized for editing)
         if (clip.startTime < preloadEnd && clipEnd > time) {
-          sources.add(clip.sourceFile)
+          sources.add(clip.intermediatePath)
         }
       }
     }
@@ -775,7 +778,7 @@ export class VideoCompositor {
 
     for (const [filePath, source] of this.sources) {
       // Don't evict sources for active clips
-      const isActive = this.state.activeClips.some((clip) => clip.sourceFile === filePath)
+      const isActive = this.state.activeClips.some((clip) => clip.intermediatePath === filePath)
       if (isActive) continue
 
       if (source.lastAccessed < oldestTime) {
