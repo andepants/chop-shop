@@ -57,10 +57,13 @@ export function ExportProgress(): React.JSX.Element {
   /**
    * Handle opening file location in system file manager
    */
-  function handleOpenLocation(): void {
+  async function handleOpenLocation(): Promise<void> {
     if (successPath) {
-      // Use Electron shell to show item in folder
-      window.electron?.shell?.showItemInFolder(successPath)
+      try {
+        await window.api.openFileLocation(successPath)
+      } catch (error) {
+        console.error('[ExportProgress] Failed to open file location:', error)
+      }
     }
   }
 

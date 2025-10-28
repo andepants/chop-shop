@@ -16,8 +16,8 @@ interface TimelineTrackProps {
   zoomLevel: number
   /** ID of currently selected clip */
   selectedClipId: string | null
-  /** Click handler for clip selection */
-  onClipClick: (clipId: string) => void
+  /** Click handler for clip selection - receives clip ID and mouse event for position-based operations */
+  onClipClick: (clipId: string, e: React.MouseEvent) => void
   /** Click handler for timeline seeking */
   onTrackClick?: (time: number) => void
 }
@@ -67,17 +67,6 @@ export function TimelineTrack({
         onClick={handleTrackClick}
         style={{ backgroundColor: 'var(--bg-timeline)' }}
       >
-        {/* Subtle grid lines */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.01) 1px, transparent 1px)',
-              backgroundSize: `${zoomLevel * 5}px 100%`
-            }}
-          />
-        </div>
-
         {track.clips.map((clip, index) => (
           <TimelineClip
             key={clip.id}
@@ -85,7 +74,7 @@ export function TimelineTrack({
             clipIndex={index}
             zoomLevel={zoomLevel}
             isSelected={clip.id === selectedClipId}
-            onClick={() => onClipClick(clip.id)}
+            onClick={(e) => onClipClick(clip.id, e)}
           />
         ))}
       </div>

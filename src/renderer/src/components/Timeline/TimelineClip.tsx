@@ -6,11 +6,12 @@
  * scaled by the current zoom level (pixels per second).
  */
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { formatTime } from '@/utils'
 import { cn } from '@/utils/cn.util'
 import { TrimTool } from '@/components/EditTools'
 import { useToolStore } from '@/store/toolStore'
+import { useTimelineStore } from '@/store/timelineStore'
 import type { Clip } from './timeline.types'
 
 interface TimelineClipProps {
@@ -22,8 +23,8 @@ interface TimelineClipProps {
   zoomLevel: number
   /** Whether this clip is currently selected */
   isSelected?: boolean
-  /** Click handler for clip selection */
-  onClick?: () => void
+  /** Click handler for clip selection/tools - receives mouse event for position-based operations */
+  onClick?: (e: React.MouseEvent) => void
 }
 
 /**
@@ -57,6 +58,10 @@ export function TimelineClip({
   // Drag state for visual feedback
   const [isDragging, setIsDragging] = useState(false)
 
+  // Razor tool state - tracks mouse position for split preview
+  const [razorMouseX, setRazorMouseX] = useState<number | null>(null)
+  const clipRef = useRef<HTMLDivElement>(null)
+
   // Calculate effective duration accounting for trim values (Story 3.1)
   const effectiveDuration = clip.duration - clip.trimIn - clip.trimOut
 
@@ -75,11 +80,12 @@ export function TimelineClip({
         : 'grab'
 
   /**
-   * Handle drag start - store clip index for drop handler
+   * Handle drag start - store clip ID and index for drop handler
    */
   function handleDragStart(e: React.DragEvent): void {
     setIsDragging(true)
     e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('clipId', clip.id)
     e.dataTransfer.setData('clipIndex', clipIndex.toString())
 
     // Create semi-transparent drag image
@@ -99,11 +105,64 @@ export function TimelineClip({
     setIsDragging(false)
   }
 
+  /**
+   * Handle mouse move for razor tool preview
+   * Tracks mouse X position within clip for split line preview
+   */
+  function handleMouseMove(e: React.MouseEvent): void {
+    if (selectedTool !== 'split') return
+    if (!clipRef.current) return
+
+    const rect = clipRef.current.getBoundingClientRect()
+    const mouseX = e.clientX - rect.left
+    setRazorMouseX(mouseX)
+  }
+
+  /**
+   * Handle mouse leave - clear razor preview
+   */
+  function handleMouseLeave(): void {
+    setRazorMouseX(null)
+  }
+
+  /**
+   * Calculate split position with snap-to-playhead logic
+   * @param mouseX - Mouse X position relative to clip element
+   * @returns Split position in pixels within clip, or null if too close to edges
+   */
+  function calculateSplitPosition(mouseX: number): { position: number; snapped: boolean; time: number } | null {
+    const SNAP_THRESHOLD = 15 // pixels - snap to playhead if within this distance
+    const EDGE_THRESHOLD = 10 // pixels - don't allow split too close to edges
+
+    // Don't split too close to clip edges
+    if (mouseX < EDGE_THRESHOLD || mouseX > width - EDGE_THRESHOLD) {
+      return null
+    }
+
+    // Calculate playhead position relative to clip
+    const playheadPosition = useTimelineStore.getState().playheadPosition
+    const playheadX = (playheadPosition - clip.startTime) * zoomLevel
+
+    // Check if playhead is within clip bounds
+    const playheadInClip = playheadPosition > clip.startTime && playheadPosition < clip.startTime + effectiveDuration
+
+    // Snap to playhead if mouse is close and playhead is in clip
+    if (playheadInClip && Math.abs(mouseX - playheadX) < SNAP_THRESHOLD) {
+      const snapTime = playheadPosition
+      return { position: playheadX, snapped: true, time: snapTime }
+    }
+
+    // Otherwise use mouse position
+    const splitTime = clip.startTime + (mouseX / zoomLevel)
+    return { position: mouseX, snapped: false, time: splitTime }
+  }
+
   // Extract filename from sourceFile path
   const filename = clip.sourceFile.split('/').pop() || clip.sourceFile
 
   return (
     <div
+      ref={clipRef}
       className={cn(
         'absolute rounded',
         'transition-all duration-200 ease-out',
@@ -125,7 +184,9 @@ export function TimelineClip({
       draggable={selectedTool === 'select'}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      onClick={onClick}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      onClick={(e) => onClick?.(e)}
       role="button"
       tabIndex={0}
       aria-label={`Clip at ${formatTime(clip.startTime)}, duration ${formatTime(effectiveDuration)}`}
@@ -152,6 +213,56 @@ export function TimelineClip({
         <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded text-xs font-mono bg-black/75 text-zinc-100 z-10">
           {formatTime(effectiveDuration)}
         </div>
+
+        {/* Razor tool split preview - red line follows mouse cursor */}
+        {selectedTool === 'split' && razorMouseX !== null && (() => {
+          const splitInfo = calculateSplitPosition(razorMouseX)
+          if (!splitInfo) return null
+
+          const { position, snapped, time } = splitInfo
+
+          return (
+            <>
+              {/* Red split line preview */}
+              <div
+                className="absolute top-0 bottom-0 w-0.5 pointer-events-none z-20 transition-all duration-75"
+                style={{
+                  left: `${position}px`,
+                  backgroundColor: snapped ? '#fbbf24' : '#ef4444', // Yellow when snapped, red otherwise
+                  boxShadow: snapped
+                    ? '0 0 6px rgba(251, 191, 36, 0.8)' // Yellow glow when snapped
+                    : '0 0 6px rgba(239, 68, 68, 0.8)' // Red glow
+                }}
+              >
+                {/* Triangle indicator at top */}
+                <div
+                  className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-0"
+                  style={{
+                    borderLeft: '4px solid transparent',
+                    borderRight: '4px solid transparent',
+                    borderTop: `6px solid ${snapped ? '#fbbf24' : '#ef4444'}` // Yellow when snapped, red otherwise
+                  }}
+                />
+              </div>
+
+              {/* Timestamp tooltip showing exact cut position */}
+              <div
+                className="absolute pointer-events-none z-30 px-2 py-1 rounded text-xs font-mono whitespace-nowrap"
+                style={{
+                  left: `${position}px`,
+                  top: '-28px',
+                  transform: 'translateX(-50%)',
+                  backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                  color: snapped ? '#fbbf24' : '#ef4444',
+                  border: `1px solid ${snapped ? '#fbbf24' : '#ef4444'}`
+                }}
+              >
+                {formatTime(time)}
+                {snapped && ' ⚡'}
+              </div>
+            </>
+          )
+        })()}
 
         {/* Trim handles - only shown when Trim tool active AND clip selected (Tool Selection System) */}
         {isSelected && selectedTool === 'trim' && <TrimTool clip={clip} zoomLevel={zoomLevel} />}

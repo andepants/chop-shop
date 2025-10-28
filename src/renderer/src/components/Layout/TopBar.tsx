@@ -7,7 +7,6 @@ import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { useTimelineStore } from '../../store/timelineStore'
 import { useUIStore } from '../../store/uiStore'
-import { ExportModal, ExportProgress } from '../Export'
 import { Download } from 'lucide-react'
 
 /**
@@ -49,34 +48,28 @@ export function TopBar(): React.JSX.Element {
   }, [hasClips, openExportModal])
 
   return (
-    <>
-      <div
-        className="h-10 border-b flex items-center justify-between px-4"
-        style={{
-          backgroundColor: 'var(--bg-primary)',
-          borderColor: 'var(--border-subtle)'
-        }}
+    <div
+      className="h-10 border-b flex items-center justify-between px-4"
+      style={{
+        backgroundColor: 'var(--bg-primary)',
+        borderColor: 'var(--border-subtle)'
+      }}
+    >
+      {/* App Name */}
+      <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+        chop shop
+      </span>
+
+      {/* Export Button */}
+      <Button
+        onClick={handleExport}
+        disabled={!hasClips}
+        size="sm"
+        className="bg-cyan-500 hover:bg-cyan-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {/* App Name */}
-        <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-          chop shop
-        </span>
-
-        {/* Export Button */}
-        <Button
-          onClick={handleExport}
-          disabled={!hasClips}
-          size="sm"
-          className="bg-cyan-500 hover:bg-cyan-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Download className="mr-1 h-3 w-3" />
-          Export
-        </Button>
-      </div>
-
-      {/* Export Modal and Progress */}
-      <ExportModal />
-      <ExportProgress />
-    </>
+        <Download className="mr-1 h-3 w-3" />
+        Export
+      </Button>
+    </div>
   )
 }

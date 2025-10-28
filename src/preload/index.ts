@@ -109,7 +109,15 @@ const api = {
     const listener = (_event: unknown, data: { message: string; code: string }) => callback(data)
     ipcRenderer.on('export-error', listener)
     return () => ipcRenderer.removeListener('export-error', listener)
-  }
+  },
+
+  /**
+   * Open file location in system file manager
+   * @param filePath - Path to the file to show
+   * @returns Promise with success result
+   */
+  openFileLocation: (filePath: string) =>
+    ipcRenderer.invoke('open-file-location', { filePath })
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

@@ -268,6 +268,91 @@ export const useTimelineStore = create<TimelineState>((set) => ({
     }),
 
   /**
+   * Move clip to a specific timeline position (Premiere Pro style)
+   * Allows gaps between clips, with collision detection and magnetic snap
+   *
+   * @param clipId - ID of clip to move
+   * @param targetPosition - Timeline position in seconds to move clip to
+   */
+  moveClipToPosition: (clipId, targetPosition) =>
+    set((state) => {
+      const trackId = 1 // MVP: Single track only
+      const updatedTracks = state.tracks.map((track) => {
+        if (track.id !== trackId) return track
+
+        const clipToMove = track.clips.find((c) => c.id === clipId)
+        if (!clipToMove) return track
+
+        const otherClips = track.clips.filter((c) => c.id !== clipId)
+        const moveDuration = getEffectiveDuration(clipToMove)
+
+        // Collision detection: check if target position overlaps any existing clip
+        let finalPosition = Math.max(0, targetPosition) // Don't allow negative positions
+
+        const SNAP_THRESHOLD = 0.5 // 0.5 seconds magnetic snap (like Premiere Pro)
+
+        // Check for collisions and find snap points
+        for (const otherClip of otherClips) {
+          const otherStart = otherClip.startTime
+          const otherEnd = otherClip.startTime + getEffectiveDuration(otherClip)
+
+          // Check if our target position would overlap this clip
+          const wouldOverlap =
+            (finalPosition >= otherStart && finalPosition < otherEnd) ||
+            (finalPosition + moveDuration > otherStart && finalPosition < otherStart)
+
+          if (wouldOverlap) {
+            // Snap to nearest edge (before or after the other clip)
+            const distanceToBefore = Math.abs(finalPosition - (otherEnd))
+            const distanceToAfter = Math.abs(finalPosition - otherStart + moveDuration)
+
+            if (distanceToBefore < distanceToAfter) {
+              finalPosition = otherEnd // Snap to end of other clip
+            } else {
+              finalPosition = otherStart - moveDuration // Snap before other clip
+            }
+          }
+
+          // Magnetic snap to edges (within threshold)
+          if (Math.abs(finalPosition - otherEnd) < SNAP_THRESHOLD) {
+            finalPosition = otherEnd // Snap to end of other clip
+          } else if (Math.abs(finalPosition + moveDuration - otherStart) < SNAP_THRESHOLD) {
+            finalPosition = otherStart - moveDuration // Snap end to start of other clip
+          }
+        }
+
+        // Magnetic snap to timeline start
+        if (finalPosition < SNAP_THRESHOLD && finalPosition > 0) {
+          finalPosition = 0
+        }
+
+        // Update clip position
+        const updatedClips = track.clips
+          .map((clip) =>
+            clip.id === clipId ? { ...clip, startTime: finalPosition } : clip
+          )
+          .sort((a, b) => a.startTime - b.startTime)
+
+        return {
+          ...track,
+          clips: updatedClips
+        }
+      })
+
+      // Recalculate total duration
+      const allClips = updatedTracks.flatMap((track) => track.clips)
+      const maxEndTime = allClips.reduce((max, clip) => {
+        const endTime = clip.startTime + getEffectiveDuration(clip)
+        return endTime > max ? endTime : max
+      }, 0)
+
+      return {
+        tracks: updatedTracks,
+        totalDuration: maxEndTime
+      }
+    }),
+
+  /**
    * Reorder clips on a track by moving a clip from sourceIndex to destIndex
    * Recalculates startTime for all clips to maintain sequential positioning
    * Operates on Track 1 (MVP single track)

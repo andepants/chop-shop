@@ -3,7 +3,7 @@
  * Handles file import and thumbnail generation requests from renderer
  */
 
-import { ipcMain, dialog } from 'electron'
+import { ipcMain, dialog, shell } from 'electron'
 import path from 'path'
 import { validateVideoFile } from '../services/file.service'
 import { generateThumbnail } from '../services/thumbnail.service'
@@ -178,6 +178,35 @@ ipcMain.handle(
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
       console.error('[Main] Save dialog failed:', errorMessage)
+
+      return {
+        success: false,
+        error: errorMessage
+      }
+    }
+  }
+)
+
+/**
+ * Handle open-file-location IPC request
+ * Opens the file in the system file manager and selects it
+ */
+ipcMain.handle(
+  'open-file-location',
+  async (_, { filePath }: { filePath: string }): Promise<IPCResponse<boolean>> => {
+    try {
+      console.log('[Main] Opening file location:', filePath)
+
+      // Show the file in its folder
+      shell.showItemInFolder(filePath)
+
+      return {
+        success: true,
+        data: true
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      console.error('[Main] Failed to open file location:', errorMessage)
 
       return {
         success: false,

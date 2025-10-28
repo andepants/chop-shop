@@ -14,6 +14,7 @@ import { useToolStore } from '@/store/toolStore'
 import { useUIStore } from '@/store/uiStore'
 import { TimelineRuler } from './TimelineRuler'
 import { TimelineTrack } from './TimelineTrack'
+import { TimelineGrid } from './TimelineGrid'
 import { Playhead } from './Playhead'
 
 const MIN_ZOOM = 10 // Minimum 10 pixels per second
@@ -91,6 +92,7 @@ export function Timeline(): React.JSX.Element {
     addClip,
     selectClip,
     removeClip,
+    moveClipToPosition,
     reorderClips
   } = useTimelineStore()
 
@@ -173,25 +175,27 @@ export function Timeline(): React.JSX.Element {
   }
 
   /**
-   * Handle drop - add clip to timeline or reorder existing clip
-   * Implements AC #2, #3, #5 (library drag) and AC #3 (clip reorder)
+   * Handle drop - add clip to timeline or move existing clip to position
+   * Implements AC #2, #3, #5 (library drag) and position-based clip movement (Premiere Pro style)
    */
   function handleDrop(e: React.DragEvent): void {
     e.preventDefault()
 
-    // Check for clip reorder (Story 3.4)
-    const clipIndexStr = e.dataTransfer.getData('clipIndex')
-    if (clipIndexStr && clipIndexStr !== '') {
-      const sourceIndex = parseInt(clipIndexStr, 10)
-      const destIndex = dragOverIndex !== null ? dragOverIndex : sourceIndex
+    // Check for clip reorder/move (Story 3.4 + position-based movement)
+    const clipId = e.dataTransfer.getData('clipId')
+    if (clipId && clipId !== '') {
+      // Calculate actual timeline position from drop coordinates
+      if (!containerRef.current) return
+
+      const rect = containerRef.current.getBoundingClientRect()
+      const relativeX = e.clientX - rect.left
+      const dropPosition = relativeX / zoomLevel
 
       // Clear drag state
       setDragOverIndex(null)
 
-      // Only reorder if indices differ
-      if (sourceIndex !== destIndex && !isNaN(sourceIndex)) {
-        reorderClips(sourceIndex, destIndex)
-      }
+      // Move clip to the dropped position (allows gaps, Premiere Pro style)
+      moveClipToPosition(clipId, dropPosition)
       return
     }
 
@@ -225,29 +229,38 @@ export function Timeline(): React.JSX.Element {
    * Handle clip click - Tool-aware routing (Tool Selection System)
    * Routes to different handlers based on active tool
    */
-  function handleClipClick(clipId: string): void {
+  function handleClipClick(clipId: string, e: React.MouseEvent): void {
     const { selectedTool } = useToolStore.getState()
     const { splitClip } = useTimelineStore.getState()
 
     if (selectedTool === 'split') {
-      // Split tool: Split clip at playhead if playhead is over this clip
+      // Split tool: Split clip at mouse click position
       const clip = tracks.flatMap((track) => track.clips).find((c) => c.id === clipId)
       if (!clip) return
 
+      // Calculate mouse position relative to the clip element
+      const clipElement = e.currentTarget as HTMLElement
+      const rect = clipElement.getBoundingClientRect()
+      const mouseX = e.clientX - rect.left
+
+      // Convert mouse X position to timeline time
+      const splitTime = clip.startTime + (mouseX / zoomLevel)
+
+      // Validate split time is within clip bounds (with small edge margin)
       const clipStart = clip.startTime
       const clipEnd = clip.startTime + (clip.duration - clip.trimIn - clip.trimOut)
+      const EDGE_MARGIN = 0.1 // Don't split within 0.1s of edges
 
-      // Check if playhead is within clip bounds
-      if (playheadPosition > clipStart && playheadPosition < clipEnd) {
-        splitClip(clipId, playheadPosition)
-        console.log(`[Timeline] Split clip ${clipId} at ${playheadPosition}s`)
+      if (splitTime > clipStart + EDGE_MARGIN && splitTime < clipEnd - EDGE_MARGIN) {
+        splitClip(clipId, splitTime)
+        console.log(`[Timeline] Split clip ${clipId} at ${splitTime.toFixed(2)}s (mouse position)`)
       } else {
-        // Show user feedback when split fails
+        // Show user feedback when split fails (too close to edges)
         useUIStore.getState().showError(
-          'Position the playhead within the clip to split it.',
+          'Cannot split too close to the edge of a clip.',
           'Cannot Split Clip'
         )
-        console.warn('[Timeline] Playhead not within clip bounds for split operation')
+        console.warn('[Timeline] Split position too close to clip edge')
       }
     } else {
       // Select or Trim tool: Select clip and load in preview
@@ -343,9 +356,16 @@ export function Timeline(): React.JSX.Element {
       {/* Track area with playhead */}
       <div
         ref={containerRef}
+        data-timeline-container
         className="flex-1 relative min-h-[200px]"
         style={{ backgroundColor: 'var(--bg-timeline)' }}
       >
+        {/* Grid lines - CapCut/Premiere Pro style */}
+        <TimelineGrid
+          totalDuration={Math.max(totalDuration, 60)}
+          zoomLevel={zoomLevel}
+        />
+
         {/* Playhead - AC #7 */}
         <Playhead position={playheadPosition} zoomLevel={zoomLevel} />
 
