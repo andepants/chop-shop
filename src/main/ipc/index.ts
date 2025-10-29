@@ -4,6 +4,7 @@
  */
 import { registerFFmpegHandlers } from './ffmpeg.handlers'
 import { registerAIHandlers } from './ai.handlers'
+import { registerClipboardHandlers } from './clipboard.handlers'
 import './file.handlers' // File import/export handlers (self-registering)
 import './transcode.handlers' // Transcode handlers (self-registering)
 import './recording.handlers' // Recording handlers (self-registering)
@@ -16,6 +17,7 @@ export function registerIPCHandlers(): void {
 
   registerFFmpegHandlers()
   registerAIHandlers()
+  registerClipboardHandlers()
 
   console.log('[Main] All IPC handlers registered successfully')
 }

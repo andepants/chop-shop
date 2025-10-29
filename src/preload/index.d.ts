@@ -45,6 +45,20 @@ export interface API {
   hasApiKey: () => Promise<IPCResponse<{ hasKey: boolean }>>
   transcribeAudio: (clips: unknown[]) => Promise<IPCResponse<{ text: string; duration: number; warning?: string }>>
   onTranscriptionProgress: (callback: (data: { percentage: number; message: string }) => void) => () => void
+  generatePosts: (request: {
+    transcription?: string
+    userGuidance?: string
+    personas: string[]
+    platforms: ('youtube' | 'twitter' | 'linkedin')[]
+    includeEmojis: boolean
+  }) => Promise<unknown>
+  onAIStreamChunk: (callback: (data: { platform: string; content: string; complete: boolean }) => void) => () => void
+  onAIGenerationRetry: (callback: (data: { platform: string; attempt: number; maxAttempts: number; delay: number }) => void) => () => void
+  loadCache: () => Promise<unknown>
+  saveCacheEntry: (entry: unknown) => Promise<unknown>
+  clearCache: () => Promise<unknown>
+  writeClipboard: (text: string) => Promise<IPCResponse<void>>
+  readClipboard: () => Promise<IPCResponse<string>>
 }
 
 declare global {

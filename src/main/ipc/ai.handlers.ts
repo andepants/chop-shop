@@ -12,7 +12,8 @@ import { audioExtractorService } from '../services/ai/audio-extractor.service'
 import { whisperService } from '../services/ai/whisper.service'
 import {
   contentGeneratorService,
-  type GenerationRequest
+  type GenerationRequest,
+  type Platform
 } from '../services/ai/content-generator.service'
 import * as cacheService from '../services/ai/cache.service'
 import { exportTimelineForTranscription } from '../services/ai/temp-export.service'
@@ -440,6 +441,83 @@ export function registerAIHandlers(): void {
         return {
           success: false,
           error: 'An unknown error occurred during content generation'
+        }
+      }
+    }
+  )
+
+  /**
+   * Regenerate content for a single platform
+   * Channel: ai:regenerate-platform
+   *
+   * Orchestrates content regeneration for a single platform:
+   * 1. Retrieve API key
+   * 2. Initialize content generator service
+   * 3. Generate post for the specified platform with streaming
+   * 4. Return success/error response
+   *
+   * Emits streaming events: ai-stream-chunk, ai-generation-retry
+   */
+  ipcMain.handle(
+    'ai:regenerate-platform',
+    async (
+      event,
+      platform: Platform,
+      request: GenerationRequest
+    ): Promise<IPCResponse<{ success: boolean }>> => {
+      try {
+        // Get main window for sending streaming events
+        const mainWindow = BrowserWindow.fromWebContents(event.sender)
+
+        if (!mainWindow) {
+          return {
+            success: false,
+            error: 'Main window not found'
+          }
+        }
+
+        // Get API key
+        const apiKey = await apiKeyManager.getKey()
+
+        if (!apiKey) {
+          return {
+            success: false,
+            error: 'No API key found. Please add your OpenAI API key in AI Settings.'
+          }
+        }
+
+        // Initialize content generator service with API key
+        contentGeneratorService.initialize(apiKey)
+
+        // Generate post for single platform
+        const result = await contentGeneratorService.generateSinglePlatform(platform, request, mainWindow)
+
+        // Check if generation failed
+        if (result.error) {
+          return {
+            success: false,
+            error: result.error
+          }
+        }
+
+        return {
+          success: true,
+          data: { success: true }
+        }
+      } catch (error) {
+        console.error('[AIHandlers] Regeneration failed:', error)
+
+        // Return user-friendly error message
+        if (error instanceof Error) {
+          return {
+            success: false,
+            error: error.message
+          }
+        }
+
+        return {
+          success: false,
+          error: 'An unknown error occurred during content regeneration'
         }
       }
     }

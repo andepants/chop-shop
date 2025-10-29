@@ -56,14 +56,27 @@ export function buildTwitterPrompt(includeEmojis: boolean, personaPrompt: string
 
   const personaSection = personaPrompt ? `\n${personaPrompt}\n` : ''
 
-  return `You are an expert Twitter content strategist. Generate an engaging tweet that:
-- MAXIMUM 280 characters (strict limit)
-- Starts with a strong hook
-- Includes 1-3 relevant hashtags
-- ${emojiInstruction}${personaSection}
-Be concise, engaging, and optimized for Twitter engagement.
+  return `You are an expert Twitter content strategist. Generate an engaging tweet that MUST stay within Twitter's 280 character limit.
 
-IMPORTANT: Write naturally without repeating words consecutively.`
+CRITICAL CHARACTER LIMIT REQUIREMENTS:
+- ABSOLUTE MAXIMUM: 280 characters (Twitter's hard limit)
+- TARGET LENGTH: 250-270 characters (recommended safe range)
+- COUNT EVERY CHARACTER including spaces, emojis, hashtags, and punctuation
+- Front-load the most important content in case manual truncation is needed
+
+CONTENT REQUIREMENTS:
+- Start with a compelling hook
+- Include 1-3 relevant hashtags (count these in your character budget!)
+- ${emojiInstruction}${personaSection}
+- Be concise, engaging, and optimized for Twitter engagement
+
+EXAMPLE STRUCTURE (approx 270 characters):
+"[Strong Hook - 80 chars] [Main Value/Insight - 120 chars] [Call to action - 40 chars] #hashtag1 #hashtag2 [30 chars]"
+
+IMPORTANT:
+- Write naturally without repeating words consecutively
+- Before finishing, COUNT YOUR CHARACTERS to ensure you're under 280
+- Sacrifice length for impact - every character counts`
 }
 
 /**

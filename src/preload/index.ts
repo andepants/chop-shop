@@ -237,6 +237,24 @@ const api = {
     ipcRenderer.invoke('ai:generate-posts', request),
 
   /**
+   * Regenerate content for a single platform
+   * @param platform - Platform to regenerate (youtube, twitter, linkedin)
+   * @param request - Generation request (personas, transcription, guidance, emojis)
+   * @returns Promise with regeneration result
+   */
+  regeneratePlatform: (
+    platform: 'youtube' | 'twitter' | 'linkedin',
+    request: {
+      transcription?: string
+      userGuidance?: string
+      personas: string[]
+      platforms: ('youtube' | 'twitter' | 'linkedin')[]
+      includeEmojis: boolean
+    }
+  ) =>
+    ipcRenderer.invoke('ai:regenerate-platform', platform, request),
+
+  /**
    * Subscribe to AI stream chunk events (content generation streaming)
    * @param callback - Callback function receiving stream chunks
    * @returns Cleanup function to remove the listener
@@ -280,7 +298,23 @@ const api = {
    * @returns Promise with clear result
    */
   clearCache: () =>
-    ipcRenderer.invoke('ai:clear-cache')
+    ipcRenderer.invoke('ai:clear-cache'),
+
+  /**
+   * Write text to system clipboard using Electron's native clipboard API
+   * More reliable than web Clipboard API in Electron renderer processes
+   * @param text - Text to copy to clipboard
+   * @returns Promise with copy result
+   */
+  writeClipboard: (text: string) =>
+    ipcRenderer.invoke('clipboard:write-text', text),
+
+  /**
+   * Read text from system clipboard
+   * @returns Promise with clipboard text content
+   */
+  readClipboard: () =>
+    ipcRenderer.invoke('clipboard:read-text')
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

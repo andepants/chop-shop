@@ -137,6 +137,7 @@ interface AIState {
   appendStreamChunk: (platform: Platform, content: string) => void
   setStreamingStatus: (platform: Platform, status: StreamingStatus) => void
   clearGeneratedPosts: () => void
+  regeneratePlatform: (platform: Platform) => Promise<boolean>
 
   // Cache actions
   setCacheEntries: (entries: CacheEntry[]) => void
@@ -528,6 +529,63 @@ export const useAIStore = create<AIState>((set) => ({
       }
     } catch (error) {
       console.error('Failed to clear cache:', error)
+      return false
+    }
+  },
+
+  /**
+   * Regenerate content for a single platform
+   * @param platform - Platform to regenerate
+   * @returns True if regeneration started successfully
+   */
+  regeneratePlatform: async (platform: Platform): Promise<boolean> => {
+    try {
+      const state = useAIStore.getState()
+
+      // Build generation request from current state
+      const request = {
+        transcription: state.includeTranscription ? state.transcriptionText : undefined,
+        userGuidance: state.userGuidance || undefined,
+        personas: state.selectedPersonas,
+        platforms: state.selectedPlatforms, // Full list for context
+        includeEmojis: state.includeEmojis
+      }
+
+      // Clear previous content for this platform and set to streaming
+      set((state) => ({
+        generatedPosts: {
+          ...state.generatedPosts,
+          [platform]: ''
+        },
+        streamingStatus: {
+          ...state.streamingStatus,
+          [platform]: 'streaming'
+        }
+      }))
+
+      const response = await window.api.regeneratePlatform(platform, request)
+
+      if (response.success) {
+        return true
+      } else {
+        console.error('Failed to regenerate platform:', response.error)
+        // Set error status
+        set((state) => ({
+          streamingStatus: {
+            ...state.streamingStatus,
+            [platform]: 'error'
+          }
+        }))
+        return false
+      }
+    } catch (error) {
+      console.error('Failed to regenerate platform:', error)
+      set((state) => ({
+        streamingStatus: {
+          ...state.streamingStatus,
+          [platform]: 'error'
+        }
+      }))
       return false
     }
   }

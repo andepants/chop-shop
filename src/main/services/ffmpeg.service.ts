@@ -800,38 +800,65 @@ export async function executeExport(
  * @param targetWidth - Target width in pixels
  * @param targetHeight - Target height in pixels
  * @param clipId - Clip ID for temporary file naming
+ * @param hasAudio - Whether the clip has audio (default: true for backwards compatibility)
  * @returns Promise with path to normalized temporary file
  */
 async function normalizeClipForConcat(
   clipPath: string,
   targetWidth: number,
   targetHeight: number,
-  clipId: string
+  clipId: string,
+  hasAudio: boolean = true
 ): Promise<string> {
   const normalizedPath = `/tmp/normalized_${clipId}.mp4`
 
   console.log('[FFmpeg] Normalizing clip for concat:', {
     input: clipPath,
     output: normalizedPath,
-    targetResolution: `${targetWidth}x${targetHeight}`
+    targetResolution: `${targetWidth}x${targetHeight}`,
+    hasAudio
   })
 
   try {
-    const args = [
-      '-i', clipPath,
-      '-filter_complex',
-      `[0:v]scale=${targetWidth}:${targetHeight},setpts=PTS-STARTPTS,fps=30[v];[0:a]asetpts=PTS-STARTPTS,aresample=48000,aformat=channel_layouts=stereo[a]`,
-      '-map', '[v]',
-      '-map', '[a]',
+    const args = ['-i', clipPath]
+
+    // Build filter_complex conditionally based on audio presence
+    // NOTE: setsar=1 normalizes SAR (Sample Aspect Ratio) to 1:1 to ensure concat compatibility
+    if (hasAudio) {
+      args.push(
+        '-filter_complex',
+        `[0:v]scale=${targetWidth}:${targetHeight},setsar=1,setpts=PTS-STARTPTS,fps=30[v];[0:a]asetpts=PTS-STARTPTS,aresample=48000,aformat=channel_layouts=stereo[a]`,
+        '-map', '[v]',
+        '-map', '[a]'
+      )
+    } else {
+      // Video-only: no audio processing
+      args.push(
+        '-filter_complex',
+        `[0:v]scale=${targetWidth}:${targetHeight},setsar=1,setpts=PTS-STARTPTS,fps=30[v]`,
+        '-map', '[v]'
+      )
+    }
+
+    // Video codec settings
+    args.push(
       '-pix_fmt', 'yuv420p',
       '-c:v', 'libx264',
       '-preset', 'ultrafast', // Fast pre-processing
-      '-crf', '18', // Maintain quality
-      '-c:a', 'aac', // Normalize audio codec
-      '-b:a', '192k', // Audio bitrate
-      '-y',
-      normalizedPath
-    ]
+      '-crf', '18' // Maintain quality
+    )
+
+    // Audio codec settings - only if clip has audio
+    if (hasAudio) {
+      args.push(
+        '-c:a', 'aac', // Normalize audio codec
+        '-b:a', '192k' // Audio bitrate
+      )
+    } else {
+      args.push('-an') // Explicitly disable audio
+    }
+
+    args.push('-y', normalizedPath)
 
     await executeFFmpegCommand(args)
 
@@ -1427,7 +1454,8 @@ export async function executeMultiPassExport(
         clip.intermediatePath,
         targetWidth,
         targetHeight,
-        `t1_${clip.id}`
+        `t1_${clip.id}`,
+        clip.hasAudio !== false // Default to true for backwards compatibility
       )
       normalizedTrack1.push(normalizedPath)
       tempFiles.push(normalizedPath)
@@ -1550,7 +1578,8 @@ export async function executeMultiPassExport(
           clip.intermediatePath,
           targetWidth,
           targetHeight,
-          `t2_${clip.id}`
+          `t2_${clip.id}`,
+          clip.hasAudio !== false // Default to true for backwards compatibility
         )
         normalizedTrack2.push(normalizedPath)
         tempFiles.push(normalizedPath)

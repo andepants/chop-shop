@@ -125,6 +125,52 @@ export class ContentGeneratorService {
   }
 
   /**
+   * Generate post for a single platform (used for regeneration)
+   *
+   * @param platform - Single platform to generate for
+   * @param request - Generation request with content and settings (platforms field ignored)
+   * @param mainWindow - Electron window for streaming chunks via IPC
+   * @returns Platform result (success or failure)
+   */
+  async generateSinglePlatform(
+    platform: Platform,
+    request: GenerationRequest,
+    mainWindow: BrowserWindow
+  ): Promise<PlatformResult> {
+    if (!this.openai) {
+      throw new Error('OpenAI client not initialized. Call initialize() first.')
+    }
+
+    // Build persona prompt
+    const personaPrompt = buildPersonaPrompt(request.personas)
+
+    // Build user message from transcription/guidance
+    const userMessage = this.buildUserMessage(request.transcription, request.userGuidance)
+
+    try {
+      const content = await this.generateForPlatform(
+        platform,
+        userMessage,
+        personaPrompt,
+        request.includeEmojis,
+        mainWindow
+      )
+
+      return {
+        platform,
+        content
+      }
+    } catch (error) {
+      console.error(`[ContentGenerator] ${platform} generation failed:`, error)
+      return {
+        platform,
+        content: '',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }
+    }
+  }
+
+  /**
    * Generate content for a single platform with streaming and retry logic
    *
    * @param platform - Target platform (youtube, twitter, linkedin)
