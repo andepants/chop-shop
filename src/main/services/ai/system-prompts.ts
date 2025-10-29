@@ -31,7 +31,9 @@ export function buildYouTubePrompt(includeEmojis: boolean, personaPrompt: string
 - Provides value and context
 - Uses clear section headers
 - ${emojiInstruction}${personaSection}
-Keep descriptions informative and engaging, optimized for YouTube search.`
+Keep descriptions informative and engaging, optimized for YouTube search.
+
+IMPORTANT: Write naturally without repeating words consecutively (e.g., avoid "TitleTitle" or "DescriptionDescription").`
 }
 
 /**
@@ -59,7 +61,9 @@ export function buildTwitterPrompt(includeEmojis: boolean, personaPrompt: string
 - Starts with a strong hook
 - Includes 1-3 relevant hashtags
 - ${emojiInstruction}${personaSection}
-Be concise, engaging, and optimized for Twitter engagement.`
+Be concise, engaging, and optimized for Twitter engagement.
+
+IMPORTANT: Write naturally without repeating words consecutively.`
 }
 
 /**
@@ -88,5 +92,7 @@ export function buildLinkedInPrompt(includeEmojis: boolean, personaPrompt: strin
 - Provides insights or takeaways
 - Engages professional audience
 - ${emojiInstruction}${personaSection}
-Keep it professional, insightful, and optimized for LinkedIn engagement.`
+Keep it professional, insightful, and optimized for LinkedIn engagement.
+
+IMPORTANT: Write naturally without repeating words consecutively.`
 }

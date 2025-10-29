@@ -819,12 +819,16 @@ async function normalizeClipForConcat(
   try {
     const args = [
       '-i', clipPath,
-      '-vf', `scale=${targetWidth}:${targetHeight},setpts=PTS-STARTPTS,fps=30`,
+      '-filter_complex',
+      `[0:v]scale=${targetWidth}:${targetHeight},setpts=PTS-STARTPTS,fps=30[v];[0:a]asetpts=PTS-STARTPTS,aresample=48000,aformat=channel_layouts=stereo[a]`,
+      '-map', '[v]',
+      '-map', '[a]',
       '-pix_fmt', 'yuv420p',
       '-c:v', 'libx264',
       '-preset', 'ultrafast', // Fast pre-processing
       '-crf', '18', // Maintain quality
-      '-an', // No audio (audio will be handled separately)
+      '-c:a', 'aac', // Normalize audio codec
+      '-b:a', '192k', // Audio bitrate
       '-y',
       normalizedPath
     ]
@@ -1696,15 +1700,15 @@ export async function executeMultiPassExport(
       if (track1HasAudio && track2HasAudio) {
         overlayFilter += `;[0:a]volume=${track1Volume}[a1];[1:a]volume=${track2Volume}[a2];[a1][a2]amix=inputs=2:duration=longest[outa]`
       } else if (track1HasAudio) {
-        overlayFilter += ';[0:a]volume=${track1Volume}[outa]'
+        overlayFilter += `;[0:a]volume=${track1Volume}[outa]`
       } else if (track2HasAudio) {
-        overlayFilter += ';[1:a]volume=${track2Volume}[outa]'
+        overlayFilter += `;[1:a]volume=${track2Volume}[outa]`
       }
     } else {
       // No overlay - just pass through Track 1
       overlayFilter = '[0:v]copy[outv]'
       if (track1HasAudio) {
-        overlayFilter += ';[0:a]volume=${track1Volume}[outa]'
+        overlayFilter += `;[0:a]volume=${track1Volume}[outa]`
       }
     }
 

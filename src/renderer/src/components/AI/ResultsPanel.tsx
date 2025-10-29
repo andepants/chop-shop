@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState, useRef } from 'react'
-import { useAIStore, type Platform, type StreamingStatus } from '../../store/aiStore'
+import { useAIStore, type Platform } from '../../store/aiStore'
 import { Button } from '../ui/button'
 import { Alert, AlertDescription } from '../ui/alert'
 import { Copy, Check, Loader2, Youtube, Twitter, Linkedin, AlertCircle, Trash2 } from 'lucide-react'
@@ -115,11 +115,10 @@ function PlatformResultCard({ platform }: { platform: Platform }) {
   // Loading state
   const isLoading = streamingStatus === 'streaming'
   const isIdle = streamingStatus === 'idle'
-  const isComplete = streamingStatus === 'complete'
   const isError = streamingStatus === 'error'
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-5 flex flex-col h-full">
+    <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -132,7 +131,7 @@ function PlatformResultCard({ platform }: { platform: Platform }) {
       <div
         ref={contentRef}
         onScroll={handleScroll}
-        className="flex-1 bg-zinc-950 border border-zinc-800 rounded-md p-4 mb-3 overflow-y-auto min-h-[200px] max-h-[400px] relative"
+        className="flex-1 bg-zinc-950 border border-zinc-800 rounded-md p-3 mb-3 overflow-y-auto min-h-[150px] max-h-[250px] relative"
         style={{
           scrollBehavior: 'smooth'
         }}

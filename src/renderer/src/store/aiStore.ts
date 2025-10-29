@@ -7,6 +7,7 @@
 
 import { create } from 'zustand'
 import type { CacheEntry } from '../types/cache.types'
+import { cleanAIContent } from '../utils/text-cleanup'
 
 /**
  * Result of API key connection test
@@ -295,7 +296,7 @@ export const useAIStore = create<AIState>((set) => ({
     set((state) => ({
       generatedPosts: {
         ...state.generatedPosts,
-        [platform]: state.generatedPosts[platform] + content
+        [platform]: cleanAIContent(state.generatedPosts[platform] + content)
       }
     })),
 
@@ -402,7 +403,8 @@ export const useAIStore = create<AIState>((set) => ({
     } catch (error) {
       const errorResult: ConnectionTestResult = {
         valid: false,
-        message: error instanceof Error ? error.message : 'An error occurred while testing the connection',
+        message:
+          error instanceof Error ? error.message : 'An error occurred while testing the connection',
         timestamp: Date.now()
       }
 
