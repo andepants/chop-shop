@@ -1,11 +1,9 @@
 /**
  * MainLayout Component
  * Main application layout with 3-panel structure:
- * - TopBar (top, full-width)
  * - Sidebar (left, fixed width)
  * - Center area split into Preview and Timeline with PlaybackBar
  */
-import { TopBar } from './TopBar'
 import { Sidebar } from './Sidebar'
 import { Timeline, ToolSelectionBar } from '@/components/Timeline'
 import { PreviewPlayer, PlaybackBar } from '@/components/Preview'
@@ -20,9 +18,6 @@ export function MainLayout(): React.JSX.Element {
       className="flex flex-col h-screen w-screen overflow-hidden"
       style={{ backgroundColor: 'var(--bg-primary)' }}
     >
-      {/* Top Bar */}
-      <TopBar />
-
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar */}

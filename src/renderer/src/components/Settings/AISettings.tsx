@@ -180,9 +180,9 @@ export function AISettings() {
 
       {/* API Key Status */}
       {hasApiKey && (
-        <Alert className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
-          <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-          <AlertDescription className="text-green-800 dark:text-green-200">
+        <Alert className="bg-zinc-800 border-green-800">
+          <CheckCircle2 className="h-4 w-4 text-green-400" />
+          <AlertDescription className="text-green-200">
             API key is configured and stored securely
           </AlertDescription>
         </Alert>
@@ -237,20 +237,20 @@ export function AISettings() {
         <Alert
           className={
             lastTestResult.valid
-              ? 'bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800'
-              : 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800'
+              ? 'bg-zinc-800 border-green-800'
+              : 'bg-zinc-800 border-red-800'
           }
         >
           {lastTestResult.valid ? (
-            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <CheckCircle2 className="h-4 w-4 text-green-400" />
           ) : (
-            <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+            <XCircle className="h-4 w-4 text-red-400" />
           )}
           <AlertDescription
             className={
               lastTestResult.valid
-                ? 'text-green-800 dark:text-green-200'
-                : 'text-red-800 dark:text-red-200'
+                ? 'text-green-200'
+                : 'text-red-200'
             }
           >
             {lastTestResult.message}

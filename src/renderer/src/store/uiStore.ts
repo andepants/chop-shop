@@ -198,21 +198,31 @@ export const useUIStore = create<UIStore>((set) => ({
     })),
 
   // Settings actions
-  openSettings: () =>
-    set((state) => ({
-      settings: {
-        ...state.settings,
-        isOpen: true
+  openSettings: () => {
+    console.log('[UIStore] openSettings called')
+    set((state) => {
+      console.log('[UIStore] Setting isOpen to true. Current state:', state.settings)
+      return {
+        settings: {
+          ...state.settings,
+          isOpen: true
+        }
       }
-    })),
+    })
+  },
 
-  closeSettings: () =>
-    set((state) => ({
-      settings: {
-        ...state.settings,
-        isOpen: false
+  closeSettings: () => {
+    console.log('[UIStore] closeSettings called')
+    set((state) => {
+      console.log('[UIStore] Setting isOpen to false. Current state:', state.settings)
+      return {
+        settings: {
+          ...state.settings,
+          isOpen: false
+        }
       }
-    })),
+    })
+  },
 
   // AI Generator actions
   showAIGenerator: () =>

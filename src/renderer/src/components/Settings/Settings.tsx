@@ -30,8 +30,13 @@ interface SettingsProps {
 export function Settings({ open, onOpenChange }: SettingsProps) {
   const [activeTab, setActiveTab] = useState('ai')
 
+  console.log('[Settings] Component rendered. open =', open)
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(newOpen) => {
+      console.log('[Settings] Dialog onOpenChange called. newOpen =', newOpen)
+      onOpenChange(newOpen)
+    }}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

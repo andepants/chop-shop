@@ -16,9 +16,24 @@ import { useWorkflowStore } from './store/workflowStore'
 function App(): React.JSX.Element {
   const isSettingsOpen = useUIStore((state) => state.settings.isOpen)
   const closeSettings = useUIStore((state) => state.closeSettings)
+  const openSettings = useUIStore((state) => state.openSettings)
+
+  console.log('[App] Rendering. isSettingsOpen =', isSettingsOpen)
 
   const isWorkflowActive = useWorkflowStore((state) => state.isWorkflowActive)
   const currentTab = useWorkflowStore((state) => state.currentTab)
+
+  /**
+   * Handle settings dialog state change
+   */
+  const handleSettingsChange = (open: boolean) => {
+    console.log('[App] handleSettingsChange called with open =', open)
+    if (open) {
+      openSettings()
+    } else {
+      closeSettings()
+    }
+  }
 
   // Determine which workflow screen to show based on current tab
   const renderWorkflowScreen = () => {
@@ -48,7 +63,7 @@ function App(): React.JSX.Element {
       <ErrorDialog />
       <RecordingModeModal />
       <RecordingTimer />
-      <Settings open={isSettingsOpen} onOpenChange={closeSettings} />
+      <Settings open={isSettingsOpen} onOpenChange={handleSettingsChange} />
     </>
   )
 }

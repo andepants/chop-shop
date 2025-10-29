@@ -13,9 +13,13 @@ import { Download, Settings } from 'lucide-react'
  * Top bar with application branding and export button
  */
 export function TopBar(): React.JSX.Element {
+  console.log('[TopBar] Component mounted/rendered')
+
   const tracks = useTimelineStore((state) => state.tracks)
   const openExportModal = useUIStore((state) => state.openExportModal)
   const openSettings = useUIStore((state) => state.openSettings)
+
+  console.log('[TopBar] openSettings function:', openSettings)
 
   // Calculate total clips count
   const totalClips = tracks.reduce((count, track) => count + track.clips.length, 0)
@@ -65,7 +69,11 @@ export function TopBar(): React.JSX.Element {
       <div className="flex items-center gap-2">
         {/* Settings Button */}
         <Button
-          onClick={openSettings}
+          onClick={() => {
+            console.log('[TopBar] Settings button clicked')
+            openSettings()
+            console.log('[TopBar] openSettings() called')
+          }}
           size="sm"
           variant="ghost"
           className="h-8 w-8 p-0"

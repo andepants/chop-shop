@@ -180,8 +180,8 @@ export function ExportScreen(): React.JSX.Element {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-zinc-950 flex items-center justify-center">
-      <div className="w-full max-w-2xl p-8">
+    <div className="fixed inset-0 z-50 bg-zinc-950 flex items-center justify-center p-4">
+      <div className="w-full max-w-2xl mx-auto bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-zinc-800/50 p-8 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-2xl font-bold text-white">
@@ -204,20 +204,24 @@ export function ExportScreen(): React.JSX.Element {
 
             {/* Validation Alert - No Clips */}
             {!hasClips && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription className="flex items-center justify-between">
-                  <span>No clips found on timeline. Add clips to the Edit tab before exporting.</span>
+              <Alert variant="destructive" className="text-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-center">
+                      No clips found on timeline. Add clips to the Edit tab before exporting.
+                    </AlertDescription>
+                  </div>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentTab('edit')}
-                    className="ml-4 border-red-600 text-red-400 hover:bg-red-600/10"
+                    className="border-red-600 text-red-400 hover:bg-red-600/10"
                   >
                     <Film className="mr-2 h-4 w-4" />
                     Go to Edit
                   </Button>
-                </AlertDescription>
+                </div>
               </Alert>
             )}
 
