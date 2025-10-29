@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import { IPCResponse, IPC_CHANNELS } from '../shared/types'
+import { IPCResponse, IPC_CHANNELS, RecordingMode, RecordingOutputFiles } from '../shared/types'
 
 /**
  * Custom APIs exposed to renderer process
@@ -133,7 +133,37 @@ const api = {
    * @returns Promise with success result
    */
   openFileLocation: (filePath: string) =>
-    ipcRenderer.invoke('open-file-location', { filePath })
+    ipcRenderer.invoke('open-file-location', { filePath }),
+
+  /**
+   * Start recording with selected mode
+   * @param options - Recording options (mode)
+   * @returns Promise with recording start result
+   */
+  startRecording: (options: { mode: RecordingMode }) =>
+    ipcRenderer.invoke('recording:start', options),
+
+  /**
+   * Stop recording and get output file paths
+   * @returns Promise with output files
+   */
+  stopRecording: (): Promise<IPCResponse<{ outputFiles: RecordingOutputFiles }>> =>
+    ipcRenderer.invoke('recording:stop'),
+
+  /**
+   * Get current recording state from main process
+   * @returns Promise with recording state
+   */
+  getRecordingState: () =>
+    ipcRenderer.invoke('recording:get-state'),
+
+  /**
+   * Reset recording state in main process
+   * Used for recovery when renderer and main process states are out of sync
+   * @returns Promise with success result
+   */
+  resetRecordingState: () =>
+    ipcRenderer.invoke('recording:reset-state')
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

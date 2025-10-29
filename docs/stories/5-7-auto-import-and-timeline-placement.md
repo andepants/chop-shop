@@ -1,6 +1,6 @@
 # Story 5.7: Auto-Import and Timeline Placement
 
-Status: drafted
+Status: Approved
 
 ## Story
 

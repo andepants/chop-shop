@@ -1,0 +1,201 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>5</epicId>
+    <storyId>2</storyId>
+    <title>Recording Mode Selection UI</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/5-2-recording-mode-selection-ui.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>content creator</asA>
+    <iWant>a simple 3-button modal to choose my recording mode</iWant>
+    <soThat>I can quickly start recording without configuration dialogs</soThat>
+    <tasks>
+      - Add Record button to sidebar (AC: 1)
+      - Create recording store (AC: 8, 9)
+      - Create RecordingModeModal component (AC: 2, 3)
+      - Implement mode selection buttons (AC: 4, 5)
+      - Implement dark theme styling (AC: 7)
+      - Integrate IPC communication (AC: 10)
+      - Create IPC handler stub (AC: 10)
+      - Wire up cancel functionality (AC: 6)
+      - Add component tests
+      - Create Recording component README
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-1">"Record" button added to left sidebar (Sidebar.tsx) with recording icon</criterion>
+    <criterion id="AC-2">`RecordingModeModal.tsx` component created with 3 mode buttons: "Screen Only", "Webcam Only", "Screen + Webcam (PiP)"</criterion>
+    <criterion id="AC-3">Modal opens when user clicks "Record" button in sidebar</criterion>
+    <criterion id="AC-4">"Screen + Webcam (PiP)" button visually highlighted as recommended/default option</criterion>
+    <criterion id="AC-5">Clicking any mode button triggers recording start and closes modal</criterion>
+    <criterion id="AC-6">Modal includes cancel button to close without starting recording</criterion>
+    <criterion id="AC-7">Modal styled with dark theme consistent with CapCut reference design</criterion>
+    <criterion id="AC-8">`recordingStore.ts` Zustand store created with minimal state: `isRecording`, `mode`, `duration`, `outputFiles`</criterion>
+    <criterion id="AC-9">Store actions defined: `startRecording(mode)`, `stopRecording()`, `updateDuration(duration)`</criterion>
+    <criterion id="AC-10">IPC integration: clicking mode button invokes `'recording:start'` IPC channel with selected mode</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Minimal Component Layer</section>
+        <snippet>RecordingModeModal with 3-button modal: Screen Only / Webcam Only / Screen + Webcam (PiP). No source selectors, no preview controls, no configuration screens.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>State Management</section>
+        <snippet>recordingStore with minimal state: isRecording, mode, duration, outputFiles. Actions: startRecording(mode), stopRecording(), updateDuration(duration).</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>APIs and Interfaces - IPC Commands</section>
+        <snippet>IPC channel 'recording:start' with RecordingMode parameter. Response: IPCResponse with success boolean.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Workflow 3: Picture-in-Picture Recording</section>
+        <snippet>PiP mode is primary use case, should be visually highlighted as [DEFAULT/HIGHLIGHTED] option in modal.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Decision Architecture</title>
+        <section>Project Structure - Recording Components</section>
+        <snippet>Recording components at src/renderer/components/Recording/. Store at src/renderer/store/recordingStore.ts. IPC handler at src/main/ipc/recording.handlers.ts.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/renderer/src/components/Export/ExportModal.tsx</path>
+        <kind>component</kind>
+        <symbol>ExportModal</symbol>
+        <lines>1-80</lines>
+        <reason>Reference pattern for modal structure using Radix UI Dialog, state management with Zustand stores (useUIStore), and IPC communication patterns</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/components/Layout/Sidebar.tsx</path>
+        <kind>component</kind>
+        <symbol>Sidebar</symbol>
+        <lines>all</lines>
+        <reason>Need to add Record button to sidebar following existing button patterns and layout</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/components/ui/dialog.tsx</path>
+        <kind>component</kind>
+        <symbol>Dialog components</symbol>
+        <lines>all</lines>
+        <reason>Radix UI Dialog primitives used for modal implementation</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/components/shared/Button.tsx</path>
+        <kind>component</kind>
+        <symbol>Button</symbol>
+        <lines>all</lines>
+        <reason>Shared button component for consistent styling of mode selection buttons</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/store/uiStore.ts</path>
+        <kind>store</kind>
+        <symbol>uiStore</symbol>
+        <lines>all</lines>
+        <reason>Pattern for UI state management including modal open/close logic to replicate for recording modal</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/store/timelineStore.ts</path>
+        <kind>store</kind>
+        <symbol>timelineStore</symbol>
+        <lines>all</lines>
+        <reason>Zustand store pattern reference for implementing recordingStore with TypeScript types</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="zustand" version="^5.0.8">State management library for recordingStore</package>
+        <package name="@radix-ui/react-dialog" version="^1.1.15">Modal/dialog primitives for RecordingModeModal</package>
+        <package name="lucide-react" version="^0.548.0">Icon library for recording button icons</package>
+        <package name="react" version="^19.1.1">React framework</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>RecordingModeModal must live in src/renderer/components/Recording/ directory</constraint>
+    <constraint>recordingStore must follow Zustand pattern at src/renderer/store/recordingStore.ts</constraint>
+    <constraint>IPC handler must be in src/main/ipc/recording.handlers.ts</constraint>
+    <constraint>NO source selection dropdowns - mode selection only</constraint>
+    <constraint>NO preview window before recording - instant start</constraint>
+    <constraint>NO configuration options (resolution, framerate) - just mode selection</constraint>
+    <constraint>PiP mode must be visually highlighted as recommended/default</constraint>
+    <constraint>Dark theme styling must match existing CapCut-inspired design</constraint>
+    <constraint>Must use Radix UI Dialog components for modal (existing pattern)</constraint>
+    <constraint>Must integrate with existing uiStore for modal open/close state</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>recordingStore</name>
+      <kind>Zustand store</kind>
+      <signature>
+interface RecordingState {
+  isRecording: boolean;
+  mode: RecordingMode | null;
+  duration: number;
+  outputFiles: { screen?: string; webcam?: string };
+  startRecording: (mode: RecordingMode) => Promise&lt;void&gt;;
+  stopRecording: () => Promise&lt;void&gt;;
+  updateDuration: (duration: number) => void;
+}
+      </signature>
+      <path>src/renderer/store/recordingStore.ts</path>
+    </interface>
+    <interface>
+      <name>RecordingModeModal</name>
+      <kind>React component</kind>
+      <signature>export function RecordingModeModal(): React.JSX.Element</signature>
+      <path>src/renderer/components/Recording/RecordingModeModal.tsx</path>
+    </interface>
+    <interface>
+      <name>IPC: recording:start</name>
+      <kind>IPC channel</kind>
+      <signature>ipcRenderer.invoke('recording:start', { mode: RecordingMode }) => IPCResponse&lt;{ success: boolean }&gt;</signature>
+      <path>src/main/ipc/recording.handlers.ts</path>
+    </interface>
+    <interface>
+      <name>RecordingMode</name>
+      <kind>TypeScript type</kind>
+      <signature>type RecordingMode = 'screen' | 'webcam' | 'pip'</signature>
+      <path>Shared type definition</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>React component testing using @testing-library/react and vitest. Mock Zustand stores and IPC calls. Test user interactions (button clicks, modal open/close). Verify correct IPC invocations with proper parameters.</standards>
+    <locations>
+      - src/renderer/components/Recording/RecordingModeModal.test.tsx
+      - src/renderer/store/recordingStore.test.ts
+    </locations>
+    <ideas>
+      <idea ac-id="AC-1">Test Record button appears in Sidebar with correct icon and onClick handler</idea>
+      <idea ac-id="AC-3">Test clicking Record button opens RecordingModeModal (verify modal state change)</idea>
+      <idea ac-id="AC-2">Test RecordingModeModal renders 3 mode buttons with correct labels</idea>
+      <idea ac-id="AC-4">Test PiP button has highlighted styling (check CSS classes or data attributes)</idea>
+      <idea ac-id="AC-5">Test clicking each mode button invokes IPC with correct mode parameter</idea>
+      <idea ac-id="AC-5">Test modal closes after mode selection</idea>
+      <idea ac-id="AC-6">Test cancel button closes modal without invoking IPC</idea>
+      <idea ac-id="AC-6">Test ESC key closes modal</idea>
+      <idea ac-id="AC-8">Test recordingStore initializes with correct default state</idea>
+      <idea ac-id="AC-9">Test startRecording action updates isRecording and mode</idea>
+      <idea ac-id="AC-9">Test stopRecording action resets state</idea>
+      <idea ac-id="AC-10">Mock window.electron.ipcRenderer.invoke and verify 'recording:start' called with mode</idea>
+    </ideas>
+  </tests>
+</story-context>

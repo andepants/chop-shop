@@ -1,0 +1,180 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>5</epicId>
+    <storyId>1</storyId>
+    <title>Recording Service Setup</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/5-1-recording-service-setup.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>a centralized recording service with auto-configuration capabilities</iWant>
+    <soThat>Epic 5's simplified recording features have a solid, testable foundation</soThat>
+    <tasks>
+      - Create recording service file and types (AC: 1)
+      - Implement auto-source selection methods (AC: 2, 3)
+      - Define fixed recording configuration (AC: 4)
+      - Create temp directory management (AC: 5)
+      - Implement service method stubs (AC: 6)
+      - Implement comprehensive error handling (AC: 7)
+      - Write integration tests (AC: 8)
+      - Implement logging system (AC: 9)
+      - Create recording state management (AC: 10)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-1">`recording.service.ts` created in `src/main/services/` with complete TypeScript types</criterion>
+    <criterion id="AC-2">Auto-select primary screen using `desktopCapturer.getSources()` with no user input required</criterion>
+    <criterion id="AC-3">Auto-select default webcam using `navigator.mediaDevices.enumerateDevices()` with fallback logic</criterion>
+    <criterion id="AC-4">Fixed recording configuration constants defined (resolution, framerate, bitrate, webcam positioning)</criterion>
+    <criterion id="AC-5">Temp directory structure created at `os.tmpdir()/chop-shop/recordings/` with error handling</criterion>
+    <criterion id="AC-6">Service methods defined for `getPrimaryScreen()`, `getDefaultWebcam()`, `startRecording()`, `stopRecording()`</criterion>
+    <criterion id="AC-7">Comprehensive error handling with user-friendly messages for permission denials and device unavailability</criterion>
+    <criterion id="AC-8">Service integration tests verify auto-selection logic without requiring actual devices</criterion>
+    <criterion id="AC-9">Logging implemented with `[Recording]` prefix for all service operations</criterion>
+    <criterion id="AC-10">Recording state management stub in service (tracks `isRecording`, `currentMode`, `outputFiles`)</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification: Screen & Webcam Capture (Simplified)</title>
+        <section>Services and Modules</section>
+        <snippet>RecordingService handles all recording logic: screen capture, webcam capture, PiP coordination, MediaRecorder management, auto-source selection, temp file storage. Single self-contained service file (~300-400 lines).</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Data Models and Contracts - RECORDING_DEFAULTS</section>
+        <snippet>Fixed configuration with screen: 1920x1080 @ 30fps, 8Mbps; webcam: 640x480 @ 30fps, 2.5Mbps, bottom-right, 20% size, circular shape; audio: auto-select microphone with echo cancellation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>APIs and Interfaces - RecordingService API</section>
+        <snippet>getPrimaryScreen() and getDefaultWebcam() methods auto-select sources with no user choice. startRecording(mode) and stopRecording() manage recording lifecycle.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Non-Functional Requirements - Security</section>
+        <snippet>Must handle macOS screen recording permissions gracefully. Clear user guidance when permissions denied. Validate all file paths. Ensure MediaStream cleanup on stop to release camera/mic.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Non-Functional Requirements - Observability</section>
+        <snippet>Log recording start/stop events with mode, duration, file sizes using `[Recording]` prefix. Log all errors with full stack traces and context.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Decision Architecture</title>
+        <section>Project Structure - Main Process Services</section>
+        <snippet>Services located at src/main/services/ following singleton pattern like ffmpeg.service.ts and file.service.ts. Main process only, no renderer involvement.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/main/services/ffmpeg.service.ts</path>
+        <kind>service</kind>
+        <symbol>FFmpegService</symbol>
+        <lines>1-100</lines>
+        <reason>Reference pattern for service structure, error handling (FFmpegError, FFmpegErrorCode), and TypeScript typing patterns to follow for recording.service.ts</reason>
+      </artifact>
+      <artifact>
+        <path>src/main/services/file.service.ts</path>
+        <kind>service</kind>
+        <symbol>FileService</symbol>
+        <lines>all</lines>
+        <reason>Example of main process service pattern for file operations and error handling</reason>
+      </artifact>
+      <artifact>
+        <path>src/main/services/thumbnail.service.ts</path>
+        <kind>service</kind>
+        <symbol>ThumbnailService</symbol>
+        <lines>all</lines>
+        <reason>Reference for service that processes media files, similar patterns may apply for recording</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="electron" version="^38.1.2">Desktop framework providing desktopCapturer API</package>
+        <package name="@types/node" version="^22.18.6">TypeScript definitions for Node.js (os, path, fs modules)</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Service must live in src/main/services/recording.service.ts per architecture</constraint>
+    <constraint>Follow singleton pattern like existing services (ffmpeg, file, thumbnail)</constraint>
+    <constraint>Main process only - no renderer involvement at this stage</constraint>
+    <constraint>Use Electron's desktopCapturer API (native, no external dependencies)</constraint>
+    <constraint>NO source selector UI - auto-selection only</constraint>
+    <constraint>NO preview positioning controls - fixed bottom-right corner</constraint>
+    <constraint>NO user configuration - smart defaults only</constraint>
+    <constraint>Must handle macOS permission prompts gracefully with clear user guidance</constraint>
+    <constraint>Validate all file paths before writing to prevent directory traversal</constraint>
+    <constraint>Ensure MediaStream cleanup on stop to release camera/mic</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>RecordingService.getPrimaryScreen()</name>
+      <kind>service method</kind>
+      <signature>async getPrimaryScreen(): Promise&lt;DesktopCapturerSource&gt;</signature>
+      <path>src/main/services/recording.service.ts</path>
+    </interface>
+    <interface>
+      <name>RecordingService.getDefaultWebcam()</name>
+      <kind>service method</kind>
+      <signature>async getDefaultWebcam(): Promise&lt;MediaDeviceInfo&gt;</signature>
+      <path>src/main/services/recording.service.ts</path>
+    </interface>
+    <interface>
+      <name>RecordingService.startRecording()</name>
+      <kind>service method</kind>
+      <signature>async startRecording(mode: RecordingMode): Promise&lt;void&gt;</signature>
+      <path>src/main/services/recording.service.ts</path>
+    </interface>
+    <interface>
+      <name>RecordingService.stopRecording()</name>
+      <kind>service method</kind>
+      <signature>async stopRecording(): Promise&lt;RecordingOutput&gt;</signature>
+      <path>src/main/services/recording.service.ts</path>
+    </interface>
+    <interface>
+      <name>RecordingMode</name>
+      <kind>type</kind>
+      <signature>type RecordingMode = 'screen' | 'webcam' | 'pip'</signature>
+      <path>src/main/services/recording.service.ts</path>
+    </interface>
+    <interface>
+      <name>RecordingOutput</name>
+      <kind>interface</kind>
+      <signature>interface RecordingOutput { files: { screen?: {...}, webcam?: {...} }, metadata: {...} }</signature>
+      <path>src/main/services/recording.service.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Unit tests using mocked Electron APIs (desktopCapturer, mediaDevices). Test error paths extensively (permissions, no devices, busy devices). Verify fallback logic without requiring actual hardware. Integration tests for service initialization and configuration.</standards>
+    <locations>
+      - src/main/services/recording.service.test.ts
+      - vitest for unit testing with mocked Electron APIs
+    </locations>
+    <ideas>
+      <idea ac-id="AC-2">Mock desktopCapturer.getSources() to return array of screens, verify first screen is selected</idea>
+      <idea ac-id="AC-3">Mock navigator.mediaDevices.enumerateDevices() to return webcams, verify first videoinput selected</idea>
+      <idea ac-id="AC-3">Test fallback behavior when no devices available</idea>
+      <idea ac-id="AC-4">Verify RECORDING_DEFAULTS structure matches tech spec (resolution, framerate, bitrate values)</idea>
+      <idea ac-id="AC-5">Test temp directory creation with fs.mkdir, verify path format and error handling</idea>
+      <idea ac-id="AC-7">Test error handling for NotAllowedError (permissions denied), NotFoundError (no devices), NotReadableError (device busy)</idea>
+      <idea ac-id="AC-8">Integration test: initialize service, call getPrimaryScreen and getDefaultWebcam, verify no errors with mocked APIs</idea>
+    </ideas>
+  </tests>
+</story-context>

@@ -1,0 +1,160 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>5</epicId>
+    <storyId>6</storyId>
+    <title>Recording Timer and Controls</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/5-6-recording-timer-and-controls.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>content creator</asA>
+    <iWant>to see elapsed time during recording and easily stop the recording</iWant>
+    <soThat>I know how long I've been recording and can end capture when finished</soThat>
+    <tasks>
+      - Create RecordingTimer component (AC: 1, 2, 3)
+      - Implement timer logic (AC: 7)
+      - Add Stop Recording button (AC: 4, 8)
+      - Implement show/hide logic (AC: 5, 6)
+      - Implement stop recording action (AC: 9, 10)
+      - Create IPC stop handler (AC: 10)
+      - Update recordingStore (AC: 7, 8)
+      - Implement time formatting utility (AC: 2)
+      - Style component for dark theme (AC: 12)
+      - Ensure smooth performance (AC: 11)
+      - Write component tests
+      - Integrate with existing UI
+      - Manual testing
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-1">`RecordingTimer.tsx` component created as floating overlay during recording</criterion>
+    <criterion id="AC-2">Timer displays elapsed time in MM:SS format, updating every second</criterion>
+    <criterion id="AC-3">Timer positioned top-right of screen, non-intrusive but always visible</criterion>
+    <criterion id="AC-4">"Stop Recording" button integrated into timer component with red styling</criterion>
+    <criterion id="AC-5">Timer automatically appears when recording starts (isRecording = true)</criterion>
+    <criterion id="AC-6">Timer automatically disappears when recording stops</criterion>
+    <criterion id="AC-7">Duration state updated in recordingStore every second via setInterval</criterion>
+    <criterion id="AC-8">Clicking "Stop Recording" button triggers stopRecording() action in store</criterion>
+    <criterion id="AC-9">Clicking "Stop Recording" invokes 'recording:stop' IPC channel</criterion>
+    <criterion id="AC-10">IPC handler calls RecordingService.stopRecording() and returns output files</criterion>
+    <criterion id="AC-11">Timer remains responsive and smooth (no blocking) during recording</criterion>
+    <criterion id="AC-12">Component styled consistently with dark theme and CapCut design</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Minimal Component Layer</section>
+        <snippet>RecordingTimer floating timer display with stop button during recording. Shows elapsed time and provides stop control.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Workflows - All Recording Workflows</section>
+        <snippet>RecordingTimer appears in step 7 of screen-only, webcam-only, and PiP workflows showing elapsed time. User clicks "Stop Recording" button to end capture.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>APIs and Interfaces - IPC Commands</section>
+        <snippet>IPC channel 'recording:stop' with no request parameters. Returns IPCResponse with RecordingOutput containing file paths and metadata.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/renderer/src/components/Export/ExportProgress.tsx</path>
+        <kind>component</kind>
+        <symbol>ExportProgress</symbol>
+        <lines>all</lines>
+        <reason>Reference pattern for progress display component with timer/status updates, shows how to format time and display progress UI</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/store/recordingStore.ts</path>
+        <kind>store</kind>
+        <symbol>recordingStore</symbol>
+        <lines>all</lines>
+        <reason>Recording state management - needs updateDuration and stopRecording actions for timer functionality</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="react" version="^19.1.1">React hooks for component (useState, useEffect for timer interval)</package>
+        <package name="zustand" version="^5.0.8">State management for recording state subscription</package>
+        <package name="lucide-react" version="^0.548.0">Stop icon for button (Square or CircleStop icon)</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>RecordingTimer must be floating overlay component (fixed position, high z-index)</constraint>
+    <constraint>Timer positioned top-right (standard recording indicator position)</constraint>
+    <constraint>Semi-transparent background for visibility over any content</constraint>
+    <constraint>Time format MM:SS (or HH:MM:SS if recording exceeds 60 minutes)</constraint>
+    <constraint>Update interval exactly 1 second (1000ms) via setInterval</constraint>
+    <constraint>Must clear interval on component unmount to prevent memory leaks</constraint>
+    <constraint>Stop button styled red (universal recording stop convention)</constraint>
+    <constraint>Component only renders when isRecording = true</constraint>
+    <constraint>Must not block UI or affect recording performance</constraint>
+    <constraint>Dark theme styling consistent with existing CapCut-inspired design</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>RecordingTimer</name>
+      <kind>React component</kind>
+      <signature>export function RecordingTimer(): React.JSX.Element | null</signature>
+      <path>src/renderer/components/Recording/RecordingTimer.tsx</path>
+    </interface>
+    <interface>
+      <name>formatRecordingTime</name>
+      <kind>utility function</kind>
+      <signature>function formatRecordingTime(seconds: number): string</signature>
+      <path>src/renderer/utils/timeFormat.util.ts</path>
+    </interface>
+    <interface>
+      <name>IPC: recording:stop</name>
+      <kind>IPC channel</kind>
+      <signature>ipcRenderer.invoke('recording:stop') => IPCResponse&lt;RecordingOutput&gt;</signature>
+      <path>src/main/ipc/recording.handlers.ts</path>
+    </interface>
+    <interface>
+      <name>recordingStore.updateDuration</name>
+      <kind>Zustand store action</kind>
+      <signature>updateDuration: (duration: number) => void</signature>
+      <path>src/renderer/store/recordingStore.ts</path>
+    </interface>
+    <interface>
+      <name>recordingStore.stopRecording</name>
+      <kind>Zustand store action</kind>
+      <signature>stopRecording: () => Promise&lt;void&gt;</signature>
+      <path>src/renderer/store/recordingStore.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>React component testing with @testing-library/react. Mock Zustand store and IPC. Test timer updates, button interactions, show/hide logic. Mock setInterval/clearInterval for controlled testing.</standards>
+    <locations>
+      - src/renderer/components/Recording/RecordingTimer.test.tsx
+      - src/renderer/utils/timeFormat.util.test.ts
+    </locations>
+    <ideas>
+      <idea ac-id="AC-1">Test RecordingTimer component renders with timer and stop button</idea>
+      <idea ac-id="AC-2">Test formatRecordingTime: 0s→"00:00", 65s→"01:05", 3665s→"01:01:05"</idea>
+      <idea ac-id="AC-3">Test component has fixed position top-right CSS classes</idea>
+      <idea ac-id="AC-4">Test stop button has red background styling (check className or styles)</idea>
+      <idea ac-id="AC-5">Test component renders when isRecording=true</idea>
+      <idea ac-id="AC-6">Test component returns null when isRecording=false</idea>
+      <idea ac-id="AC-7">Mock setInterval, verify updateDuration called every 1000ms</idea>
+      <idea ac-id="AC-8">Test stop button click calls recordingStore.stopRecording()</idea>
+      <idea ac-id="AC-9">Mock IPC, verify 'recording:stop' invoked on button click</idea>
+      <idea ac-id="AC-11">Test interval cleared on component unmount (verify clearInterval called)</idea>
+      <idea ac-id="AC-12">Verify dark theme CSS classes applied (bg-black/80, text-white, etc.)</idea>
+    </ideas>
+  </tests>
+</story-context>

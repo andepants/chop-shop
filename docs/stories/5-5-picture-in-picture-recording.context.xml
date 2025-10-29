@@ -1,0 +1,157 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>5</epicId>
+    <storyId>5</storyId>
+    <title>Picture-in-Picture Recording</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/5-5-picture-in-picture-recording.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>content creator</asA>
+    <iWant>to record my screen and webcam simultaneously with a single click</iWant>
+    <soThat>I can create tutorials with my face visible without complex setup</soThat>
+    <tasks>
+      - Implement PiP mode initialization (AC: 1, 2)
+      - Acquire screen stream with audio (AC: 4)
+      - Acquire webcam stream with audio (AC: 5)
+      - Create dual MediaRecorder instances (AC: 3, 4, 5)
+      - Implement synchronized start (AC: 6, 7)
+      - Implement synchronized stop (AC: 8)
+      - Save both output files (AC: 9, 10)
+      - Implement graceful fallback (AC: 11)
+      - Handle partial recording failures (AC: 12)
+      - Implement comprehensive logging (AC: 13)
+      - Clean up resources properly
+      - Write integration tests
+      - Manual testing with real devices
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-1">RecordingService.startRecording() handles 'pip' mode by orchestrating both screen and webcam recording</criterion>
+    <criterion id="AC-2">Both screen and webcam sources auto-selected (primary screen + default webcam)</criterion>
+    <criterion id="AC-3">Two separate MediaRecorder instances created and started simultaneously</criterion>
+    <criterion id="AC-4">Screen recording: 1920x1080, 30fps, 8Mbps with microphone audio</criterion>
+    <criterion id="AC-5">Webcam recording: 640x480, 30fps, 2.5Mbps with webcam audio</criterion>
+    <criterion id="AC-6">Both recordings start within 2 seconds of mode selection (NFR requirement)</criterion>
+    <criterion id="AC-7">Both recordings buffered independently with 5s timeslice for crash recovery</criterion>
+    <criterion id="AC-8">Recording stop triggers both recorders to stop simultaneously</criterion>
+    <criterion id="AC-9">Two output files saved: `screen-recording-[timestamp].webm` and `webcam-recording-[timestamp].webm`</criterion>
+    <criterion id="AC-10">RecordingService.stopRecording() returns both file paths with metadata</criterion>
+    <criterion id="AC-11">Graceful fallback: if webcam unavailable, fall back to screen-only with user notification</criterion>
+    <criterion id="AC-12">Error handling for partial failures (e.g., screen succeeds, webcam fails)</criterion>
+    <criterion id="AC-13">Comprehensive logging for PiP orchestration with [Recording] prefix</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Workflow 3: Picture-in-Picture Recording (Primary Use Case)</section>
+        <snippet>PiP is the highlighted/default mode. User clicks "Screen + Webcam (PiP)", system auto-selects both sources, creates two MediaRecorder instances, saves two separate WebM files, auto-imports both, auto-places screen on Track 1 and webcam on Track 2 with 20% size, bottom-right, circular.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Detailed Design - Key Simplifications</section>
+        <snippet>Two separate files saved, NOT composited during recording. Compositing happens later in timeline/preview. Webcam overlay position applied in timeline, not during capture.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Non-Functional Requirements - Performance</section>
+        <snippet>Concurrent recording: PiP mode must handle 2 simultaneous MediaRecorder instances without performance degradation. Combined memory usage &lt;500MB for 10-minute recording.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Non-Functional Requirements - Reliability</section>
+        <snippet>Graceful degradation: if webcam unavailable, PiP mode falls back to screen-only with user notification.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Sequence Diagram (PiP Recording)</section>
+        <snippet>Shows orchestration: startRecording('pip') → auto-select sources → create both recorders → start simultaneously → buffer chunks → stopRecording → stop both → save two files → return both paths.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/main/services/recording.service.ts</path>
+        <kind>service</kind>
+        <symbol>RecordingService</symbol>
+        <lines>all</lines>
+        <reason>Combines Stories 5.3 (screen) and 5.4 (webcam) logic. Orchestrates dual MediaRecorder instances, synchronized start/stop, fallback logic, dual file saving.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="electron" version="^38.1.2">Provides both desktopCapturer (screen) and getUserMedia context (webcam)</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>NO Canvas compositing during recording - saves two separate files</constraint>
+    <constraint>Compositing happens later in timeline/preview (Story 4.7 from Epic 4)</constraint>
+    <constraint>Same timestamp used for both filenames for easy matching</constraint>
+    <constraint>Webcam overlay position (bottom-right, 20%, circle) applied in timeline, NOT during capture</constraint>
+    <constraint>Microphone audio goes to screen recording</constraint>
+    <constraint>Webcam audio goes to webcam recording</constraint>
+    <constraint>Both recorders must start within 2 seconds total</constraint>
+    <constraint>Both recorders use 5s timeslice independently</constraint>
+    <constraint>Fallback to screen-only if webcam unavailable (graceful degradation)</constraint>
+    <constraint>If screen fails, abort completely (screen is primary)</constraint>
+    <constraint>If webcam fails during recording, continue screen-only with notification</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>RecordingService.startRecording('pip')</name>
+      <kind>service method</kind>
+      <signature>async startRecording(mode: 'pip'): Promise&lt;void&gt;</signature>
+      <path>src/main/services/recording.service.ts</path>
+    </interface>
+    <interface>
+      <name>RecordingOutput for PiP</name>
+      <kind>interface</kind>
+      <signature>
+interface RecordingOutput {
+  files: {
+    screen?: { path: string; duration: number; resolution: {...} };
+    webcam?: { path: string; duration: number; resolution: {...} };
+  };
+  metadata: { startTime: Date; endTime: Date; mode: 'pip' };
+}
+      </signature>
+      <path>src/main/services/recording.service.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Unit tests with mocked screen and webcam APIs. Test synchronized start/stop timing. Test dual file output. Test fallback scenarios without hardware removal. Manual testing critical for real dual-device behavior, permission flows, performance under load.</standards>
+    <locations>
+      - src/main/services/recording.service.test.ts
+    </locations>
+    <ideas>
+      <idea ac-id="AC-1">Test startRecording('pip') calls both getPrimaryScreen and getDefaultWebcam</idea>
+      <idea ac-id="AC-2">Mock both desktopCapturer and getUserMedia, verify both sources selected</idea>
+      <idea ac-id="AC-3">Test two MediaRecorder instances created with different configurations</idea>
+      <idea ac-id="AC-4">Verify screen MediaRecorder has 1920x1080, 8Mbps config</idea>
+      <idea ac-id="AC-5">Verify webcam MediaRecorder has 640x480, 2.5Mbps config</idea>
+      <idea ac-id="AC-6">Measure time from startRecording to both recorders started (&lt;2s)</idea>
+      <idea ac-id="AC-7">Test both recorders use start(5000) timeslice</idea>
+      <idea ac-id="AC-8">Test stopRecording calls stop() on both recorders</idea>
+      <idea ac-id="AC-9">Test two files created with same timestamp: screen-recording-[ts].webm, webcam-recording-[ts].webm</idea>
+      <idea ac-id="AC-10">Test RecordingOutput contains both file paths and metadata for both streams</idea>
+      <idea ac-id="AC-11">Mock webcam unavailable, verify fallback to screen-only mode with user notification</idea>
+      <idea ac-id="AC-12">Mock webcam failure during recording, verify screen continues and user notified</idea>
+      <idea ac-id="AC-12">Mock screen failure during recording, verify complete abort (screen is primary)</idea>
+      <idea ac-id="AC-13">Verify PiP-specific log messages: "Starting PiP recording", "2 files added to timeline"</idea>
+    </ideas>
+  </tests>
+</story-context>

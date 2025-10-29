@@ -1,0 +1,192 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>5</epicId>
+    <storyId>7</storyId>
+    <title>Auto-Import and Timeline Placement</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/5-7-auto-import-and-timeline-placement.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>content creator</asA>
+    <iWant>my recordings to automatically appear in the media library and timeline after stopping</iWant>
+    <soThat>I can immediately start editing without manual import steps</soThat>
+    <tasks>
+      - Implement auto-import trigger (AC: 1)
+      - Integrate with media library (AC: 2, 3)
+      - Implement screen-only timeline placement (AC: 4)
+      - Implement webcam-only timeline placement (AC: 5)
+      - Implement PiP timeline placement (AC: 6, 7)
+      - Calculate PiP positioning (AC: 7)
+      - Implement timeline scroll/adjustment (AC: 8)
+      - Implement success notification (AC: 9)
+      - Ensure performance requirements (AC: 10)
+      - Implement error handling (AC: 11)
+      - Implement comprehensive logging (AC: 12)
+      - Update existing stores (AC: 1, 4, 5, 6)
+      - Write integration tests
+      - Manual testing with real recordings
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-1">After recording stops, output files automatically imported to media library</criterion>
+    <criterion id="AC-2">Media library generates thumbnails for recorded files (first frame)</criterion>
+    <criterion id="AC-3">Recorded files appear in media library with metadata (filename, duration, resolution)</criterion>
+    <criterion id="AC-4">Screen-only recording: clip automatically placed on Timeline Track 1</criterion>
+    <criterion id="AC-5">Webcam-only recording: clip automatically placed on Timeline Track 2 (overlay track)</criterion>
+    <criterion id="AC-6">PiP recording: both clips placed simultaneously (screen → Track 1, webcam → Track 2)</criterion>
+    <criterion id="AC-7">Webcam clips on Track 2 positioned bottom-right at 20% size (PiP positioning)</criterion>
+    <criterion id="AC-8">Timeline automatically scrolls/adjusts to show newly added clips</criterion>
+    <criterion id="AC-9">Success notification displayed: "Recording added to timeline" with recording duration</criterion>
+    <criterion id="AC-10">All auto-import steps complete within 5 seconds of recording stop (NFR)</criterion>
+    <criterion id="AC-11">Error handling for import failures with user-friendly messages</criterion>
+    <criterion id="AC-12">Logging for all auto-import operations with [Recording] prefix</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Workflows - All Recording Workflows</section>
+        <snippet>Steps 10-13 in each workflow: auto-import files to media library, generate thumbnails, auto-place on timeline tracks, display success notification. Screen→Track 1, Webcam→Track 2.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>System Architecture Alignment - Integration Points</section>
+        <snippet>Media Library Integration uses existing mediaStore.addFile() API. Timeline Integration uses existing timelineStore.addClipToTrack() API. Requires multi-track support from Epic 4.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Recording Configuration (Auto-Defaults) - Webcam</section>
+        <snippet>Webcam position: bottom-right, size: 20% (0.2), shape: circular. Applied in timeline/preview, NOT during recording.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Non-Functional Requirements - Performance</section>
+        <snippet>Auto-Import Speed: Recorded files must appear in media library within 5 seconds of recording stop. Timeline Placement must complete instantly (&lt;500ms).</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Decision Architecture</title>
+        <section>Epic to Architecture Mapping - Epic 4</section>
+        <snippet>Multi-track timeline support with Track 1 (main) and Track 2 (overlay). VideoCanvas for multi-track compositing with overlay positioning.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/renderer/src/store/mediaStore.ts</path>
+        <kind>store</kind>
+        <symbol>mediaStore</symbol>
+        <lines>all</lines>
+        <reason>Media library state management - addFile() method used for importing recorded files with metadata</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/store/timelineStore.ts</path>
+        <kind>store</kind>
+        <symbol>timelineStore</symbol>
+        <lines>all</lines>
+        <reason>Timeline state management - addClipToTrack() method for placing clips on specific tracks with positioning metadata</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/store/recordingStore.ts</path>
+        <kind>store</kind>
+        <symbol>recordingStore</symbol>
+        <lines>all</lines>
+        <reason>Recording state with stopRecording action - needs to trigger auto-import after IPC returns output files</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/components/Preview/VideoCanvas.tsx</path>
+        <kind>component</kind>
+        <symbol>VideoCanvas</symbol>
+        <lines>all</lines>
+        <reason>Multi-track compositing component - needs to apply circular clip-path and positioning for webcam overlay clips</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="zustand" version="^5.0.8">State management for media, timeline, and recording stores</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Two-track placement inherited from Epic 4.1 - multi-track timeline must already exist</constraint>
+    <constraint>Screen recordings always go to Track 1 (main/background track)</constraint>
+    <constraint>Webcam recordings always go to Track 2 (overlay track)</constraint>
+    <constraint>Webcam overlay positioning: bottom-right corner, 20% of screen dimensions</constraint>
+    <constraint>Webcam shape: circular (applied via CSS clip-path or canvas)</constraint>
+    <constraint>Positioning stored in clip metadata, applied by VideoCanvas</constraint>
+    <constraint>Auto-import happens immediately after stopRecording IPC returns</constraint>
+    <constraint>Thumbnail generation can be asynchronous (doesn't block timeline placement)</constraint>
+    <constraint>All auto-import steps must complete within 5 seconds total (NFR)</constraint>
+    <constraint>For PiP: both clips must start at same timeline position (synchronized)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>autoImportRecordings</name>
+      <kind>function</kind>
+      <signature>async function autoImportRecordings(output: RecordingOutput): Promise&lt;void&gt;</signature>
+      <path>src/renderer/store/recordingStore.ts or separate utility</path>
+    </interface>
+    <interface>
+      <name>mediaStore.addFile</name>
+      <kind>Zustand store action</kind>
+      <signature>addFile(filePath: string, metadata?: MediaMetadata): void</signature>
+      <path>src/renderer/store/mediaStore.ts</path>
+    </interface>
+    <interface>
+      <name>timelineStore.addClipToTrack</name>
+      <kind>Zustand store action</kind>
+      <signature>addClipToTrack(clipData: ClipData, trackId: number): void</signature>
+      <path>src/renderer/store/timelineStore.ts</path>
+    </interface>
+    <interface>
+      <name>ClipData with overlay positioning</name>
+      <kind>interface extension</kind>
+      <signature>
+interface ClipData {
+  // ... existing fields
+  overlayPosition?: {
+    x: number; y: number;
+    width: number; height: number;
+    shape: 'circle' | 'rectangle';
+  };
+}
+      </signature>
+      <path>Shared type definition</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Integration tests with mocked stores and IPC. Test track assignment logic for each recording mode. Test PiP positioning calculations with various screen resolutions. Manual testing critical for end-to-end flow. Measure performance with console.time() at each step.</standards>
+    <locations>
+      - src/renderer/store/recordingStore.test.ts
+      - src/renderer/store/mediaStore.test.ts
+      - src/renderer/store/timelineStore.test.ts
+    </locations>
+    <ideas>
+      <idea ac-id="AC-1">Test stopRecording triggers autoImportRecordings with output files</idea>
+      <idea ac-id="AC-2">Mock thumbnail service, verify thumbnail generation called for each file</idea>
+      <idea ac-id="AC-3">Test mediaStore.addFile called with correct metadata (filename, duration, resolution)</idea>
+      <idea ac-id="AC-4">Test screen-only recording adds clip to Track 1</idea>
+      <idea ac-id="AC-5">Test webcam-only recording adds clip to Track 2</idea>
+      <idea ac-id="AC-6">Test PiP recording adds screen to Track 1 AND webcam to Track 2</idea>
+      <idea ac-id="AC-7">Test webcam clip positioning calculation: 1920x1080 screen → webcam at (1516, 844) with size (384, 216)</idea>
+      <idea ac-id="AC-7">Test positioning for different resolutions: 1280x720 screen → webcam at correct bottom-right 20%</idea>
+      <idea ac-id="AC-7">Verify overlayPosition metadata includes shape: 'circle'</idea>
+      <idea ac-id="AC-8">Test timeline scrolls/adjusts viewport after clip placement</idea>
+      <idea ac-id="AC-9">Test success notification displayed with correct message and duration</idea>
+      <idea ac-id="AC-10">Measure total time from stopRecording to timeline visible (&lt;5s)</idea>
+      <idea ac-id="AC-11">Test error handling: file not found, thumbnail fails, timeline placement fails</idea>
+      <idea ac-id="AC-12">Verify all logs include [Recording] prefix and relevant context</idea>
+    </ideas>
+  </tests>
+</story-context>

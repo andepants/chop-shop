@@ -1,5 +1,5 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
-import { IPCResponse, MediaFile } from '../shared/types'
+import { IPCResponse, MediaFile, RecordingMode, RecordingOutputFiles } from '../shared/types'
 
 /**
  * Custom API interface exposed to renderer process
@@ -34,6 +34,10 @@ export interface API {
   onExportComplete: (callback: (data: { success: boolean; outputPath: string }) => void) => () => void
   onExportError: (callback: (data: { message: string; code: string }) => void) => () => void
   openFileLocation: (filePath: string) => Promise<IPCResponse<boolean>>
+  startRecording: (options: { mode: RecordingMode }) => Promise<IPCResponse<{ success: boolean }>>
+  stopRecording: () => Promise<IPCResponse<{ outputFiles: RecordingOutputFiles }>>
+  getRecordingState: () => Promise<IPCResponse<{ isRecording: boolean; currentMode: RecordingMode | null }>>
+  resetRecordingState: () => Promise<IPCResponse<{ success: boolean }>>
 }
 
 declare global {

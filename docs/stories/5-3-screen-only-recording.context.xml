@@ -1,0 +1,151 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>5</epicId>
+    <storyId>3</storyId>
+    <title>Screen-Only Recording</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/5-3-screen-only-recording.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>content creator</asA>
+    <iWant>to record my screen with a single click</iWant>
+    <soThat>I can capture tutorials and demonstrations quickly</soThat>
+    <tasks>
+      - Implement screen source acquisition (AC: 1, 2)
+      - Implement microphone audio capture (AC: 3)
+      - Create MediaRecorder for screen (AC: 4)
+      - Implement recording start flow (AC: 5, 6)
+      - Implement recording stop flow (AC: 7, 8, 9)
+      - Implement file writing logic (AC: 8)
+      - Implement error handling (AC: 10)
+      - Implement comprehensive logging (AC: 11)
+      - Manage recording state (AC: 12)
+      - Write integration tests
+      - Test with real recording
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-1">RecordingService.startRecording() handles 'screen' mode with auto-selected primary screen</criterion>
+    <criterion id="AC-2">Screen capture stream obtained using Electron's desktopCapturer API with auto-selected source</criterion>
+    <criterion id="AC-3">Microphone audio automatically captured and mixed with screen recording</criterion>
+    <criterion id="AC-4">MediaRecorder instance created with WebM/VP9 codec at 1920x1080, 30fps, 8Mbps</criterion>
+    <criterion id="AC-5">Recording starts immediately after mode selection (within 2 seconds per NFR)</criterion>
+    <criterion id="AC-6">Recorded chunks buffered in memory during capture</criterion>
+    <criterion id="AC-7">All MediaStream tracks properly stopped and cleaned up on recording end</criterion>
+    <criterion id="AC-8">Recording saved to temp directory as `screen-recording-[timestamp].webm`</criterion>
+    <criterion id="AC-9">RecordingService.stopRecording() returns file path and metadata (duration, resolution)</criterion>
+    <criterion id="AC-10">Error handling for screen permission denial with actionable user message</criterion>
+    <criterion id="AC-11">Logging with [Recording] prefix for all screen recording operations</criterion>
+    <criterion id="AC-12">Recording state properly managed (isRecording flag, currentMode='screen')</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Workflow 1: Screen-Only Recording</section>
+        <snippet>Complete flow from user clicks to auto-import. Auto-selects primary screen via desktopCapturer, records with MediaRecorder, saves WebM, auto-imports to media library, auto-places on Track 1.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Recording Configuration (Auto-Defaults) - Screen</section>
+        <snippet>Screen defaults: 1920x1080 resolution, 30fps frameRate, 8Mbps videoBitsPerSecond. Microphone audio with echoCancellation and noiseSuppression enabled.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Non-Functional Requirements - Performance</section>
+        <snippet>Recording start latency must be within 2 seconds. No frame drops maintaining 30fps. UI remains responsive during recording.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Non-Functional Requirements - Security</section>
+        <snippet>App must request macOS screen recording permissions with clear user guidance. MediaStream tracks must be explicitly stopped on completion.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Decision Architecture</title>
+        <section>Media Capture</section>
+        <snippet>desktopCapturer for screen recording, MediaRecorder API for capturing to WebM.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/main/services/recording.service.ts</path>
+        <kind>service</kind>
+        <symbol>RecordingService</symbol>
+        <lines>all</lines>
+        <reason>Foundation from Story 5.1 - extends with screen recording implementation including getPrimaryScreen, startRecording(mode='screen'), MediaRecorder management, and file saving</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="electron" version="^38.1.2">Provides desktopCapturer API for screen source enumeration and capture</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Must use Electron desktopCapturer API for screen source acquisition</constraint>
+    <constraint>Must use native MediaRecorder API for recording (no external libraries)</constraint>
+    <constraint>Auto-select primary screen = first screen from desktopCapturer.getSources()</constraint>
+    <constraint>No user screen selection dialog - fully automatic</constraint>
+    <constraint>Must start recording within 2 seconds of mode selection (NFR)</constraint>
+    <constraint>Must maintain 30fps without frame drops</constraint>
+    <constraint>WebM format with VP9 codec (fallback to VP8 if unavailable)</constraint>
+    <constraint>Screen resolution: 1920x1080, bitrate: 8Mbps</constraint>
+    <constraint>Microphone audio automatically captured and mixed</constraint>
+    <constraint>Chunks buffered with 5s timeslice for crash recovery</constraint>
+    <constraint>All MediaStream tracks must be stopped to release resources</constraint>
+    <constraint>Must handle macOS screen recording permission gracefully</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>RecordingService.startRecording('screen')</name>
+      <kind>service method</kind>
+      <signature>async startRecording(mode: 'screen'): Promise&lt;void&gt;</signature>
+      <path>src/main/services/recording.service.ts</path>
+    </interface>
+    <interface>
+      <name>Electron.desktopCapturer.getSources()</name>
+      <kind>Electron API</kind>
+      <signature>desktopCapturer.getSources(options: SourcesOptions): Promise&lt;DesktopCapturerSource[]&gt;</signature>
+      <path>Native Electron API</path>
+    </interface>
+    <interface>
+      <name>MediaRecorder</name>
+      <kind>Web API</kind>
+      <signature>new MediaRecorder(stream: MediaStream, options: MediaRecorderOptions)</signature>
+      <path>Native browser API</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Unit tests with mocked Electron desktopCapturer and MediaRecorder APIs. Test error paths for permissions, no devices, busy devices. Verify fallback logic without actual hardware. Integration tests for service initialization. Manual testing required for actual screen capture and file playback.</standards>
+    <locations>
+      - src/main/services/recording.service.test.ts
+    </locations>
+    <ideas>
+      <idea ac-id="AC-1">Mock desktopCapturer.getSources() to return array of screen sources, verify getPrimaryScreen selects first</idea>
+      <idea ac-id="AC-2">Test getUserMedia called with correct chromeMediaSource and chromeMediaSourceId constraints</idea>
+      <idea ac-id="AC-3">Test microphone audio stream merging into screen MediaStream</idea>
+      <idea ac-id="AC-4">Test MediaRecorder instantiation with correct mimeType (webm;codecs=vp9) and videoBitsPerSecond (8000000)</idea>
+      <idea ac-id="AC-5">Measure time from startRecording call to mediaRecorder.start() (must be &lt;2s)</idea>
+      <idea ac-id="AC-6">Test ondataavailable handler collects chunks into array</idea>
+      <idea ac-id="AC-7">Test all video and audio tracks stopped on stopRecording</idea>
+      <idea ac-id="AC-8">Test filename generation format: screen-recording-[timestamp].webm</idea>
+      <idea ac-id="AC-9">Test RecordingOutput structure with file path, duration, resolution metadata</idea>
+      <idea ac-id="AC-10">Test NotAllowedError handling displays "enable in System Preferences" message</idea>
+      <idea ac-id="AC-11">Verify all console.log calls include [Recording] prefix</idea>
+      <idea ac-id="AC-12">Test state transitions: isRecording false→true on start, true→false on stop, currentMode updates</idea>
+    </ideas>
+  </tests>
+</story-context>

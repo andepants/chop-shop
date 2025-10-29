@@ -1,0 +1,150 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>5</epicId>
+    <storyId>4</storyId>
+    <title>Webcam-Only Recording</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/5-4-webcam-only-recording.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>content creator</asA>
+    <iWant>to record from my webcam with a single click</iWant>
+    <soThat>I can capture talking head videos or reactions quickly</soThat>
+    <tasks>
+      - Implement webcam source acquisition (AC: 1, 2)
+      - Implement audio capture (AC: 3)
+      - Create MediaRecorder for webcam (AC: 4)
+      - Implement recording start flow (AC: 5, 6)
+      - Implement recording stop flow (AC: 7, 8, 9)
+      - Implement error handling (AC: 10, 11)
+      - Implement comprehensive logging (AC: 12)
+      - Manage recording state
+      - Write integration tests
+      - Manual testing
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-1">RecordingService.startRecording() handles 'webcam' mode with auto-selected default webcam</criterion>
+    <criterion id="AC-2">Webcam video stream obtained using getUserMedia with auto-selected videoinput device</criterion>
+    <criterion id="AC-3">Webcam audio automatically captured from same device or default microphone</criterion>
+    <criterion id="AC-4">MediaRecorder instance created with WebM/VP9 codec at 640x480, 30fps, 2.5Mbps</criterion>
+    <criterion id="AC-5">Recording starts immediately after mode selection (within 2 seconds per NFR)</criterion>
+    <criterion id="AC-6">Recorded chunks buffered in memory during capture with periodic flush</criterion>
+    <criterion id="AC-7">All MediaStream tracks properly stopped and cleaned up on recording end</criterion>
+    <criterion id="AC-8">Recording saved to temp directory as `webcam-recording-[timestamp].webm`</criterion>
+    <criterion id="AC-9">RecordingService.stopRecording() returns file path and metadata (duration, resolution)</criterion>
+    <criterion id="AC-10">Error handling for webcam/microphone permission denial with actionable user message</criterion>
+    <criterion id="AC-11">Graceful degradation if webcam unavailable (clear error, no crash)</criterion>
+    <criterion id="AC-12">Logging with [Recording] prefix for all webcam recording operations</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Workflow 2: Webcam-Only Recording</section>
+        <snippet>User selects Webcam Only mode, system auto-selects default webcam, records with webcam audio, saves WebM file, auto-imports to media library, auto-places on Track 2 (overlay track).</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Recording Configuration (Auto-Defaults) - Webcam</section>
+        <snippet>Webcam defaults: 640x480 resolution, 30fps frameRate, 2.5Mbps videoBitsPerSecond, 20% size, circular shape (applied in timeline). Audio with echoCancellation and noiseSuppression.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Non-Functional Requirements - Reliability</section>
+        <snippet>Graceful degradation: if webcam unavailable, display clear error with actionable guidance. MediaRecorder error handling with user-friendly messages.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Decision Architecture</title>
+        <section>Media Capture</section>
+        <snippet>getUserMedia for webcam access, MediaRecorder API for capturing to WebM format.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/main/services/recording.service.ts</path>
+        <kind>service</kind>
+        <symbol>RecordingService</symbol>
+        <lines>all</lines>
+        <reason>Extends Story 5.1 foundation with webcam recording mode, getDefaultWebcam implementation, lower resolution/bitrate MediaRecorder for webcam</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="electron" version="^38.1.2">Desktop framework - getUserMedia accessible via renderer context</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Must use navigator.mediaDevices.getUserMedia for webcam access</constraint>
+    <constraint>Must use navigator.mediaDevices.enumerateDevices() to find default webcam</constraint>
+    <constraint>Auto-select default webcam = first videoinput device from enumerateDevices()</constraint>
+    <constraint>No webcam selection UI - fully automatic</constraint>
+    <constraint>Lower resolution than screen: 640x480 vs 1920x1080</constraint>
+    <constraint>Lower bitrate: 2.5Mbps vs 8Mbps for screen</constraint>
+    <constraint>WebM format with VP9 codec (fallback to VP8)</constraint>
+    <constraint>Must handle NotAllowedError (camera permission), NotFoundError (no webcam), NotReadableError (webcam busy)</constraint>
+    <constraint>Must handle OverconstrainedError if requested resolution unsupported</constraint>
+    <constraint>Graceful error handling - no crashes on device unavailability</constraint>
+    <constraint>Webcam shape (circular) applied in timeline, not during recording</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>RecordingService.startRecording('webcam')</name>
+      <kind>service method</kind>
+      <signature>async startRecording(mode: 'webcam'): Promise&lt;void&gt;</signature>
+      <path>src/main/services/recording.service.ts</path>
+    </interface>
+    <interface>
+      <name>RecordingService.getDefaultWebcam()</name>
+      <kind>service method</kind>
+      <signature>async getDefaultWebcam(): Promise&lt;MediaDeviceInfo&gt;</signature>
+      <path>src/main/services/recording.service.ts</path>
+    </interface>
+    <interface>
+      <name>navigator.mediaDevices.getUserMedia()</name>
+      <kind>Web API</kind>
+      <signature>getUserMedia(constraints: MediaStreamConstraints): Promise&lt;MediaStream&gt;</signature>
+      <path>Native browser API</path>
+    </interface>
+    <interface>
+      <name>navigator.mediaDevices.enumerateDevices()</name>
+      <kind>Web API</kind>
+      <signature>enumerateDevices(): Promise&lt;MediaDeviceInfo[]&gt;</signature>
+      <path>Native browser API</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Unit tests with mocked navigator.mediaDevices APIs. Test device enumeration, getUserMedia constraints, error scenarios (no webcam, permissions denied, device busy). Manual testing with real webcam hardware (built-in FaceTime, USB webcams).</standards>
+    <locations>
+      - src/main/services/recording.service.test.ts
+    </locations>
+    <ideas>
+      <idea ac-id="AC-1">Test startRecording('webcam') calls getDefaultWebcam and getUserMedia</idea>
+      <idea ac-id="AC-2">Mock enumerateDevices to return webcam devices, verify first videoinput selected</idea>
+      <idea ac-id="AC-3">Test getUserMedia constraints include audio: true with echoCancellation</idea>
+      <idea ac-id="AC-4">Test MediaRecorder created with mimeType webm;codecs=vp9, videoBitsPerSecond 2500000</idea>
+      <idea ac-id="AC-5">Verify recording initialization latency &lt;2 seconds</idea>
+      <idea ac-id="AC-6">Test chunks buffered with 5s timeslice via mediaRecorder.start(5000)</idea>
+      <idea ac-id="AC-7">Test all tracks stopped on stopRecording (verify track.stop() called)</idea>
+      <idea ac-id="AC-8">Test filename format: webcam-recording-[timestamp].webm</idea>
+      <idea ac-id="AC-9">Test RecordingOutput metadata includes 640x480 resolution</idea>
+      <idea ac-id="AC-10">Test NotAllowedError shows "enable in System Preferences > Camera" message</idea>
+      <idea ac-id="AC-11">Test NotFoundError displays "No webcam detected" without crashing</idea>
+      <idea ac-id="AC-11">Test NotReadableError displays "Webcam busy" message</idea>
+      <idea ac-id="AC-12">Verify all logs prefixed with [Recording]</idea>
+    </ideas>
+  </tests>
+</story-context>

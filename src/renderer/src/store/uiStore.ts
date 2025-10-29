@@ -19,9 +19,14 @@ interface ExportState {
   successPath: string | null
 }
 
+interface RecordingModalState {
+  isModalOpen: boolean
+}
+
 interface UIStoreState {
   error: ErrorState
   export: ExportState
+  recordingModal: RecordingModalState
 }
 
 interface UIStoreActions {
@@ -34,6 +39,8 @@ interface UIStoreActions {
   completeExport: (outputPath: string) => void
   failExport: (error: string) => void
   resetExport: () => void
+  openRecordingModal: () => void
+  closeRecordingModal: () => void
 }
 
 type UIStore = UIStoreState & UIStoreActions
@@ -56,6 +63,10 @@ export const useUIStore = create<UIStore>((set) => ({
     progress: 0,
     error: null,
     successPath: null
+  },
+
+  recordingModal: {
+    isModalOpen: false
   },
 
   // Error actions
@@ -144,6 +155,23 @@ export const useUIStore = create<UIStore>((set) => ({
         progress: 0,
         error: null,
         successPath: null
+      }
+    })),
+
+  // Recording modal actions
+  openRecordingModal: () =>
+    set((state) => ({
+      recordingModal: {
+        ...state.recordingModal,
+        isModalOpen: true
+      }
+    })),
+
+  closeRecordingModal: () =>
+    set((state) => ({
+      recordingModal: {
+        ...state.recordingModal,
+        isModalOpen: false
       }
     }))
 }))

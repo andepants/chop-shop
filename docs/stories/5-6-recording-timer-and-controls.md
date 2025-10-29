@@ -1,6 +1,6 @@
 # Story 5.6: Recording Timer and Controls
 
-Status: drafted
+Status: Approved
 
 ## Story
 

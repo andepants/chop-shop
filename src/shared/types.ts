@@ -67,3 +67,16 @@ export interface VideoMetadata {
   isVFR: boolean
   transcodeStatus: 'pending' | 'in-progress' | 'complete' | 'failed'
 }
+
+/**
+ * Recording mode options
+ */
+export type RecordingMode = 'screen' | 'webcam' | 'pip'
+
+/**
+ * Recording output files
+ */
+export interface RecordingOutputFiles {
+  screen?: string
+  webcam?: string
+}

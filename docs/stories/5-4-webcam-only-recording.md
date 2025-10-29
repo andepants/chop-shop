@@ -1,6 +1,6 @@
 # Story 5.4: Webcam-Only Recording
 
-Status: drafted
+Status: Approved
 
 ## Story
 

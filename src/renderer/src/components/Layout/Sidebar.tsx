@@ -6,7 +6,9 @@
 import { MediaLibrary } from '../MediaLibrary'
 import { useMediaStore } from '../../store/mediaStore'
 import { useUIStore } from '../../store/uiStore'
+import { useRecordingStore } from '../../store/recordingStore'
 import { Button } from '@/components/ui/button'
+import { Circle } from 'lucide-react'
 
 /**
  * Sidebar component with polished design and refined button styling
@@ -16,6 +18,8 @@ export function Sidebar(): React.JSX.Element {
   const setIsImporting = useMediaStore((state) => state.setIsImporting)
   const addFiles = useMediaStore((state) => state.addFiles)
   const showError = useUIStore((state) => state.showError)
+  const openRecordingModal = useUIStore((state) => state.openRecordingModal)
+  const isRecording = useRecordingStore((state) => state.isRecording)
 
   /**
    * Handle Import button click
@@ -75,18 +79,35 @@ export function Sidebar(): React.JSX.Element {
       <div className="px-4 py-3.5 border-b border-slate-700/50 bg-slate-950/50">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-100 tracking-tight">Media</h2>
-          <Button
-            onClick={handleImportClick}
-            disabled={isImporting}
-            size="sm"
-            className={
-              isImporting
-                ? 'bg-slate-800 text-slate-400 cursor-not-allowed shadow-sm'
-                : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-md hover:shadow-lg transition-all duration-150'
-            }
-          >
-            {isImporting ? 'Importing...' : 'Import'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={openRecordingModal}
+              disabled={isRecording}
+              size="sm"
+              className={
+                isRecording
+                  ? 'bg-red-800 text-slate-300 cursor-not-allowed shadow-sm'
+                  : 'bg-red-600 hover:bg-red-500 text-white shadow-md hover:shadow-lg transition-all duration-150'
+              }
+            >
+              <Circle
+                className={`h-3 w-3 mr-1.5 ${isRecording ? 'fill-red-400 text-red-400 animate-pulse' : 'fill-current'}`}
+              />
+              {isRecording ? 'Recording...' : 'Record'}
+            </Button>
+            <Button
+              onClick={handleImportClick}
+              disabled={isImporting}
+              size="sm"
+              className={
+                isImporting
+                  ? 'bg-slate-800 text-slate-400 cursor-not-allowed shadow-sm'
+                  : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-md hover:shadow-lg transition-all duration-150'
+              }
+            >
+              {isImporting ? 'Importing...' : 'Import'}
+            </Button>
+          </div>
         </div>
       </div>
       <MediaLibrary />
