@@ -1,6 +1,6 @@
 # Story 6.1: AI Settings & Secure API Key Management
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -136,7 +136,7 @@ so that I can use AI features without exposing my credentials.
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/stories/6-1-ai-settings-secure-api-key-management.context.xml
 
 ### Agent Model Used
 

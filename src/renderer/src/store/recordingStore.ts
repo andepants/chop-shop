@@ -296,48 +296,95 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
   /**
    * Stop recording
    * Stops MediaRecorder and sends data to main process for file writing
+   * Handles both single-file modes (screen, webcam) and dual-file mode (PiP)
    */
   stopRecording: async () => {
     try {
       console.log('[RecordingStore] Stopping recording...')
 
+      const currentMode = useRecordingStore.getState().mode
+
       // Stop recording in renderer and get chunks
-      const chunks = await recordingManager.stopRecording()
+      const result = await recordingManager.stopRecording()
 
-      // Convert chunks to single Blob
-      const blob = new Blob(chunks, { type: 'video/webm;codecs=vp9' })
+      // Check if this is PiP mode with dual blobs
+      if (currentMode === 'pip' && !Array.isArray(result)) {
+        console.log('[RecordingStore] Processing PiP dual recording...')
 
-      // Convert to ArrayBuffer for IPC transfer
-      const arrayBuffer = await blob.arrayBuffer()
-      const uint8Array = new Uint8Array(arrayBuffer)
+        // Convert screen chunks to Blob
+        const screenBlob = new Blob(result.screen, { type: 'video/webm;codecs=vp9' })
+        const screenBuffer = new Uint8Array(await screenBlob.arrayBuffer())
 
-      console.log(`[RecordingStore] Sending ${uint8Array.length} bytes to main process...`)
+        // Convert webcam chunks to Blob
+        const webcamBlob = new Blob(result.webcam, { type: 'video/webm;codecs=vp9' })
+        const webcamBuffer = new Uint8Array(await webcamBlob.arrayBuffer())
 
-      // Send to main process for file writing
-      const response = await window.electron.ipcRenderer.invoke('recording:stop', {
-        recordingData: uint8Array
-      })
+        console.log(`[RecordingStore] Sending PiP data - Screen: ${screenBuffer.length} bytes, Webcam: ${webcamBuffer.length} bytes`)
 
-      if (response.success && response.data) {
-        const outputFiles = response.data.outputFiles || {}
-        const actualDuration = response.data.duration || 0
-        const currentMode = useRecordingStore.getState().mode
-
-        set({
-          isRecording: false,
-          outputFiles
+        // Send to main process for dual file writing
+        const response = await window.electron.ipcRenderer.invoke('recording:stop-pip', {
+          screenData: screenBuffer,
+          webcamData: webcamBuffer
         })
 
-        console.log('[RecordingStore] Recording stopped successfully')
-        console.log('[RecordingStore] Output files:', outputFiles)
-        console.log('[RecordingStore] Actual duration:', actualDuration.toFixed(2), 'seconds')
+        if (response.success && response.data) {
+          const outputFiles = response.data.outputFiles || {}
+          const actualDuration = response.data.duration || 0
 
-        // Auto-import recordings to media library and timeline
-        if (currentMode) {
-          await autoImportRecordings(outputFiles, currentMode, actualDuration)
+          set({
+            isRecording: false,
+            outputFiles
+          })
+
+          console.log('[RecordingStore] PiP recording stopped successfully')
+          console.log('[RecordingStore] Output files:', outputFiles)
+          console.log('[RecordingStore] Actual duration:', actualDuration.toFixed(2), 'seconds')
+
+          // Auto-import both recordings to media library and timeline
+          await autoImportRecordings(outputFiles, 'pip', actualDuration)
+        } else {
+          throw new Error(response.error || 'Failed to stop PiP recording')
         }
       } else {
-        throw new Error(response.error || 'Failed to stop recording')
+        // Single file mode (screen-only or webcam-only)
+        console.log('[RecordingStore] Processing single recording...')
+
+        const chunks = result as Blob[]
+
+        // Convert chunks to single Blob
+        const blob = new Blob(chunks, { type: 'video/webm;codecs=vp9' })
+
+        // Convert to ArrayBuffer for IPC transfer
+        const arrayBuffer = await blob.arrayBuffer()
+        const uint8Array = new Uint8Array(arrayBuffer)
+
+        console.log(`[RecordingStore] Sending ${uint8Array.length} bytes to main process...`)
+
+        // Send to main process for file writing
+        const response = await window.electron.ipcRenderer.invoke('recording:stop', {
+          recordingData: uint8Array
+        })
+
+        if (response.success && response.data) {
+          const outputFiles = response.data.outputFiles || {}
+          const actualDuration = response.data.duration || 0
+
+          set({
+            isRecording: false,
+            outputFiles
+          })
+
+          console.log('[RecordingStore] Recording stopped successfully')
+          console.log('[RecordingStore] Output files:', outputFiles)
+          console.log('[RecordingStore] Actual duration:', actualDuration.toFixed(2), 'seconds')
+
+          // Auto-import recordings to media library and timeline
+          if (currentMode) {
+            await autoImportRecordings(outputFiles, currentMode, actualDuration)
+          }
+        } else {
+          throw new Error(response.error || 'Failed to stop recording')
+        }
       }
     } catch (error) {
       console.error('[RecordingStore] Failed to stop recording:', error)

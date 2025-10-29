@@ -1,0 +1,113 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>6</epicId>
+    <storyId>5</storyId>
+    <title>Voice Persona Selection System</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/6-5-voice-persona-selection-system.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a content creator</asA>
+    <iWant>to select voice personas to influence the tone and style of generated posts</iWant>
+    <soThat>my content matches my brand personality</soThat>
+    <tasks>
+      - Task 1: Define voice persona data structure (AC: 2)
+      - Task 2: Add persona state to aiStore (AC: 7)
+      - Task 3: Create multi-select persona dropdown component (AC: 1, 8)
+      - Task 4: Implement selected personas display (AC: 3, 4)
+      - Task 5: Implement persona blending prompt logic (AC: 5)
+      - Task 6: Create persona descriptions for prompts (AC: 5)
+      - Task 7: Integrate persona selector into Generation Panel (AC: 1)
+      - Task 8: Add persona blending to content generation (AC: 5)
+      - Task 9: Handle edge cases and validation (AC: 6)
+      - Task 10: Add UI enhancements (Optional)
+      - Task 11: Write unit tests for persona blending logic (Testing)
+      - Task 12: Write component tests for PersonaSelector (Testing)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. Multi-select dropdown implemented with shadcn/ui Select component
+    2. Dropdown includes 12+ voice personas across Business/Tech, Creative/Humor, Professional categories
+    3. Users can select multiple personas (style blending)
+    4. Selected personas shown as tags/chips with remove option
+    5. System prompt generator blends selected personas into unified style instructions
+    6. Default state: No personas selected (neutral/professional tone)
+    7. Persona selection persists across session
+    8. Dropdown searchable/filterable for easy selection
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="Data Models and Contracts">
+        Defines Voice Personas with 12+ personas (Naval, Elon, Gary Vee, Tim Ferriss, Scott Adams, Seth Godin, Casey Neistat, MKBHD, Simon Sinek, Brené Brown, Adam Grant, Malcolm Gladwell).
+      </doc>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="Services and Modules">
+        Specifies GenerationPanel.tsx integration for persona selection and blending into system prompts.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/renderer/src/store/aiStore.ts" kind="zustand-store" symbol="useAIStore" reason="State management for selectedPersonas array"/>
+      <artifact path="src/renderer/src/components/AI/GenerationPanel.tsx" kind="component" symbol="GenerationPanel" reason="Integration point for PersonaSelector component"/>
+    </code>
+    <dependencies>
+      <node>
+        <package name="@radix-ui/react-select" version="^2.2.6" reason="shadcn/ui Select component for multi-select dropdown (already installed)"/>
+        <package name="lucide-react" version="^0.548.0" reason="Icons for chips and UI elements"/>
+        <package name="zustand" version="^5.0.8" reason="State management"/>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Persona Data: Define VoicePersona interface with id, name, category, description fields
+    - Multi-Select: Use shadcn/ui Select/Combobox with custom multi-select logic
+    - Prompt Building: Main process utility blends persona styles into system prompts (1 persona → single style, multiple → blended)
+    - State Persistence: Selected personas persist within session via aiStore
+    - Limit: Recommend max 3-4 personas, warn if >3, hard limit at 5
+    - Default: Empty array (no personas, neutral tone)
+    - Categories: Business/Tech, Creative/Humor, Professional
+  </constraints>
+
+  <interfaces>
+    <interface name="VoicePersona" kind="interface" signature="{ id: string; name: string; category: 'business' | 'creative' | 'professional'; description: string }" path="src/shared/constants/personas.constants.ts">
+      Defines persona data structure with style description for prompts
+    </interface>
+    <interface name="buildPersonaPrompt" kind="utility-function" signature="(personaIds: string[]) => string" path="src/main/services/ai/persona-prompt-builder.ts">
+      Blends selected personas into unified style instruction for system prompts
+    </interface>
+    <interface name="aiStore.selectedPersonas" kind="zustand-state" signature="selectedPersonas: string[]" path="src/renderer/src/store/aiStore.ts">
+      Array of selected persona IDs for style blending
+    </interface>
+    <interface name="aiStore.addPersona" kind="zustand-action" signature="addPersona: (id: string) => void" path="src/renderer/src/store/aiStore.ts">
+      Adds persona to selection
+    </interface>
+    <interface name="aiStore.removePersona" kind="zustand-action" signature="removePersona: (id: string) => void" path="src/renderer/src/store/aiStore.ts">
+      Removes persona from selection
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests for persona blending logic (0, 1, multiple personas). Component tests for PersonaSelector UI and multi-select behavior. Test search/filter functionality. Test state binding to aiStore.
+    </standards>
+    <locations>
+      - src/main/services/ai/__tests__/persona-prompt-builder.test.ts
+      - src/renderer/src/components/AI/__tests__/PersonaSelector.test.tsx
+      - src/renderer/src/store/__tests__/aiStore.test.ts (update)
+    </locations>
+    <ideas>
+      - AC 1: Test multi-select dropdown renders with shadcn/ui Select
+      - AC 2: Test all 12+ personas displayed in dropdown, grouped by category
+      - AC 3, 4: Test adding/removing personas, chips/badges display
+      - AC 5: Test buildPersonaPrompt blends styles (single vs multiple personas)
+      - AC 6: Test default state (empty array, neutral tone)
+      - AC 7: Test selectedPersonas persists in aiStore
+      - AC 8: Test search/filter functionality filters personas by name
+      - Edge cases: Max 5 personas, warn at >3
+    </ideas>
+  </tests>
+</story-context>

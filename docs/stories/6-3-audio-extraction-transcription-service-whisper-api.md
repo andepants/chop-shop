@@ -1,6 +1,6 @@
 # Story 6.3: Audio Extraction & Transcription Service (Whisper API)
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -209,7 +209,7 @@ return transcription.text;
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/stories/6-3-audio-extraction-transcription-service-whisper-api.context.xml
 
 ### Agent Model Used
 

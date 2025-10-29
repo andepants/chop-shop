@@ -1,0 +1,119 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>6</epicId>
+    <storyId>1</storyId>
+    <title>AI Settings & Secure API Key Management</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/6-1-ai-settings-secure-api-key-management.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a content creator</asA>
+    <iWant>to securely store my OpenAI API key in the application</iWant>
+    <soThat>I can use AI features without exposing my credentials</soThat>
+    <tasks>
+      - Task 1: Create API Key Manager Service (AC: 3, 6)
+      - Task 2: Implement IPC handlers for API key operations (AC: 3, 4, 7)
+      - Task 3: Create AI Settings UI component (AC: 1, 2, 8)
+      - Task 4: Implement API key testing logic (AC: 4, 5)
+      - Task 5: Create AI state management store (AC: 6)
+      - Task 6: Integrate AI Settings into main Settings UI (AC: 1)
+      - Task 7: Add comprehensive error handling (AC: 5, 7)
+      - Task 8: Write unit tests for API key manager service (Testing)
+      - Task 9: Write integration tests for AI settings flow (Testing)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. AI Settings panel accessible from main application settings
+    2. Input field for OpenAI API key with password masking
+    3. API key stored using Electron's safeStorage (encrypted, per-project)
+    4. "Test Connection" button validates API key with OpenAI
+    5. Success/error messages displayed for connection test
+    6. Key persists across application restarts
+    7. Option to clear/reset stored API key
+    8. Settings panel uses shadcn/ui components (Input, Button, Label)
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="Services and Modules">
+        Defines api-key-manager.service.ts with responsibility: "Secure API key storage/retrieval using Electron safeStorage". Uses encrypted key stored in userData directory with decrypted key on retrieval in Main Process.
+      </doc>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="APIs and Interfaces">
+        Specifies IPC handlers: ai-store-key, ai-get-key, ai-clear-key, ai-test-connection with typed request/response formats.
+      </doc>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="Security">
+        Mandates Electron safeStorage for OS-level encryption (macOS Keychain). API keys never logged or exposed to renderer directly.
+      </doc>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="Data Models and Contracts">
+        Defines APIKeyStorage interface with encrypted string (Base64) and ISO 8601 timestamp.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/main/ipc/index.ts" kind="ipc-registry" symbol="IPC_CHANNELS" reason="Central IPC channel registration pattern to follow for AI handlers"/>
+      <artifact path="src/main/ipc/recording.handlers.ts" kind="ipc-handlers" symbol="recordingHandlers" reason="Example IPC handler pattern for main process service integration"/>
+      <artifact path="src/renderer/src/store/recordingStore.ts" kind="zustand-store" symbol="useRecordingStore" reason="Zustand store pattern to replicate for aiStore.ts"/>
+      <artifact path="src/renderer/src/store/uiStore.ts" kind="zustand-store" symbol="useUIStore" reason="UI state management pattern for Settings panel integration"/>
+      <artifact path="src/preload/index.ts" kind="preload-bridge" symbol="api" reason="IPC channel whitelisting location for new AI handlers"/>
+    </code>
+    <dependencies>
+      <node>
+        <package name="openai" version="^4.78.0" reason="OpenAI Node.js SDK for API key validation and Whisper/GPT API calls"/>
+        <package name="electron" version="^38.1.2" reason="Provides safeStorage API for encrypted key storage"/>
+        <package name="zustand" version="^5.0.8" reason="Already installed, used for aiStore state management"/>
+        <package name="@radix-ui/react-dialog" version="^1.1.15" reason="shadcn/ui Dialog component dependency"/>
+        <package name="lucide-react" version="^0.548.0" reason="Icons for Settings UI"/>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Process Separation: API key storage/encryption handled entirely in main process. Renderer never has direct access to encrypted keys.
+    - IPC Communication: Use typed IPC channels following existing patterns in src/main/ipc/. Whitelist all channels in preload script.
+    - Security: Never log API keys. Use Electron safeStorage API (requires Electron 13+).
+    - Storage Location: Store encrypted key in app.getPath('userData')/ai-config.json
+    - Component Library: Use shadcn/ui components (Input, Button, Label, Alert) for consistency with Epic 2, Story 2.6
+    - State Management: Follow Zustand patterns from recordingStore.ts and timelineStore.ts
+  </constraints>
+
+  <interfaces>
+    <interface name="IPC: ai-store-key" kind="ipc-channel" signature="(apiKey: string) => Promise<IPCResponse<{success: boolean}>>" path="src/main/ipc/ai.handlers.ts">
+      Encrypts and stores API key using safeStorage
+    </interface>
+    <interface name="IPC: ai-get-key" kind="ipc-channel" signature="() => Promise<IPCResponse<{key: string | null}>>" path="src/main/ipc/ai.handlers.ts">
+      Retrieves and decrypts stored API key
+    </interface>
+    <interface name="IPC: ai-clear-key" kind="ipc-channel" signature="() => Promise<IPCResponse<{success: boolean}>>" path="src/main/ipc/ai.handlers.ts">
+      Deletes stored API key from userData
+    </interface>
+    <interface name="IPC: ai-test-connection" kind="ipc-channel" signature="(apiKey: string) => Promise<IPCResponse<{valid: boolean; message: string}>>" path="src/main/ipc/ai.handlers.ts">
+      Validates API key with OpenAI (list models endpoint)
+    </interface>
+    <interface name="APIKeyManager" kind="service-class" signature="class ApiKeyManager { storeKey(), getKey(), clearKey() }" path="src/main/services/ai/api-key-manager.service.ts">
+      Core service for encrypted API key management
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests use Vitest framework. Main process tests located in __tests__ subdirectories with .test.ts suffix. Mock Electron APIs (safeStorage) using vi.mock(). Integration tests mock IPC communication and external API calls. Follow existing test patterns from src/renderer/src/store/__tests__/
+    </standards>
+    <locations>
+      - src/main/services/ai/__tests__/api-key-manager.service.test.ts
+      - src/main/ipc/__tests__/ai.handlers.test.ts
+      - src/renderer/src/components/Settings/__tests__/AISettings.test.tsx
+      - src/renderer/src/store/__tests__/aiStore.test.ts
+    </locations>
+    <ideas>
+      - AC 3: Test encryption/decryption roundtrip with mock safeStorage
+      - AC 4: Test OpenAI connection validation with mocked API responses (valid key, invalid key, network error)
+      - AC 6: Test key persistence by mocking app restart (store, retrieve after simulated restart)
+      - AC 7: Test clear key operation removes stored data
+      - AC 8: Test UI renders shadcn/ui components correctly
+      - Error cases: safeStorage unavailable, API timeout, malformed API key
+    </ideas>
+  </tests>
+</story-context>

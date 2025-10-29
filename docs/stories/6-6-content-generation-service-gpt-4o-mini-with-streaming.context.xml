@@ -1,0 +1,119 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>6</epicId>
+    <storyId>6</storyId>
+    <title>Content Generation Service (GPT-4o-mini with Streaming)</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/6-6-content-generation-service-gpt-4o-mini-with-streaming.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a content creator</asA>
+    <iWant>AI to generate platform-optimized social media posts in real-time</iWant>
+    <soThat>I can immediately use content tailored for YouTube, Twitter, and LinkedIn</soThat>
+    <tasks>
+      - Task 1: Create Generation Panel UI component (AC: 1, 2, 3)
+      - Task 2: Add generation state to aiStore (AC: 9)
+      - Task 3: Create platform-specific system prompts (AC: 5, 8)
+      - Task 4: Create content generation service (AC: 4, 9, 10)
+      - Task 5: Implement streaming chunk processing (AC: 10)
+      - Task 6: Add IPC handler for generation (AC: 4, 10)
+      - Task 7: Build user messages for GPT (AC: 7)
+      - Task 8: Implement parallel generation (AC: 9)
+      - Task 9: Add comprehensive error handling (AC: 11)
+      - Task 10: Implement retry logic (AC: 11)
+      - Task 11: Add validation in GenerationPanel (AC: 3, 7)
+      - Task 12: Trigger generation on button click (AC: 4)
+      - Task 13-15: Write tests for prompts, service, and integration (Testing)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. Generate tab shows platform checkboxes: YouTube, Twitter, LinkedIn (multi-select)
+    2. "Include Emojis" toggle checkbox (default: off)
+    3. "Generate Posts" button enabled when at least one platform selected
+    4. Main process service calls GPT-4o-mini API with streaming enabled
+    5. System prompts crafted per platform (YouTube: SEO descriptions, Twitter: 280 char hooks, LinkedIn: professional 1-3 paragraphs)
+    6. Selected voice personas blended into system prompt
+    7. Transcription and/or user guidance included in prompt if checked
+    8. Emoji setting explicitly instructed in system prompts
+    9. Parallel generation: All selected platforms generate simultaneously
+    10. Streaming responses sent via IPC to renderer as chunks arrive
+    11. Error handling for API failures, rate limits, and network issues
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="Services and Modules">
+        Defines content-generator.service.ts for GPT-4o-mini streaming integration with parallel platform generation and GenerationPanel.tsx for UI controls.
+      </doc>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="APIs and Interfaces">
+        Specifies IPC handler ai-generate-posts for generation orchestration with streaming events ai-stream-chunk.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/renderer/src/store/aiStore.ts" kind="zustand-store" symbol="useAIStore" reason="State management for selectedPlatforms, includeEmojis, generationStatus"/>
+      <artifact path="src/renderer/src/components/AI/PersonaSelector.tsx" kind="component" symbol="PersonaSelector" reason="Integrated into GenerationPanel for persona selection (Story 6.5)"/>
+      <artifact path="src/main/services/ai/persona-prompt-builder.ts" kind="service" symbol="buildPersonaPrompt" reason="Blends personas into system prompts"/>
+      <artifact path="src/main/services/ai/api-key-manager.service.ts" kind="service" symbol="ApiKeyManager" reason="Retrieve API key for GPT-4o-mini authentication"/>
+    </code>
+    <dependencies>
+      <node>
+        <package name="openai" version="^4.78.0" reason="OpenAI SDK for GPT-4o-mini API with streaming support"/>
+        <package name="zustand" version="^5.0.8" reason="State management"/>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Streaming Architecture: GPT-4o-mini streams via SSE, chunks sent to renderer via IPC events ai-stream-chunk
+    - Parallel Execution: Each platform generates concurrently using Promise.all/Promise.allSettled
+    - System Prompts: Platform-specific prompts (YouTube: SEO, Twitter: 280 char, LinkedIn: professional) with persona blending and emoji settings
+    - Validation: At least one platform selected, at least one input (transcription or guidance)
+    - Error Handling: Handle API failures, rate limits, network issues with retry logic (max 2 retries, exponential backoff)
+    - IPC Events: ai-stream-chunk with payload {platform, content, complete}
+  </constraints>
+
+  <interfaces>
+    <interface name="IPC: ai-generate-posts" kind="ipc-channel" signature="(request: GenerationRequest) => Promise<IPCResponse<{success: boolean}>>" path="src/main/ipc/ai.handlers.ts">
+      Orchestrates content generation for selected platforms with streaming chunks via IPC events
+    </interface>
+    <interface name="IPC Event: ai-stream-chunk" kind="ipc-event" signature="(payload: {platform: string; content: string; complete: boolean}) => void" path="src/main/ipc/ai.handlers.ts">
+      Streams content chunks to renderer as GPT-4o-mini generates text
+    </interface>
+    <interface name="buildYouTubePrompt" kind="utility-function" signature="(includeEmojis: boolean, personaPrompt: string) => string" path="src/main/services/ai/system-prompts.ts">
+      Builds YouTube system prompt with SEO optimization and emoji/persona settings
+    </interface>
+    <interface name="buildTwitterPrompt" kind="utility-function" signature="(includeEmojis: boolean, personaPrompt: string) => string" path="src/main/services/ai/system-prompts.ts">
+      Builds Twitter system prompt with 280 char limit and emoji/persona settings
+    </interface>
+    <interface name="buildLinkedInPrompt" kind="utility-function" signature="(includeEmojis: boolean, personaPrompt: string) => string" path="src/main/services/ai/system-prompts.ts">
+      Builds LinkedIn system prompt with professional tone and emoji/persona settings
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests for system prompts and content generation service with mocked OpenAI SDK. Integration tests for IPC flow with mocked streaming. Test parallel generation, error handling, retry logic.
+    </standards>
+    <locations>
+      - src/main/services/ai/__tests__/system-prompts.test.ts
+      - src/main/services/ai/__tests__/content-generator.service.test.ts
+      - src/main/ipc/__tests__/ai.handlers.test.ts (generation flow)
+      - src/renderer/src/components/AI/__tests__/GenerationPanel.test.tsx
+    </locations>
+    <ideas>
+      - AC 1-3: Test GenerationPanel renders checkboxes, button enabled when platform selected
+      - AC 4: Test GPT-4o-mini API called with stream=true
+      - AC 5: Test system prompts for each platform (YouTube, Twitter, LinkedIn)
+      - AC 6: Test persona prompt injection into system prompts
+      - AC 7: Test transcription/guidance included in user message
+      - AC 8: Test emoji setting in system prompts (include vs exclude)
+      - AC 9: Test parallel generation (Promise.all) for multiple platforms
+      - AC 10: Test streaming chunks emitted via IPC events
+      - AC 11: Test error handling (API failures, rate limits, network errors, retry logic)
+    </ideas>
+  </tests>
+</story-context>

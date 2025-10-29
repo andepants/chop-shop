@@ -1,6 +1,6 @@
 # Story 6.7: Results Display with Streaming & Copy Controls
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -312,7 +312,7 @@ async function copyToClipboard(content: string, platform: string) {
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/stories/6-7-results-display-with-streaming-copy-controls.context.xml
 
 ### Agent Model Used
 

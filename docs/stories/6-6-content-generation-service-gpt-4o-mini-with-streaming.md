@@ -1,6 +1,6 @@
 # Story 6.6: Content Generation Service (GPT-4o-mini with Streaming)
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -321,7 +321,7 @@ async function generatePosts(request: GenerationRequest) {
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/stories/6-6-content-generation-service-gpt-4o-mini-with-streaming.context.xml
 
 ### Agent Model Used
 

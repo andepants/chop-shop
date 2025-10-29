@@ -1,0 +1,108 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>6</epicId>
+    <storyId>7</storyId>
+    <title>Results Display with Streaming & Copy Controls</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/6-7-results-display-with-streaming-copy-controls.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a content creator</asA>
+    <iWant>to see generated posts stream in real-time with copy buttons and character counts</iWant>
+    <soThat>I can quickly distribute my content across platforms</soThat>
+    <tasks>
+      - Task 1: Create Results Panel component (AC: 2, 8)
+      - Task 2: Add generated posts state to aiStore (AC: 8)
+      - Task 3: Implement streaming display logic (AC: 3, 10)
+      - Task 4: Auto-activate Results tab on generation start (AC: 1)
+      - Task 5: Implement real-time character counting (AC: 4)
+      - Task 6: Add character limit warnings (AC: 5)
+      - Task 7: Implement copy-to-clipboard functionality (AC: 6, 7)
+      - Task 8: Add loading spinner during generation (AC: 9)
+      - Task 9: Handle parallel display (AC: 2)
+      - Task 10: Handle stream completion (AC: 3, 9)
+      - Task 11: Add clear/reset functionality (Optional enhancement)
+      - Task 12: Implement smooth scrolling (AC: 10)
+      - Task 13: Add error state display (Error handling)
+      - Task 14-15: Write tests for Results Panel and streaming (Testing)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. Results tab automatically activated when generation starts
+    2. Platform sections display in parallel (YouTube, Twitter, LinkedIn)
+    3. Generated text streams into each section as API returns chunks
+    4. Real-time character count displayed below each platform's text
+    5. Warning indicator if character count exceeds limits (Twitter: 280, LinkedIn: 3000)
+    6. Individual "Copy to Clipboard" button per platform (shadcn/ui Button)
+    7. Copy button shows confirmation feedback ("Copied!") on click
+    8. Generated content remains in view until session ends or cleared
+    9. Loading spinner shown while generation in progress
+    10. Smooth UI updates during streaming (no flickering/jumping)
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="Services and Modules">
+        Defines ResultsPanel.tsx for streaming results display with copy controls and character counting.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/renderer/src/store/aiStore.ts" kind="zustand-store" symbol="useAIStore" reason="State management for generatedPosts object with appendStreamChunk action"/>
+      <artifact path="src/renderer/src/components/AI/AIGeneratorPage.tsx" kind="component" symbol="AIGeneratorPage" reason="Auto-activate Results tab when generation starts"/>
+    </code>
+    <dependencies>
+      <node>
+        <package name="lucide-react" version="^0.548.0" reason="Icons for copy button and warnings"/>
+        <package name="react" version="^19.1.1" reason="React framework"/>
+        <package name="zustand" version="^5.0.8" reason="State management"/>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Streaming Display: Real-time UI updates as IPC events arrive, smooth animations prevent flickering
+    - State Management: Zustand aiStore accumulates stream chunks per platform via appendStreamChunk action
+    - Character Counting: Derived value from content length, no separate state
+    - Character Limits: Twitter 280, LinkedIn 3000, YouTube no limit (show count)
+    - Copy-to-Clipboard: Use navigator.clipboard API with permission handling
+    - Parallel Display: All platform sections visible simultaneously, update independently
+    - Auto-scroll: Smooth scroll to latest content, respect user manual scroll
+  </constraints>
+
+  <interfaces>
+    <interface name="aiStore.generatedPosts" kind="zustand-state" signature="generatedPosts: {youtube: string; twitter: string; linkedin: string}" path="src/renderer/src/store/aiStore.ts">
+      Stores generated content per platform
+    </interface>
+    <interface name="aiStore.appendStreamChunk" kind="zustand-action" signature="appendStreamChunk: (platform: string, content: string) => void" path="src/renderer/src/store/aiStore.ts">
+      Appends streaming chunk to platform content
+    </interface>
+    <interface name="aiStore.clearGeneratedPosts" kind="zustand-action" signature="clearGeneratedPosts: () => void" path="src/renderer/src/store/aiStore.ts">
+      Clears all generated posts
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Component tests for ResultsPanel with simulated IPC events. Test streaming updates, character counting, warnings, copy functionality. Integration tests for streaming flow.
+    </standards>
+    <locations>
+      - src/renderer/src/components/AI/__tests__/ResultsPanel.test.tsx
+      - src/renderer/src/store/__tests__/aiStore.test.ts (update)
+    </locations>
+    <ideas>
+      - AC 1: Test Results tab auto-activated on generation start
+      - AC 2, 9: Test all platform sections render in parallel
+      - AC 3: Test streaming chunks update UI in real-time (simulate IPC events)
+      - AC 4: Test character count updates as content streams in
+      - AC 5: Test warnings display when exceeding limits (Twitter 280, LinkedIn 3000)
+      - AC 6, 7: Test copy-to-clipboard functionality with "Copied!" feedback
+      - AC 8: Test generated content persists until cleared
+      - AC 9: Test loading spinner shown/hidden during generation
+      - AC 10: Test smooth UI updates (no flickering)
+    </ideas>
+  </tests>
+</story-context>

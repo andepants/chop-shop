@@ -1,0 +1,125 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>6</epicId>
+    <storyId>9</storyId>
+    <title>Error Handling & Validation</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/6-9-error-handling-validation.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a content creator</asA>
+    <iWant>clear error messages and validation feedback</iWant>
+    <soThat>I understand what went wrong and how to fix issues</soThat>
+    <tasks>
+      - Task 1: Create error handling utility (AC: 9)
+      - Task 2: Add error state to aiStore (AC: 9)
+      - Task 3: Implement API key validation (AC: 1)
+      - Task 4: Implement timeline validation (AC: 2)
+      - Task 5: Handle Whisper API errors (AC: 3)
+      - Task 6: Handle GPT-4o-mini API errors (AC: 4)
+      - Task 7: Implement input validation (AC: 5)
+      - Task 8: Implement character limit warnings (AC: 6)
+      - Task 9: Add retry logic to services (AC: 7)
+      - Task 10: Implement loading states (AC: 8)
+      - Task 11: Add retry buttons to error states (AC: 10)
+      - Task 12: Add "Back" or "Cancel" options (AC: 10)
+      - Task 13: Create comprehensive error messages map (AC: 1-7)
+      - Task 14: Add logging for all errors (Debugging)
+      - Task 15-16: Write tests for error handling and error flows (Testing)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. API key validation: Show specific error if key is invalid/missing
+    2. Timeline validation: Show error if no audio/video clips exist before transcription
+    3. Whisper API errors: Display user-friendly messages (audio too large, quota exceeded)
+    4. GPT-4o-mini API errors: Display rate limit warnings, network failures
+    5. Empty input validation: Warn if trying to generate with no transcription or guidance
+    6. Platform limit warnings: Clear visual indicators when exceeding character limits
+    7. Network error handling: Retry logic with user notification
+    8. Loading states: Disable buttons during processing to prevent duplicate requests
+    9. Error messages use shadcn/ui Alert/Toast components
+    10. All error states allow user to retry or return to previous step
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="Error Handling">
+        Comprehensive error handling strategy for API failures, validation errors, and network issues with user-friendly messages and retry logic.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/renderer/src/store/aiStore.ts" kind="zustand-store" symbol="useAIStore" reason="State management for error field and loading states"/>
+      <artifact path="src/renderer/src/components/Settings/AISettings.tsx" kind="component" symbol="AISettings" reason="API key validation and error display"/>
+      <artifact path="src/renderer/src/components/AI/TranscriptionPanel.tsx" kind="component" symbol="TranscriptionPanel" reason="Timeline validation and Whisper error display"/>
+      <artifact path="src/renderer/src/components/AI/GenerationPanel.tsx" kind="component" symbol="GenerationPanel" reason="Input validation and generation error display"/>
+      <artifact path="src/renderer/src/components/AI/ResultsPanel.tsx" kind="component" symbol="ResultsPanel" reason="Character limit warnings"/>
+      <artifact path="src/main/services/ai/whisper.service.ts" kind="service" symbol="WhisperService" reason="Whisper API error categorization and retry logic"/>
+      <artifact path="src/main/services/ai/content-generator.service.ts" kind="service" symbol="ContentGeneratorService" reason="GPT API error categorization and retry logic"/>
+    </code>
+    <dependencies>
+      <node>
+        <package name="zustand" version="^5.0.8" reason="State management for errors and loading states"/>
+        <package name="lucide-react" version="^0.548.0" reason="Icons for error alerts and warnings"/>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Error Categorization: Classify by type (auth, network, quota, validation) for appropriate handling
+    - User-Friendly Messages: Translate technical errors to actionable messages with suggestions
+    - Retry Logic: Exponential backoff (max 2 retries) for transient errors (network, rate limits), no retry for auth failures
+    - Loading States: Disable buttons during operations to prevent race conditions
+    - Validation: Timeline (has clips), API key (valid), inputs (transcription or guidance), platforms (at least one)
+    - Character Limits: Twitter 280, LinkedIn 3000, YouTube no limit
+    - Error Display: shadcn/ui Alert for inline errors, Toast for notifications
+    - Error Logging: Console logs with [AI-Error] prefix, context, timestamp
+  </constraints>
+
+  <interfaces>
+    <interface name="showErrorToast" kind="utility-function" signature="(message: string, details?: string) => void" path="src/renderer/src/utils/error-handler.ts">
+      Displays error notification using shadcn/ui Toast
+    </interface>
+    <interface name="showErrorAlert" kind="utility-function" signature="(message: string, action?: () => void) => void" path="src/renderer/src/utils/error-handler.ts">
+      Displays inline error alert with optional retry action
+    </interface>
+    <interface name="aiStore.error" kind="zustand-state" signature="error: string | null" path="src/renderer/src/store/aiStore.ts">
+      Current error message to display in UI
+    </interface>
+    <interface name="aiStore.setError" kind="zustand-action" signature="setError: (message: string) => void" path="src/renderer/src/store/aiStore.ts">
+      Sets error message for display
+    </interface>
+    <interface name="aiStore.clearError" kind="zustand-action" signature="clearError: () => void" path="src/renderer/src/store/aiStore.ts">
+      Clears error message
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests for error message display, retry logic, validation. Integration tests for API error scenarios with mocked responses. Test all error types: auth, network, quota, validation.
+    </standards>
+    <locations>
+      - src/renderer/src/utils/__tests__/error-handler.test.ts
+      - src/main/services/ai/__tests__/whisper.service.test.ts (error handling)
+      - src/main/services/ai/__tests__/content-generator.service.test.ts (error handling)
+      - src/renderer/src/components/AI/__tests__/TranscriptionPanel.test.tsx (validation)
+      - src/renderer/src/components/AI/__tests__/GenerationPanel.test.tsx (validation)
+      - src/renderer/src/components/AI/__tests__/ResultsPanel.test.tsx (char limits)
+    </locations>
+    <ideas>
+      - AC 1: Test API key validation with invalid/missing key
+      - AC 2: Test timeline validation (no clips → error)
+      - AC 3: Test Whisper errors (file too large, quota exceeded, network failure)
+      - AC 4: Test GPT errors (rate limit, quota, network, stream interruption)
+      - AC 5: Test input validation (no transcription and no guidance → error)
+      - AC 6: Test character limit warnings (Twitter >280, LinkedIn >3000)
+      - AC 7: Test retry logic (max 2 retries, exponential backoff, transient vs permanent errors)
+      - AC 8: Test loading states (buttons disabled during operations)
+      - AC 9: Test error display with Alert/Toast components
+      - AC 10: Test retry buttons and "Back" options
+    </ideas>
+  </tests>
+</story-context>

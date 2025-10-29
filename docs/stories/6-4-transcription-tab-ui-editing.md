@@ -1,6 +1,6 @@
 # Story 6.4: Transcription Tab UI & Editing
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -217,7 +217,7 @@ export function validateTranscriptionInput(
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/stories/6-4-transcription-tab-ui-editing.context.xml
 
 ### Agent Model Used
 

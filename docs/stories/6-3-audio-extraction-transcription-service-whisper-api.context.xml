@@ -1,0 +1,118 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>6</epicId>
+    <storyId>3</storyId>
+    <title>Audio Extraction & Transcription Service (Whisper API)</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/6-3-audio-extraction-transcription-service-whisper-api.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a content creator</asA>
+    <iWant>to automatically extract and transcribe audio from my timeline</iWant>
+    <soThat>I can use it as context for social media post generation</soThat>
+    <tasks>
+      - Task 1: Create audio extraction service (AC: 1, 2, 3)
+      - Task 2: Implement Whisper API integration service (AC: 4, 8)
+      - Task 3: Add IPC handler for transcription (AC: 6)
+      - Task 4: Implement progress tracking and IPC events (AC: 5)
+      - Task 5: Add comprehensive error handling (AC: 7, 8)
+      - Task 6: Implement file size management (AC: 8)
+      - Task 7: Add temporary file cleanup (Best practice)
+      - Task 8: Update aiStore for transcription state (AC: 6)
+      - Task 9: Write unit tests for audio extraction service (Testing)
+      - Task 10: Write unit tests for Whisper service (Testing)
+      - Task 11: Write integration tests for transcription flow (Testing)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. Main process service extracts audio from all timeline clips (concatenated)
+    2. Extracted audio converted to format compatible with Whisper API (MP3/WAV)
+    3. Service validates timeline has audio/video clips before extraction
+    4. Whisper API integration transcribes audio using `whisper-1` model
+    5. Progress indicator shows transcription status (percentage if possible)
+    6. Transcription result returned to renderer process via IPC
+    7. Error handling for API failures with user-friendly messages
+    8. Service properly handles large audio files (up to 25MB Whisper limit)
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="Services and Modules">
+        Defines audio-extractor.service.ts for extracting/concatenating audio from timeline clips, and whisper.service.ts for OpenAI Whisper API transcription. Both services operate in Main Process.
+      </doc>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="APIs and Interfaces">
+        Specifies IPC handler ai-transcribe-audio for orchestrating extraction and transcription, with progress events ai-transcription-progress.
+      </doc>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="Workflows and Sequencing">
+        Workflow 2: Audio Transcription flow - extract audio from timeline → transcribe via Whisper → return result.
+      </doc>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="Non-Functional Requirements">
+        Performance requirements: handle up to 25MB audio files with compression/chunking, emit progress updates every 10%.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/main/ipc/ai.handlers.ts" kind="ipc-handlers" symbol="ai-transcribe-audio" reason="IPC handler location for transcription orchestration"/>
+      <artifact path="src/main/ipc/ffmpeg.handlers.ts" kind="ipc-handlers" symbol="ffmpegHandlers" reason="FFmpeg usage patterns for audio extraction and format conversion"/>
+      <artifact path="src/renderer/src/store/aiStore.ts" kind="zustand-store" symbol="useAIStore" reason="State management for transcription results and status"/>
+      <artifact path="src/main/services/ai/api-key-manager.service.ts" kind="service" symbol="ApiKeyManager" reason="Retrieve API key for Whisper API authentication"/>
+    </code>
+    <dependencies>
+      <node>
+        <package name="openai" version="^4.78.0" reason="OpenAI SDK for Whisper API transcription (required by Story 6.1)"/>
+        <package name="ffmpeg-static" version="^5.2.0" reason="FFmpeg binary for audio extraction and format conversion (already installed Epic 1)"/>
+        <package name="ffprobe-static" version="^3.1.0" reason="FFprobe for audio metadata extraction (already installed)"/>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Process Separation: Audio extraction and Whisper API calls execute entirely in main process for security and performance
+    - FFmpeg Integration: Reuse existing FFmpeg setup from Epic 1 (ffmpeg-static package bundled with app)
+    - File Size Limits: Whisper API max 25MB. Apply compression (64kbps bitrate) or chunking (10-min segments) if exceeded
+    - Temporary Storage: Save audio files to os.tmpdir()/chop-shop/ai-audio/ with cleanup after processing
+    - Progress Tracking: Emit IPC events during extraction (0-50%) and transcription (50-100%)
+    - Error Handling: Return user-friendly error messages for timeline validation, FFmpeg failures, API errors, rate limits
+    - OpenAI SDK: Use official openai package for Whisper API integration with model whisper-1
+  </constraints>
+
+  <interfaces>
+    <interface name="IPC: ai-transcribe-audio" kind="ipc-channel" signature="() => Promise<IPCResponse<{text: string; duration: number}>>" path="src/main/ipc/ai.handlers.ts">
+      Orchestrates audio extraction from timeline and Whisper transcription. Emits progress events.
+    </interface>
+    <interface name="IPC Event: ai-transcription-progress" kind="ipc-event" signature="(percentage: number, message: string) => void" path="src/main/ipc/ai.handlers.ts">
+      Progress event emitted during extraction and transcription with percentage and descriptive message
+    </interface>
+    <interface name="AudioExtractorService.extractAudioFromTimeline" kind="service-method" signature="(clips: TimelineClip[]) => Promise<string>" path="src/main/services/ai/audio-extractor.service.ts">
+      Extracts and concatenates audio from timeline clips, returns temp audio file path
+    </interface>
+    <interface name="WhisperService.transcribeAudio" kind="service-method" signature="(audioFilePath: string, apiKey: string) => Promise<string>" path="src/main/services/ai/whisper.service.ts">
+      Transcribes audio file using OpenAI Whisper API, handles file size validation and chunking
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests for services with mocked FFmpeg and OpenAI SDK. Integration tests for IPC flow with mocked services. Use Vitest framework. Test edge cases: empty timeline, large files, API failures. Manual testing with real timeline clips and OpenAI API.
+    </standards>
+    <locations>
+      - src/main/services/ai/__tests__/audio-extractor.service.test.ts
+      - src/main/services/ai/__tests__/whisper.service.test.ts
+      - src/main/ipc/__tests__/ai.handlers.test.ts (transcription flow)
+      - src/renderer/src/store/__tests__/aiStore.test.ts (transcription state)
+    </locations>
+    <ideas>
+      - AC 1, 2: Test audio extraction with mock timeline clips, verify FFmpeg commands for concatenation and format conversion
+      - AC 3: Test timeline validation (no clips, no audio tracks) returns error
+      - AC 4: Test Whisper API call with mocked OpenAI SDK, verify model=whisper-1
+      - AC 5: Test progress event emission at key stages (extraction start, extraction complete, transcription complete)
+      - AC 6: Test IPC handler returns transcription text and duration to renderer
+      - AC 7: Test error handling for FFmpeg failures, API auth errors, network errors, rate limits
+      - AC 8: Test file size validation, compression (bitrate reduction), and chunking for large files (>25MB)
+      - Integration: Test full flow (timeline → extract → transcribe → cleanup)
+    </ideas>
+  </tests>
+</story-context>

@@ -358,6 +358,91 @@ class RecordingService {
   }
 
   /**
+   * Complete PiP recording with DUAL file data from renderer (screen + webcam)
+   * Saves two separate WebM files for independent timeline clips
+   * @param screenBuffer - Screen recording data from renderer
+   * @param webcamBuffer - Webcam recording data from renderer
+   * @returns Recording output with both file paths and metadata
+   * @throws RecordingError if no recording is in progress
+   */
+  async completePiPRecording(screenBuffer: Buffer, webcamBuffer: Buffer): Promise<RecordingOutput> {
+    if (!this.isRecording || this.currentMode !== 'pip' || !this.startTime) {
+      throw new RecordingError(
+        'No PiP recording in progress. Please start a PiP recording before stopping.',
+        RecordingErrorCode.UNKNOWN_ERROR
+      )
+    }
+
+    const endTime = new Date()
+    const startTime = this.startTime
+
+    console.log(`[Recording] Completing PiP recording (dual files) at ${endTime.toISOString()}`)
+
+    try {
+      const timestamp = Date.now()
+
+      // Save screen recording file
+      const screenFilename = `screen-recording-${timestamp}.webm`
+      const { path: screenPath, size: screenSize } = await this.saveRecordingFile(screenBuffer, screenFilename)
+
+      // Save webcam recording file
+      const webcamFilename = `webcam-recording-${timestamp}.webm`
+      const { path: webcamPath, size: webcamSize } = await this.saveRecordingFile(webcamBuffer, webcamFilename)
+
+      const duration = (endTime.getTime() - startTime.getTime()) / 1000
+
+      // Populate output files with metadata for both recordings
+      this.outputFiles.screen = {
+        path: screenPath,
+        size: screenSize,
+        duration,
+        format: 'webm'
+      }
+
+      this.outputFiles.webcam = {
+        path: webcamPath,
+        size: webcamSize,
+        duration,
+        format: 'webm'
+      }
+
+      const output: RecordingOutput = {
+        files: this.outputFiles,
+        metadata: {
+          mode: 'pip',
+          startTime,
+          endTime,
+          totalDuration: duration
+        }
+      }
+
+      console.log(`[Recording] PiP recording completed. Duration: ${duration.toFixed(2)}s`)
+      console.log(`[Recording] Screen file: ${screenPath} (${(screenSize / 1024 / 1024).toFixed(2)} MB)`)
+      console.log(`[Recording] Webcam file: ${webcamPath} (${(webcamSize / 1024 / 1024).toFixed(2)} MB)`)
+
+      // Reset state
+      this.isRecording = false
+      this.currentMode = null
+      this.outputFiles = {}
+      this.startTime = null
+
+      return output
+    } catch (error) {
+      console.error('[Recording] Error completing PiP recording:', error)
+
+      // Cleanup on error
+      this.isRecording = false
+      this.currentMode = null
+      this.startTime = null
+
+      throw new RecordingError(
+        'Failed to complete PiP recording properly. Some files may not have been saved.',
+        RecordingErrorCode.UNKNOWN_ERROR
+      )
+    }
+  }
+
+  /**
    * Get current recording state
    */
   getRecordingState(): {

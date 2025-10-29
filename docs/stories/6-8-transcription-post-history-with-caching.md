@@ -1,6 +1,6 @@
 # Story 6.8: Transcription & Post History with Caching
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -330,7 +330,7 @@ function trimCache(entries: CacheEntry[]): CacheEntry[] {
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/stories/6-8-transcription-post-history-with-caching.context.xml
 
 ### Agent Model Used
 

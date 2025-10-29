@@ -1,0 +1,114 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>6</epicId>
+    <storyId>8</storyId>
+    <title>Transcription & Post History with Caching</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/6-8-transcription-post-history-with-caching.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a content creator</asA>
+    <iWant>to access my previous transcriptions and generated posts</iWant>
+    <soThat>I can reuse content or generate new variations</soThat>
+    <tasks>
+      - Task 1: Define cache data structure (AC: 4, 5, 10)
+      - Task 2: Create cache service in main process (AC: 4, 5, 10)
+      - Task 3: Add IPC handlers for cache operations (AC: 4, 5, 8)
+      - Task 4: Auto-save cache after generation (AC: 4, 5)
+      - Task 5: Create History Panel component (AC: 1, 2, 9)
+      - Task 6: Load cache on History tab activation (AC: 1, 4, 5)
+      - Task 7: Implement history entry click handler (AC: 3)
+      - Task 8: Add "Clear Cache" button (AC: 6, 7, 8)
+      - Task 9: Add cache state to aiStore (AC: 4, 5)
+      - Task 10: Implement cache file management (AC: 10)
+      - Task 11-12: Add UI enhancements (empty state, search/filter)
+      - Task 13-15: Write tests for cache service, History Panel, integration (Testing)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. History tab displays chronological list of past generations
+    2. Each history entry shows: timestamp, transcription snippet, generated platforms
+    3. Clicking history entry loads that transcription and posts into respective tabs
+    4. Transcriptions cached in project data (persists across sessions)
+    5. Generated posts cached in project data (persists across sessions)
+    6. "Clear Cache" button at top of History tab
+    7. Clear Cache shows confirmation dialog before deleting
+    8. Clearing cache removes all transcriptions and posts from storage
+    9. History list scrollable if content exceeds visible area
+    10. Cache stored efficiently (JSON format, reasonable file size limits)
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="Services and Modules">
+        Defines cache.service.ts for JSON file management in userData directory and HistoryPanel.tsx for history display.
+      </doc>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="Data Models and Contracts">
+        Defines CacheEntry interface with transcription, generatedPosts, request, and timestamps.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/renderer/src/store/aiStore.ts" kind="zustand-store" symbol="useAIStore" reason="State management for cacheEntries array"/>
+      <artifact path="src/main/ipc/ai.handlers.ts" kind="ipc-handlers" symbol="ai-save-cache-entry" reason="IPC handler location for cache operations"/>
+    </code>
+    <dependencies>
+      <node>
+        <package name="zustand" version="^5.0.8" reason="State management"/>
+        <package name="lucide-react" version="^0.548.0" reason="Icons for history entries and buttons"/>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Cache Storage: JSON file in app.getPath('userData')/ai-cache.json for cross-session persistence
+    - Data Structure: CacheEntry with id (UUID), transcription, generatedPosts, request, createdAt timestamp
+    - IPC Communication: Main process handles file I/O, renderer requests via ai-load-cache, ai-save-cache-entry, ai-clear-cache
+    - File Size Limits: Max 10MB or 100 entries, FIFO removal if exceeded
+    - Auto-save: Create and save CacheEntry after successful generation
+    - History Display: Chronological list (newest first), clickable entries load into tabs
+    - Clear Cache: Confirmation dialog (AlertDialog) before deletion
+  </constraints>
+
+  <interfaces>
+    <interface name="CacheEntry" kind="interface" signature="{ id: string; transcription: Transcription; generatedPosts: GeneratedPost[]; request: GenerationRequest; createdAt: string }" path="src/shared/types/cache.types.ts">
+      Defines cache entry structure with all generation data
+    </interface>
+    <interface name="IPC: ai-load-cache" kind="ipc-channel" signature="() => Promise<IPCResponse<CacheEntry[]>>" path="src/main/ipc/ai.handlers.ts">
+      Loads all cache entries from userData directory
+    </interface>
+    <interface name="IPC: ai-save-cache-entry" kind="ipc-channel" signature="(entry: CacheEntry) => Promise<IPCResponse<{success: boolean}>>" path="src/main/ipc/ai.handlers.ts">
+      Appends new cache entry to file
+    </interface>
+    <interface name="IPC: ai-clear-cache" kind="ipc-channel" signature="() => Promise<IPCResponse<{success: boolean}>>" path="src/main/ipc/ai.handlers.ts">
+      Deletes all cache entries
+    </interface>
+    <interface name="aiStore.cacheEntries" kind="zustand-state" signature="cacheEntries: CacheEntry[]" path="src/renderer/src/store/aiStore.ts">
+      In-memory cache entries for history display
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests for cache service (save, load, clear, corrupted file handling). Component tests for HistoryPanel (render entries, click handler, clear cache). Integration tests for cache persistence across sessions.
+    </standards>
+    <locations>
+      - src/main/services/ai/__tests__/cache.service.test.ts
+      - src/main/ipc/__tests__/ai.handlers.test.ts (cache operations)
+      - src/renderer/src/components/AI/__tests__/HistoryPanel.test.tsx
+      - src/renderer/src/store/__tests__/aiStore.test.ts (update)
+    </locations>
+    <ideas>
+      - AC 1, 2: Test HistoryPanel renders chronological list with timestamp, snippet, platforms
+      - AC 3: Test clicking entry loads transcription/posts into tabs
+      - AC 4, 5: Test cache persistence (save → load across sessions)
+      - AC 6, 7, 8: Test "Clear Cache" button with confirmation dialog
+      - AC 9: Test scrollable list with many entries
+      - AC 10: Test file size limits, FIFO removal, JSON format
+      - Integration: Test complete flow (generate → save cache → load → display → click → clear)
+    </ideas>
+  </tests>
+</story-context>

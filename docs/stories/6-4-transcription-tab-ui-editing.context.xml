@@ -1,0 +1,113 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>6</epicId>
+    <storyId>4</storyId>
+    <title>Transcription Tab UI & Editing</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/6-4-transcription-tab-ui-editing.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a content creator</asA>
+    <iWant>to view, edit, and control the transcription before generating posts</iWant>
+    <soThat>I can ensure accuracy and add missing context</soThat>
+    <tasks>
+      - Task 1: Create Transcription Panel component (AC: 1, 5, 6, 7, 8)
+      - Task 2: Implement timeline validation (AC: 2)
+      - Task 3: Trigger transcription via IPC (AC: 3)
+      - Task 4: Implement progress indicator (AC: 4)
+      - Task 5: Add transcription state management (AC: 5, 10)
+      - Task 6: Implement editable transcription (AC: 5, 8)
+      - Task 7: Implement checkbox behavior (AC: 6)
+      - Task 8: Implement validation logic (AC: 9)
+      - Task 9: Add loading states (UX enhancement)
+      - Task 10: Add clear/reset functionality (Optional enhancement)
+      - Task 11: Write component tests for Transcription Panel (Testing)
+      - Task 12: Write integration tests for transcription flow (Testing)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. Transcribe tab displays "Transcribe Audio" button
+    2. Button checks for timeline clips; shows error if none exist
+    3. Clicking button triggers audio extraction and transcription
+    4. Progress indicator visible during transcription process
+    5. Transcription auto-populates into editable textarea (shadcn/ui Textarea)
+    6. Checkbox: "Include transcription in post generation prompt"
+    7. Second textarea: "Additional Guidance" (optional user input)
+    8. Both fields editable and optional (can be left empty)
+    9. Validation: At least one field must have content to enable Generate button
+    10. Transcription persists in session (cached until cleared)
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="Services and Modules">
+        Defines TranscriptionPanel.tsx for transcription UI with editing capabilities and user guidance input.
+      </doc>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="Workflows and Sequencing">
+        Workflow 2: Audio Transcription flow - button click → IPC call → progress updates → result display.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/renderer/src/store/aiStore.ts" kind="zustand-store" symbol="useAIStore" reason="State management for transcription, userGuidance, includeTranscription, progress"/>
+      <artifact path="src/renderer/src/store/timelineStore.ts" kind="zustand-store" symbol="useTimelineStore" reason="Check if timeline has clips for validation"/>
+      <artifact path="src/main/ipc/ai.handlers.ts" kind="ipc-handlers" symbol="ai-transcribe-audio" reason="IPC channel to trigger transcription"/>
+    </code>
+    <dependencies>
+      <node>
+        <package name="@radix-ui/react-checkbox" version="latest" reason="shadcn/ui Checkbox component for includeTranscription toggle"/>
+        <package name="lucide-react" version="^0.548.0" reason="Icons for button and progress indicator"/>
+        <package name="react" version="^19.1.1" reason="React framework"/>
+        <package name="zustand" version="^5.0.8" reason="State management"/>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Component Structure: TranscriptionPanel is controlled component with aiStore state
+    - IPC Communication: Call ai-transcribe-audio channel, listen for ai-transcription-progress events
+    - Validation: Export validation function for use by Generate button (Story 6.6)
+    - State Persistence: Transcription state persists across tab switches within session
+    - Progress Indicator: Show during extraction (0-50%) and transcription (50-100%)
+    - Error Handling: Display user-friendly error alerts for timeline validation and IPC failures
+  </constraints>
+
+  <interfaces>
+    <interface name="validateTranscriptionInput" kind="utility-function" signature="(transcription: string, userGuidance: string, includeTranscription: boolean) => boolean" path="src/renderer/src/components/AI/TranscriptionPanel.tsx">
+      Validates at least one of transcription+checkbox or userGuidance is non-empty
+    </interface>
+    <interface name="aiStore.transcription" kind="zustand-state" signature="transcription: string" path="src/renderer/src/store/aiStore.ts">
+      Stores transcription text for editing and generation
+    </interface>
+    <interface name="aiStore.userGuidance" kind="zustand-state" signature="userGuidance: string" path="src/renderer/src/store/aiStore.ts">
+      Stores optional user guidance for post generation
+    </interface>
+    <interface name="aiStore.includeTranscription" kind="zustand-state" signature="includeTranscription: boolean" path="src/renderer/src/store/aiStore.ts">
+      Controls whether transcription is included in generation prompt
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Component tests use Vitest + React Testing Library. Test IPC communication with mocks. Test state binding to aiStore. Test validation logic. Test progress indicator updates.
+    </standards>
+    <locations>
+      - src/renderer/src/components/AI/__tests__/TranscriptionPanel.test.tsx
+      - src/renderer/src/store/__tests__/aiStore.test.ts (update)
+    </locations>
+    <ideas>
+      - AC 1: Test "Transcribe Audio" button renders
+      - AC 2: Test timeline validation (no clips → error alert)
+      - AC 3: Test IPC call triggered on button click
+      - AC 4: Test progress indicator shows/updates during transcription
+      - AC 5: Test transcription populates textarea on IPC success
+      - AC 6: Test checkbox toggles includeTranscription state
+      - AC 7, 8: Test user guidance textarea updates state, both fields editable
+      - AC 9: Test validation function (empty fields → false, one filled → true)
+      - AC 10: Test state persists across component re-renders
+    </ideas>
+  </tests>
+</story-context>

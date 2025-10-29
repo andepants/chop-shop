@@ -1,6 +1,6 @@
 # Story 6.9: Error Handling & Validation
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -322,7 +322,7 @@ toast({
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/stories/6-9-error-handling-validation.context.xml
 
 ### Agent Model Used
 

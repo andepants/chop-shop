@@ -127,6 +127,55 @@ ipcMain.handle(
 )
 
 /**
+ * Handle recording:stop-pip IPC request
+ * Receives DUAL recording data from renderer (screen + webcam) and saves as two separate files
+ */
+ipcMain.handle(
+  'recording:stop-pip',
+  async (_, { screenData, webcamData }: { screenData: Uint8Array; webcamData: Uint8Array }): Promise<IPCResponse<{ outputFiles: RecordingOutputFiles; duration?: number }>> => {
+    try {
+      console.log('[Main] PiP recording stop requested - Screen:', screenData.length, 'bytes, Webcam:', webcamData.length, 'bytes')
+
+      // Convert Uint8Arrays to Buffers
+      const screenBuffer = Buffer.from(screenData)
+      const webcamBuffer = Buffer.from(webcamData)
+
+      const output = await recordingService.completePiPRecording(screenBuffer, webcamBuffer)
+
+      const outputFiles: RecordingOutputFiles = {}
+      if (output.files.screen) {
+        outputFiles.screen = output.files.screen.path
+      }
+      if (output.files.webcam) {
+        outputFiles.webcam = output.files.webcam.path
+      }
+
+      return {
+        success: true,
+        data: {
+          outputFiles,
+          duration: output.metadata.totalDuration
+        }
+      }
+    } catch (error) {
+      console.error('[Main] Failed to stop PiP recording:', error)
+
+      if (error instanceof RecordingError) {
+        return {
+          success: false,
+          error: error.message
+        }
+      }
+
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to stop PiP recording'
+      }
+    }
+  }
+)
+
+/**
  * Get current recording state from main process
  * Used to synchronize state between renderer and main process
  */

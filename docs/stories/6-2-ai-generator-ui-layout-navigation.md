@@ -1,6 +1,6 @@
 # Story 6.2: AI Generator UI Layout & Navigation
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -161,7 +161,7 @@ AIGeneratorPage (container)
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/stories/6-2-ai-generator-ui-layout-navigation.context.xml
 
 ### Agent Model Used
 

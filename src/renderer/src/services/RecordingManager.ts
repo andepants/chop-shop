@@ -9,21 +9,33 @@ import type { RecordingMode } from '../../../shared/types'
 /**
  * Recording Manager
  * Singleton for managing MediaRecorder in renderer process
+ * Supports both single-stream recording (screen, webcam) and dual-stream recording (PiP)
  */
 class RecordingManager {
+  // Single recorder properties (for screen-only and webcam-only modes)
   private mediaRecorder: MediaRecorder | null = null
   private mediaStream: MediaStream | null = null
   private recordedChunks: Blob[] = []
+
+  // Dual recorder properties (for PiP mode)
+  private screenRecorder: MediaRecorder | null = null
+  private webcamRecorder: MediaRecorder | null = null
+  private screenStream: MediaStream | null = null
+  private webcamStream: MediaStream | null = null
+  private screenChunks: Blob[] = []
+  private webcamChunks: Blob[] = []
+
+  // State
   private isRecording: boolean = false
   private currentMode: RecordingMode | null = null
 
   /**
    * Start picture-in-picture recording
-   * Captures both screen and webcam, composites webcam as overlay
+   * Records screen and webcam as TWO SEPARATE files for independent timeline clips
    */
   async startPiPRecording(): Promise<void> {
     try {
-      console.log('[RecordingManager] Starting PiP recording...')
+      console.log('[RecordingManager] Starting PiP recording (dual MediaRecorders)...')
 
       // Get screen source
       const screenResponse = await window.electron.ipcRenderer.invoke('recording:get-screen-source')
@@ -42,8 +54,8 @@ class RecordingManager {
       const selectedDevice = videoDevices[0]
       console.log(`[RecordingManager] Selected webcam: ${selectedDevice.label}`)
 
-      // Get screen stream
-      const screenStream = await navigator.mediaDevices.getUserMedia({
+      // Get screen stream (no audio - will use microphone from webcam)
+      this.screenStream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
           mandatory: {
@@ -62,10 +74,9 @@ class RecordingManager {
       console.log('[RecordingManager] Screen stream acquired')
 
       // Get webcam stream with fallback for audio
-      let webcamStream: MediaStream
       try {
         console.log('[RecordingManager] Requesting webcam with audio...')
-        webcamStream = await navigator.mediaDevices.getUserMedia({
+        this.webcamStream = await navigator.mediaDevices.getUserMedia({
           video: {
             deviceId: { exact: selectedDevice.deviceId },
             width: { ideal: 640 },
@@ -81,7 +92,7 @@ class RecordingManager {
         console.log('[RecordingManager] Webcam stream acquired with audio')
       } catch (error: any) {
         console.warn('[RecordingManager] Failed to get audio, trying video-only webcam:', error.name)
-        webcamStream = await navigator.mediaDevices.getUserMedia({
+        this.webcamStream = await navigator.mediaDevices.getUserMedia({
           video: {
             deviceId: { exact: selectedDevice.deviceId },
             width: { ideal: 640 },
@@ -93,39 +104,56 @@ class RecordingManager {
         console.log('[RecordingManager] Webcam stream acquired (video-only)')
       }
 
-      // Composite streams using canvas
-      const compositeStream = await this.compositeStreams(screenStream, webcamStream)
-
-      this.mediaStream = compositeStream
-
-      // Create MediaRecorder
+      // Determine codec
       const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
         ? 'video/webm;codecs=vp9'
         : 'video/webm;codecs=vp8'
 
       console.log('[RecordingManager] Using codec:', mimeType)
 
-      this.mediaRecorder = new MediaRecorder(compositeStream, {
+      // Create screen MediaRecorder
+      this.screenRecorder = new MediaRecorder(this.screenStream, {
         mimeType,
         videoBitsPerSecond: 8_000_000 // 8 Mbps for screen quality
       })
 
-      this.recordedChunks = []
+      this.screenChunks = []
 
-      this.mediaRecorder.ondataavailable = (event) => {
+      this.screenRecorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
-          this.recordedChunks.push(event.data)
-          console.log(`[RecordingManager] Chunk received: ${(event.data.size / 1024).toFixed(2)} KB`)
+          this.screenChunks.push(event.data)
+          console.log(`[RecordingManager] Screen chunk: ${(event.data.size / 1024).toFixed(2)} KB`)
         }
       }
 
-      this.mediaRecorder.onerror = (event: any) => {
-        console.error('[RecordingManager] MediaRecorder error:', event.error)
+      this.screenRecorder.onerror = (event: any) => {
+        console.error('[RecordingManager] Screen recorder error:', event.error)
       }
 
-      this.mediaRecorder.start(5000)
+      // Create webcam MediaRecorder
+      this.webcamRecorder = new MediaRecorder(this.webcamStream, {
+        mimeType,
+        videoBitsPerSecond: 2_500_000 // 2.5 Mbps for webcam
+      })
 
-      console.log('[RecordingManager] PiP recording started')
+      this.webcamChunks = []
+
+      this.webcamRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          this.webcamChunks.push(event.data)
+          console.log(`[RecordingManager] Webcam chunk: ${(event.data.size / 1024).toFixed(2)} KB`)
+        }
+      }
+
+      this.webcamRecorder.onerror = (event: any) => {
+        console.error('[RecordingManager] Webcam recorder error:', event.error)
+      }
+
+      // Start both recorders simultaneously
+      this.screenRecorder.start(5000)
+      this.webcamRecorder.start(5000)
+
+      console.log('[RecordingManager] PiP recording started (2 separate streams)')
 
       this.isRecording = true
       this.currentMode = 'pip'
@@ -133,75 +161,6 @@ class RecordingManager {
       this.cleanup()
       throw error
     }
-  }
-
-  /**
-   * Composite screen and webcam streams using canvas
-   * Creates a single stream with webcam overlaid on screen
-   */
-  private async compositeStreams(
-    screenStream: MediaStream,
-    webcamStream: MediaStream
-  ): Promise<MediaStream> {
-    const canvas = document.createElement('canvas')
-    canvas.width = 1920
-    canvas.height = 1080
-    const ctx = canvas.getContext('2d')!
-
-    const screenVideo = document.createElement('video')
-    screenVideo.srcObject = screenStream
-    screenVideo.muted = true
-    await screenVideo.play()
-
-    const webcamVideo = document.createElement('video')
-    webcamVideo.srcObject = webcamStream
-    webcamVideo.muted = true
-    await webcamVideo.play()
-
-    // Calculate PiP size (20% of screen width)
-    const pipWidth = canvas.width * 0.2
-    const pipHeight = (pipWidth * 3) / 4 // 4:3 aspect ratio
-    const pipX = canvas.width - pipWidth - 20 // 20px from right
-    const pipY = canvas.height - pipHeight - 20 // 20px from bottom
-
-    // Draw composite frame
-    const drawFrame = () => {
-      if (!this.isRecording) return
-
-      // Draw screen
-      ctx.drawImage(screenVideo, 0, 0, canvas.width, canvas.height)
-
-      // Draw webcam PiP with circular mask
-      ctx.save()
-      ctx.beginPath()
-      ctx.arc(pipX + pipWidth / 2, pipY + pipHeight / 2, pipWidth / 2, 0, Math.PI * 2)
-      ctx.closePath()
-      ctx.clip()
-      ctx.drawImage(webcamVideo, pipX, pipY, pipWidth, pipHeight)
-      ctx.restore()
-
-      // Border for PiP
-      ctx.strokeStyle = '#06b6d4'
-      ctx.lineWidth = 3
-      ctx.beginPath()
-      ctx.arc(pipX + pipWidth / 2, pipY + pipHeight / 2, pipWidth / 2, 0, Math.PI * 2)
-      ctx.stroke()
-
-      requestAnimationFrame(drawFrame)
-    }
-
-    drawFrame()
-
-    // Get composite video stream
-    const compositeVideoStream = canvas.captureStream(30)
-
-    // Add audio from webcam
-    const audioTracks = webcamStream.getAudioTracks()
-    if (audioTracks.length > 0) {
-      compositeVideoStream.addTrack(audioTracks[0])
-    }
-
-    return compositeVideoStream
   }
 
   /**
@@ -445,13 +404,77 @@ class RecordingManager {
 
   /**
    * Stop recording and return chunks
+   * Returns single Blob[] for screen/webcam modes, or {screen, webcam} for PiP mode
    */
-  async stopRecording(): Promise<Blob[]> {
-    if (!this.isRecording || !this.mediaRecorder) {
+  async stopRecording(): Promise<Blob[] | { screen: Blob[]; webcam: Blob[] }> {
+    if (!this.isRecording) {
       throw new Error('No recording in progress')
     }
 
     console.log('[RecordingManager] Stopping recording...')
+
+    // Handle PiP mode with dual recorders
+    if (this.currentMode === 'pip' && this.screenRecorder && this.webcamRecorder) {
+      console.log('[RecordingManager] Stopping dual PiP recorders...')
+
+      // Stop both recorders and wait for final chunks
+      await Promise.all([
+        new Promise<void>((resolve, reject) => {
+          if (!this.screenRecorder) {
+            reject(new Error('Screen recorder not found'))
+            return
+          }
+
+          this.screenRecorder.onstop = () => {
+            console.log('[RecordingManager] Screen recorder stopped')
+            resolve()
+          }
+
+          this.screenRecorder.onerror = (event: any) => {
+            reject(new Error(`Screen recorder error: ${event.error}`))
+          }
+
+          this.screenRecorder.stop()
+        }),
+        new Promise<void>((resolve, reject) => {
+          if (!this.webcamRecorder) {
+            reject(new Error('Webcam recorder not found'))
+            return
+          }
+
+          this.webcamRecorder.onstop = () => {
+            console.log('[RecordingManager] Webcam recorder stopped')
+            resolve()
+          }
+
+          this.webcamRecorder.onerror = (event: any) => {
+            reject(new Error(`Webcam recorder error: ${event.error}`))
+          }
+
+          this.webcamRecorder.stop()
+        })
+      ])
+
+      // Stop all media tracks
+      this.cleanup()
+
+      const screenChunks = [...this.screenChunks]
+      const webcamChunks = [...this.webcamChunks]
+
+      this.screenChunks = []
+      this.webcamChunks = []
+      this.isRecording = false
+      this.currentMode = null
+
+      console.log(`[RecordingManager] PiP recording stopped - Screen: ${screenChunks.length} chunks, Webcam: ${webcamChunks.length} chunks`)
+
+      return { screen: screenChunks, webcam: webcamChunks }
+    }
+
+    // Handle single recorder modes (screen-only, webcam-only)
+    if (!this.mediaRecorder) {
+      throw new Error('No recording in progress')
+    }
 
     // Stop MediaRecorder and wait for final chunks
     await new Promise<void>((resolve, reject) => {
@@ -487,8 +510,10 @@ class RecordingManager {
 
   /**
    * Cleanup media resources
+   * Handles both single and dual stream/recorder cleanup
    */
   private cleanup(): void {
+    // Cleanup single recorder resources (screen-only, webcam-only)
     if (this.mediaStream) {
       this.mediaStream.getTracks().forEach((track) => {
         track.stop()
@@ -498,6 +523,26 @@ class RecordingManager {
     }
 
     this.mediaRecorder = null
+
+    // Cleanup dual recorder resources (PiP)
+    if (this.screenStream) {
+      this.screenStream.getTracks().forEach((track) => {
+        track.stop()
+        console.log(`[RecordingManager] Stopped screen ${track.kind} track`)
+      })
+      this.screenStream = null
+    }
+
+    if (this.webcamStream) {
+      this.webcamStream.getTracks().forEach((track) => {
+        track.stop()
+        console.log(`[RecordingManager] Stopped webcam ${track.kind} track`)
+      })
+      this.webcamStream = null
+    }
+
+    this.screenRecorder = null
+    this.webcamRecorder = null
   }
 
   /**

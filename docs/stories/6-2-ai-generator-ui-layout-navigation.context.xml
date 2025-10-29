@@ -1,0 +1,115 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>6</epicId>
+    <storyId>2</storyId>
+    <title>AI Generator UI Layout & Navigation</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/6-2-ai-generator-ui-layout-navigation.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a content creator</asA>
+    <iWant>a dedicated AI Generator page with organized tabs</iWant>
+    <soThat>I can easily navigate between transcription, generation, and history</soThat>
+    <tasks>
+      - Task 1: Add AI Generator button to sidebar (AC: 1, 2)
+      - Task 2: Create AI Generator page container component (AC: 3, 7, 8)
+      - Task 3: Implement tab navigation system (AC: 4, 5, 6)
+      - Task 4: Create placeholder panel components (AC: 4)
+      - Task 5: Add UI state management for AI Generator visibility (AC: 3, 7)
+      - Task 6: Implement page routing/navigation (AC: 3, 7)
+      - Task 7: Style and theme the AI Generator page (AC: 8)
+      - Task 8: Add keyboard shortcuts for navigation (Optional enhancement)
+      - Task 9: Write component tests for AI Generator page (Testing)
+      - Task 10: Write integration tests for navigation flow (Testing)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. "AI Generator" button added next to Record button in sidebar
+    2. Button always visible/enabled (validation happens on action)
+    3. Clicking button opens dedicated AI Generator page/modal (separate from timeline)
+    4. Page contains tab navigation: History, Transcribe, Generate, Results
+    5. Tab system implemented with shadcn/ui Tabs component
+    6. Navigation between tabs maintains state within session
+    7. "Back to Editor" button returns to main timeline view
+    8. Layout responsive and matches dark theme
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="Services and Modules">
+        Defines AIGeneratorPage.tsx as main AI Generator page container with tab navigation state management.
+      </doc>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="Component Structure">
+        Specifies component organization under src/renderer/src/components/AI/ with panel components for each tab.
+      </doc>
+      <doc path="docs/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="State Management">
+        Integrates with uiStore.ts for AI Generator page visibility and active tab state.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/renderer/src/store/uiStore.ts" kind="zustand-store" symbol="useUIStore" reason="State management pattern for aiGeneratorVisible flag and UI visibility toggles"/>
+      <artifact path="src/renderer/src/components/Sidebar.tsx" kind="component" symbol="Sidebar" reason="Location to add AI Generator button next to Record button"/>
+    </code>
+    <dependencies>
+      <node>
+        <package name="@radix-ui/react-tabs" version="^1.1.13" reason="shadcn/ui Tabs component for tab navigation (already installed)"/>
+        <package name="lucide-react" version="^0.548.0" reason="Icons for AI Generator button (sparkles, robot, brain icons)"/>
+        <package name="react" version="^19.1.1" reason="React framework for component development"/>
+        <package name="zustand" version="^5.0.8" reason="State management for UI visibility"/>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Component Structure: AI Generator page is top-level route/page component that orchestrates panel components
+    - State Management: Use uiStore.ts (Zustand) for page visibility, local component state for active tab
+    - Tab System: Use shadcn/ui Tabs component for accessible tab navigation with keyboard support
+    - Routing: Simple conditional rendering based on visibility state (no complex routing library needed)
+    - Theme: Must match dark theme from existing UI with consistent typography and spacing
+    - Component Location: All AI components under src/renderer/src/components/AI/
+    - Testing: Component tests for each panel, integration tests for navigation flow
+  </constraints>
+
+  <interfaces>
+    <interface name="uiStore.aiGeneratorVisible" kind="zustand-state" signature="aiGeneratorVisible: boolean" path="src/renderer/src/store/uiStore.ts">
+      Boolean flag to control AI Generator page visibility
+    </interface>
+    <interface name="uiStore.showAIGenerator" kind="zustand-action" signature="showAIGenerator: () => void" path="src/renderer/src/store/uiStore.ts">
+      Action to display AI Generator page and hide timeline
+    </interface>
+    <interface name="uiStore.hideAIGenerator" kind="zustand-action" signature="hideAIGenerator: () => void" path="src/renderer/src/store/uiStore.ts">
+      Action to hide AI Generator page and restore timeline view
+    </interface>
+    <interface name="AIGeneratorPage" kind="react-component" signature="const AIGeneratorPage: React.FC" path="src/renderer/src/components/AI/AIGeneratorPage.tsx">
+      Main container component with tab navigation and panel orchestration
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Component tests use Vitest + React Testing Library. Tests located in __tests__ subdirectories with .test.tsx suffix. Follow existing test patterns from src/renderer/src/store/__tests__/. Test accessibility (keyboard navigation, ARIA attributes). Test dark theme styling consistency.
+    </standards>
+    <locations>
+      - src/renderer/src/components/AI/__tests__/AIGeneratorPage.test.tsx
+      - src/renderer/src/components/AI/__tests__/HistoryPanel.test.tsx
+      - src/renderer/src/components/AI/__tests__/TranscriptionPanel.test.tsx
+      - src/renderer/src/components/AI/__tests__/GenerationPanel.test.tsx
+      - src/renderer/src/components/AI/__tests__/ResultsPanel.test.tsx
+      - src/renderer/src/store/__tests__/uiStore.test.ts (update existing)
+    </locations>
+    <ideas>
+      - AC 1, 2: Test AI Generator button renders in Sidebar and is enabled
+      - AC 3: Test clicking button calls showAIGenerator() and displays AIGeneratorPage
+      - AC 4, 5: Test all four tabs render (History, Transcribe, Generate, Results)
+      - AC 6: Test tab switching maintains content state (no data loss)
+      - AC 7: Test "Back to Editor" button calls hideAIGenerator() and restores timeline
+      - AC 8: Test dark theme classes applied, responsive layout on window resize
+      - Integration: Test full flow (sidebar click → AI Generator opens → tabs switch → back to editor)
+      - Accessibility: Test keyboard navigation (Tab, Arrow keys, Esc)
+    </ideas>
+  </tests>
+</story-context>

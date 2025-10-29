@@ -1,6 +1,6 @@
 # Story 6.5: Voice Persona Selection System
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -230,7 +230,7 @@ interface AIStore {
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/stories/6-5-voice-persona-selection-system.context.xml
 
 ### Agent Model Used
 
