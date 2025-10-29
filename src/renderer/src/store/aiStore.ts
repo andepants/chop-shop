@@ -6,6 +6,7 @@
  */
 
 import { create } from 'zustand'
+import type { CacheEntry } from '../types/cache.types'
 
 /**
  * Result of API key connection test
@@ -97,8 +98,16 @@ interface AIState {
     linkedin: StreamingStatus
   }
 
+  // Cache state
+  cacheEntries: CacheEntry[]
+
+  // Error state
+  error: string | null
+
   // Actions
   setHasApiKey: (hasKey: boolean) => void
+  setError: (message: string) => void
+  clearError: () => void
   setApiKeyStatus: (status: AIState['apiKeyStatus']) => void
   setTestingConnection: (isTesting: boolean) => void
   setTestResult: (result: ConnectionTestResult) => void
@@ -128,11 +137,19 @@ interface AIState {
   setStreamingStatus: (platform: Platform, status: StreamingStatus) => void
   clearGeneratedPosts: () => void
 
+  // Cache actions
+  setCacheEntries: (entries: CacheEntry[]) => void
+  addCacheEntry: (entry: CacheEntry) => void
+  clearCacheEntries: () => void
+
   // Async operations
   checkApiKey: () => Promise<void>
   testConnection: (apiKey: string) => Promise<ConnectionTestResult>
   storeApiKey: (apiKey: string) => Promise<boolean>
   clearApiKey: () => Promise<boolean>
+  loadCache: () => Promise<void>
+  saveCacheEntry: (entry: CacheEntry) => Promise<boolean>
+  clearCache: () => Promise<boolean>
 }
 
 /**
@@ -177,8 +194,18 @@ export const useAIStore = create<AIState>((set) => ({
     linkedin: 'idle'
   },
 
+  // Cache initial state
+  cacheEntries: [],
+
+  // Error initial state
+  error: null,
+
   // Synchronous actions
   setHasApiKey: (hasKey) => set({ hasApiKey: hasKey }),
+
+  setError: (message) => set({ error: message }),
+
+  clearError: () => set({ error: null }),
 
   setApiKeyStatus: (status) => set({ apiKeyStatus: status }),
 
@@ -294,6 +321,16 @@ export const useAIStore = create<AIState>((set) => ({
       },
       generationStatus: 'idle'
     }),
+
+  // Cache actions
+  setCacheEntries: (entries) => set({ cacheEntries: entries }),
+
+  addCacheEntry: (entry) =>
+    set((state) => ({
+      cacheEntries: [entry, ...state.cacheEntries]
+    })),
+
+  clearCacheEntries: () => set({ cacheEntries: [] }),
 
   // Async operations
   /**
@@ -424,6 +461,71 @@ export const useAIStore = create<AIState>((set) => ({
       }
     } catch (error) {
       console.error('Failed to clear API key:', error)
+      return false
+    }
+  },
+
+  /**
+   * Load all cache entries from userData directory
+   */
+  loadCache: async (): Promise<void> => {
+    try {
+      const response = await window.api.loadCache()
+
+      if (response.success && response.data) {
+        set({ cacheEntries: response.data })
+      } else {
+        console.error('Failed to load cache:', response.error)
+        set({ cacheEntries: [] })
+      }
+    } catch (error) {
+      console.error('Failed to load cache:', error)
+      set({ cacheEntries: [] })
+    }
+  },
+
+  /**
+   * Save a new cache entry to persistent storage
+   * @param entry - Cache entry to save
+   * @returns True if saved successfully
+   */
+  saveCacheEntry: async (entry: CacheEntry): Promise<boolean> => {
+    try {
+      const response = await window.api.saveCacheEntry(entry)
+
+      if (response.success) {
+        // Add to in-memory state
+        set((state) => ({
+          cacheEntries: [entry, ...state.cacheEntries]
+        }))
+        return true
+      } else {
+        console.error('Failed to save cache entry:', response.error)
+        return false
+      }
+    } catch (error) {
+      console.error('Failed to save cache entry:', error)
+      return false
+    }
+  },
+
+  /**
+   * Clear all cache entries from storage
+   * @returns True if cleared successfully
+   */
+  clearCache: async (): Promise<boolean> => {
+    try {
+      const response = await window.api.clearCache()
+
+      if (response.success) {
+        set({ cacheEntries: [] })
+        return true
+      } else {
+        console.error('Failed to clear cache:', response.error)
+        return false
+      }
+    } catch (error) {
+      console.error('Failed to clear cache:', error)
       return false
     }
   }

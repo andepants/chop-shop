@@ -23,6 +23,8 @@ import {
   DialogHeader,
   DialogTitle
 } from '../ui/dialog'
+import { TIMELINE_ERRORS, VALIDATION_ERRORS } from '../../../../shared/constants/error-messages'
+import { logError } from '../../utils/error-handler'
 
 /**
  * Validates transcription input for content generation
@@ -80,7 +82,9 @@ export function TranscriptionPanel() {
   async function handleTranscribe() {
     // Validate timeline has clips
     if (!hasClips) {
-      setTranscriptionError('No clips found on timeline. Please add video clips before transcribing.')
+      const errorMsg = TIMELINE_ERRORS.NO_CLIPS
+      setTranscriptionError(errorMsg)
+      logError('TranscriptionPanel', errorMsg, { clipCount: clips.length })
       return
     }
 
@@ -95,14 +99,14 @@ export function TranscriptionPanel() {
       if (response.success && response.data) {
         setTranscription(response.data.text, response.data.duration, response.data.warning)
       } else {
-        setTranscriptionError(
-          response.error || 'Transcription failed. Please check your API key and try again.'
-        )
+        const errorMsg = response.error || 'Transcription failed. Please check your API key and try again.'
+        setTranscriptionError(errorMsg)
+        logError('TranscriptionPanel', errorMsg, { response })
       }
     } catch (error) {
-      setTranscriptionError(
-        error instanceof Error ? error.message : 'An error occurred during transcription.'
-      )
+      const errorMsg = error instanceof Error ? error.message : 'An error occurred during transcription.'
+      setTranscriptionError(errorMsg)
+      logError('TranscriptionPanel', error)
     }
   }
 
@@ -129,7 +133,7 @@ export function TranscriptionPanel() {
     if (transcriptionText || userGuidance) {
       const isValid = validateTranscriptionInput(transcriptionText, userGuidance, includeTranscription)
       if (!isValid && transcriptionText.trim().length === 0 && userGuidance.trim().length === 0) {
-        setValidationError('Please provide either a transcription or additional guidance to generate posts.')
+        setValidationError(VALIDATION_ERRORS.NO_INPUT)
       } else {
         setValidationError(null)
       }

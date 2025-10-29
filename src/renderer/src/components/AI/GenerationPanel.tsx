@@ -11,6 +11,9 @@ import { Checkbox } from '../ui/checkbox'
 import { useAIStore, type Platform } from '../../store/aiStore'
 import { Youtube, Twitter, Linkedin, Sparkles } from 'lucide-react'
 import { useState } from 'react'
+import type { CacheEntry, GeneratedPost, Transcription, GenerationRequest } from '../../types/cache.types'
+import { VALIDATION_ERRORS } from '../../../../shared/constants/error-messages'
+import { logError, showErrorToast } from '../../utils/error-handler'
 
 /**
  * Platform configuration for rendering checkboxes
@@ -20,6 +23,96 @@ const PLATFORMS: Array<{ id: Platform; label: string; icon: React.ReactNode }> =
   { id: 'twitter', label: 'Twitter', icon: <Twitter className="w-4 h-4" /> },
   { id: 'linkedin', label: 'LinkedIn', icon: <Linkedin className="w-4 h-4" /> }
 ]
+
+/**
+ * Character limits for each platform
+ */
+const PLATFORM_LIMITS: Record<Platform, number | null> = {
+  twitter: 280,
+  linkedin: 3000,
+  youtube: null
+}
+
+/**
+ * Save generation to cache after successful completion
+ */
+async function saveToCacheAfterGeneration(request: {
+  transcription?: string
+  userGuidance?: string
+  personas: string[]
+  platforms: Platform[]
+  includeEmojis: boolean
+}): Promise<void> {
+  try {
+    const aiStore = useAIStore.getState()
+
+    // Get transcription data
+    const currentTranscription = aiStore.currentTranscription
+    if (!currentTranscription) {
+      console.warn('[GenerationPanel] No transcription available to cache')
+      return
+    }
+
+    // Build transcription object
+    const transcription: Transcription = {
+      id: crypto.randomUUID(),
+      text: currentTranscription.text,
+      audioSourceClips: [], // Would need to track source clips if available
+      createdAt: new Date(currentTranscription.timestamp).toISOString(),
+      duration: currentTranscription.duration
+    }
+
+    // Build generated posts array from aiStore
+    const generatedPosts: GeneratedPost[] = []
+    const postsState = aiStore.generatedPosts
+
+    request.platforms.forEach((platform) => {
+      const content = postsState[platform]
+      if (content && content.trim().length > 0) {
+        const charCount = content.length
+        const limit = PLATFORM_LIMITS[platform]
+
+        generatedPosts.push({
+          id: crypto.randomUUID(),
+          platform,
+          content,
+          characterCount: charCount,
+          exceedsLimit: limit !== null && charCount > limit,
+          generatedAt: new Date().toISOString()
+        })
+      }
+    })
+
+    // Build generation request object
+    const generationRequest: GenerationRequest = {
+      transcription: request.transcription,
+      userGuidance: request.userGuidance,
+      personas: request.personas,
+      platforms: request.platforms,
+      includeEmojis: request.includeEmojis
+    }
+
+    // Create cache entry
+    const cacheEntry: CacheEntry = {
+      id: crypto.randomUUID(),
+      transcription,
+      generatedPosts,
+      request: generationRequest,
+      createdAt: new Date().toISOString()
+    }
+
+    // Save to cache
+    const success = await aiStore.saveCacheEntry(cacheEntry)
+
+    if (success) {
+      console.log('[GenerationPanel] Successfully saved generation to cache')
+    } else {
+      console.error('[GenerationPanel] Failed to save generation to cache')
+    }
+  } catch (error) {
+    console.error('[GenerationPanel] Error saving to cache:', error)
+  }
+}
 
 /**
  * GenerationPanel Component Props
@@ -100,6 +193,9 @@ export function GenerationPanel({ onGenerationStart }: GenerationPanelProps) {
       if (response.success) {
         // Set generation status to complete
         useAIStore.getState().setGenerationStatus('complete')
+
+        // Auto-save to cache after successful generation
+        await saveToCacheAfterGeneration(request)
 
         // Navigate to Results tab
         // Note: This requires passing setActiveTab from AIGeneratorPage

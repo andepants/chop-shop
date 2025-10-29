@@ -77,10 +77,14 @@ export function ExportScreen(): React.JSX.Element {
 
   /**
    * Handle export start
+   * Automatically uses multi-track export if both tracks have clips
    */
   async function handleExport(): Promise<void> {
     if (!outputPath) return
 
+    // Separate clips by track
+    const track1Clips = tracks[0]?.clips || []
+    const track2Clips = tracks[1]?.clips || []
     const allClips = tracks.flatMap((track) => track.clips)
 
     if (allClips.length === 0) {
@@ -88,15 +92,39 @@ export function ExportScreen(): React.JSX.Element {
       return
     }
 
+    // Determine if multi-track export is needed
+    const isMultiTrack = track1Clips.length > 0 && track2Clips.length > 0
+
     try {
       console.log('[ExportScreen] Starting export...')
+      console.log('[ExportScreen] Multi-track:', isMultiTrack)
+      console.log('[ExportScreen] Track 1 clips:', track1Clips.length)
+      console.log('[ExportScreen] Track 2 clips:', track2Clips.length)
+      console.log('[ExportScreen] Resolution:', resolution)
+      console.log('[ExportScreen] Output:', outputPath)
+
       startExport()
 
-      await window.api.startExport({
-        clips: allClips,
-        resolution,
-        outputPath
-      })
+      if (isMultiTrack) {
+        // Use multi-track export with overlay compositing
+        await window.api.startMultiTrackExport({
+          tracks: {
+            main: track1Clips,
+            overlay: track2Clips
+          },
+          resolution,
+          outputPath,
+          pipPosition: 'bottom-right', // Default PiP position
+          pipSize: 25 // 25% of main video width
+        })
+      } else {
+        // Use single-track export (original behavior)
+        await window.api.startExport({
+          clips: allClips,
+          resolution,
+          outputPath
+        })
+      }
     } catch (error) {
       console.error('[ExportScreen] Export failed:', error)
     }

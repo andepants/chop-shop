@@ -258,7 +258,29 @@ const api = {
       callback(data)
     ipcRenderer.on('ai-generation-retry', listener)
     return () => ipcRenderer.removeListener('ai-generation-retry', listener)
-  }
+  },
+
+  /**
+   * Load all cache entries from userData directory
+   * @returns Promise with array of cache entries
+   */
+  loadCache: () =>
+    ipcRenderer.invoke('ai:load-cache'),
+
+  /**
+   * Save a new cache entry to persistent storage
+   * @param entry - Cache entry to save
+   * @returns Promise with save result
+   */
+  saveCacheEntry: (entry: unknown) =>
+    ipcRenderer.invoke('ai:save-cache-entry', entry),
+
+  /**
+   * Clear all cache entries from storage
+   * @returns Promise with clear result
+   */
+  clearCache: () =>
+    ipcRenderer.invoke('ai:clear-cache')
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

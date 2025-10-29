@@ -16,6 +16,8 @@ import {
   contentGeneratorService,
   type GenerationRequest
 } from '../services/ai/content-generator.service'
+import * as cacheService from '../services/ai/cache.service'
+import type { CacheEntry } from '../../renderer/src/types/cache.types'
 import OpenAI from 'openai'
 
 /**
@@ -399,4 +401,55 @@ export function registerAIHandlers(): void {
       }
     }
   )
+
+  /**
+   * Load all cache entries
+   * Channel: ai:load-cache
+   */
+  ipcMain.handle('ai:load-cache', async (): Promise<IPCResponse<CacheEntry[]>> => {
+    try {
+      const entries = await cacheService.loadCache()
+      return { success: true, data: entries }
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to load cache: ${error instanceof Error ? error.message : 'Unknown error'}`
+      }
+    }
+  })
+
+  /**
+   * Save a new cache entry
+   * Channel: ai:save-cache-entry
+   */
+  ipcMain.handle(
+    'ai:save-cache-entry',
+    async (_event, entry: CacheEntry): Promise<IPCResponse<{ success: boolean }>> => {
+      try {
+        await cacheService.saveCacheEntry(entry)
+        return { success: true, data: { success: true } }
+      } catch (error) {
+        return {
+          success: false,
+          error: `Failed to save cache entry: ${error instanceof Error ? error.message : 'Unknown error'}`
+        }
+      }
+    }
+  )
+
+  /**
+   * Clear all cache entries
+   * Channel: ai:clear-cache
+   */
+  ipcMain.handle('ai:clear-cache', async (): Promise<IPCResponse<{ success: boolean }>> => {
+    try {
+      await cacheService.clearCache()
+      return { success: true, data: { success: true } }
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to clear cache: ${error instanceof Error ? error.message : 'Unknown error'}`
+      }
+    }
+  })
 }

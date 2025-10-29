@@ -1,0 +1,242 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>5</epicId>
+    <storyId>8</storyId>
+    <title>Fix Multi-Track Export with Audio, Gaps, and Muting</title>
+    <status>Ready</status>
+    <generatedAt>2025-10-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/5-8-fix-multi-track-export-with-audio-gaps-muting.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>content creator</asA>
+    <iWant>to export my multi-track timeline with proper audio mixing, timeline gaps filled with black screens, and track muting controls</iWant>
+    <soThat>my exported video accurately reflects my timeline arrangement with correct audio and timing</soThat>
+    <tasks>
+      <task id="1" ac="2,3,4">Add track mute/volume state to types and store</task>
+      <task id="2" ac="3">Implement mute button UI functionality</task>
+      <task id="3" ac="6">Add explicit clip sorting before export</task>
+      <task id="4" ac="5">Create gap detection utilities</task>
+      <task id="5" ac="5">Create black screen generation for gaps</task>
+      <task id="6" ac="5">Modify single-track FFmpeg command to insert gaps</task>
+      <task id="7" ac="5">Modify multi-track FFmpeg command to insert gaps</task>
+      <task id="8" ac="1,2">Fix multi-track audio mixing bug</task>
+      <task id="9" ac="3,4">Implement track mute handling in export</task>
+      <task id="10" ac="2">Implement configurable track volume in audio mixing</task>
+      <task id="11" ac="7,9">Create export validation function</task>
+      <task id="12" ac="8">Build export validation UI</task>
+      <task id="13" ac="1,2,4">Write tests for multi-track audio export</task>
+      <task id="14" ac="5">Write tests for gap filling</task>
+      <task id="15" ac="6,7,8,9">Write integration tests for complete export flow</task>
+      <task id="16" ac="10">Manual testing with real timeline scenarios (QA)</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Multi-track exports include audio from both unmuted tracks with proper mixing</criterion>
+    <criterion id="2">Track 1 audio mixed at 100% volume, Track 2 audio mixed at configurable track volume</criterion>
+    <criterion id="3">Mute button on timeline tracks is functional and toggles mute state visually</criterion>
+    <criterion id="4">Muted tracks have their audio excluded from export (video-only export if all muted)</criterion>
+    <criterion id="5">Timeline gaps between clips are filled with black screens and silent audio in export</criterion>
+    <criterion id="6">All clips on timeline are exported in correct chronological order (explicitly sorted by startTime)</criterion>
+    <criterion id="7">Export validation checks all clips have valid intermediate files before starting export</criterion>
+    <criterion id="8">Export validation UI shows pre-export checklist (clips count, gaps detected, muted tracks, warnings)</criterion>
+    <criterion id="9">Validation prevents export start if critical issues found (missing intermediate files, no clips)</criterion>
+    <criterion id="10">All exports work correctly for: single-track, multi-track, with gaps, with muted tracks, and combinations</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Chop Shop - Decision Architecture</title>
+        <section>State Management &amp; Service Layer</section>
+        <snippet>Zustand for state management with immutability patterns. Main/renderer separation: FFmpeg runs only in main process. All file paths stored as absolute paths using path.join.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-3.md</path>
+        <title>Epic Technical Specification: Editing &amp; Export (MVP Checkpoint)</title>
+        <section>FFmpeg Service &amp; Export Pipeline</section>
+        <snippet>ffmpeg.service.ts implements export pipeline: command building, child process execution, progress parsing. Export runs asynchronously with progress events to prevent UI blocking.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification: Screen &amp; Webcam Capture</title>
+        <section>Multi-track Auto-placement</section>
+        <snippet>Two-track auto-placement: Track 1 for screen, Track 2 for webcam overlay. Reuses timelineStore.addClipToTrack() with no timeline extensions needed.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/3-5-export-timeline-to-mp4.md</path>
+        <title>Story 3.5: Export Timeline to MP4</title>
+        <section>FFmpeg Export Implementation</section>
+        <snippet>Original single-track export implementation with H.264 codec, CRF 18, resolution options (720p, 1080p, source). Uses FFmpeg filter_complex for video processing.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/4-1-multi-track-timeline-2-tracks.md</path>
+        <title>Story 4.1: Multi-Track Timeline (2 Tracks)</title>
+        <section>Track Interface &amp; Multi-track State</section>
+        <snippet>Track interface with id, clips array, height. Multi-track timeline supports Track 1 (main) and Track 2 (overlay). Clips can be distributed across tracks.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/4-7-enhanced-preview-with-multi-track-compositing.md</path>
+        <title>Story 4.7: Enhanced Preview with Multi-Track Compositing</title>
+        <section>PiP Rendering &amp; Audio Mixing</section>
+        <snippet>VideoCompositor handles canvas-based multi-track rendering. PiP positioning for Track 2 overlays. Audio mixing with Web Audio API (Track 1 = 100%, Track 2 = 80%).</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/main/services/ffmpeg.service.ts</path>
+        <kind>service</kind>
+        <symbol>buildMultiTrackFFmpegCommand</symbol>
+        <lines>917-1024</lines>
+        <reason>Multi-track FFmpeg command builder with audio mixing bug (lines 1008-1024) using invalid 'copy' filter. Needs gap handling and mute support.</reason>
+      </artifact>
+      <artifact>
+        <path>src/main/services/ffmpeg.service.ts</path>
+        <kind>service</kind>
+        <symbol>buildFFmpegCommand</symbol>
+        <lines>573-633</lines>
+        <reason>Single-track FFmpeg command builder. Needs gap detection and black screen insertion for timeline gaps.</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/components/Timeline/timeline.types.ts</path>
+        <kind>types</kind>
+        <symbol>Track</symbol>
+        <lines>46-53</lines>
+        <reason>Track interface definition. Needs extension with isMuted and volume properties for mute/volume control.</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/store/timelineStore.ts</path>
+        <kind>store</kind>
+        <symbol>timelineStore</symbol>
+        <lines>full-file</lines>
+        <reason>Zustand timeline state management. Needs new actions: toggleTrackMute(trackId), setTrackVolume(trackId, volume).</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/components/Export/ExportScreen.tsx</path>
+        <kind>component</kind>
+        <symbol>handleExport</symbol>
+        <lines>82-99</lines>
+        <reason>Export handler retrieves clips from tracks (lines 86-88). Needs explicit sorting, validation, and mute state passing to IPC.</reason>
+      </artifact>
+      <artifact>
+        <path>src/renderer/src/components/Timeline/TimelineTrack.tsx</path>
+        <kind>component</kind>
+        <symbol>Mute button placeholder</symbol>
+        <lines>163-168</lines>
+        <reason>Mute button UI (currently placeholder). Needs onClick handler connected to toggleTrackMute and visual state indicator.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="ffmpeg-static" version="5.2.0">Bundles FFmpeg 6.0 binaries for video processing</package>
+        <package name="zustand" version="5.0.8">State management for timeline and track state</package>
+        <package name="electron" version="latest">Main/renderer IPC for FFmpeg execution</package>
+        <package name="react" version="18.x">UI components for export validation and mute controls</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Use functional programming patterns - avoid classes (CLAUDE.md guideline)</constraint>
+    <constraint>All functions must have JSDoc documentation with purpose and parameters</constraint>
+    <constraint>Files must not exceed 500 lines for AI tool compatibility</constraint>
+    <constraint>FFmpeg runs only in main process (ADR-002 security pattern)</constraint>
+    <constraint>Maintain Zustand immutability patterns in state updates</constraint>
+    <constraint>Use existing intermediate file workflow - no new encoding pipeline</constraint>
+    <constraint>Preserve existing H.264 export settings (CRF 18, slow preset)</constraint>
+    <constraint>Gap detection must handle trimmed clips correctly (duration - trimOut)</constraint>
+    <constraint>Black screen generation uses FFmpeg color filter (no memory allocation)</constraint>
+    <constraint>Audio mixing must respect track volume levels (Track 1: 100%, Track 2: configurable)</constraint>
+    <constraint>Validation UI must distinguish errors (red, blocks export) from warnings (yellow, allows proceed)</constraint>
+    <constraint>All paths in code must use project-relative format (strip project root prefix)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Track (Extended)</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface Track { id: number; clips: Clip[]; height: number; isMuted: boolean; volume: number; }</signature>
+      <path>src/renderer/src/components/Timeline/timeline.types.ts</path>
+    </interface>
+    <interface>
+      <name>Gap</name>
+      <kind>TypeScript interface (new)</kind>
+      <signature>interface Gap { startTime: number; duration: number; position: number; }</signature>
+      <path>src/main/utils/timeline.utils.ts (to be created)</path>
+    </interface>
+    <interface>
+      <name>ExportValidationResult</name>
+      <kind>TypeScript interface (new)</kind>
+      <signature>interface ExportValidationResult { valid: boolean; errors: string[]; warnings: string[]; info: { clipCount: number; gapCount: number; mutedTracks: number[]; totalDuration: number; }; }</signature>
+      <path>src/renderer/src/components/Export/ExportScreen.tsx</path>
+    </interface>
+    <interface>
+      <name>toggleTrackMute</name>
+      <kind>Zustand action (new)</kind>
+      <signature>toggleTrackMute: (trackId: number) =&gt; void</signature>
+      <path>src/renderer/src/store/timelineStore.ts</path>
+    </interface>
+    <interface>
+      <name>setTrackVolume</name>
+      <kind>Zustand action (new)</kind>
+      <signature>setTrackVolume: (trackId: number, volume: number) =&gt; void</signature>
+      <path>src/renderer/src/store/timelineStore.ts</path>
+    </interface>
+    <interface>
+      <name>detectGaps</name>
+      <kind>Utility function (new)</kind>
+      <signature>function detectGaps(clips: Clip[]): Gap[]</signature>
+      <path>src/main/utils/timeline.utils.ts (to be created)</path>
+    </interface>
+    <interface>
+      <name>generateBlackSegmentFilter</name>
+      <kind>Utility function (new)</kind>
+      <signature>function generateBlackSegmentFilter(gapIndex: number, duration: number, width: number, height: number): { video: string; audio: string }</signature>
+      <path>src/main/utils/timeline.utils.ts (to be created)</path>
+    </interface>
+    <interface>
+      <name>FFmpeg color filter</name>
+      <kind>FFmpeg filter</kind>
+      <signature>color=black:s=${width}x${height}:d=${duration}:r=30[gap${gapIndex}v]</signature>
+      <path>FFmpeg documentation</path>
+    </interface>
+    <interface>
+      <name>FFmpeg anullsrc filter</name>
+      <kind>FFmpeg filter</kind>
+      <signature>anullsrc=channel_layout=stereo:sample_rate=48000:duration=${duration}[gap${gapIndex}a]</signature>
+      <path>FFmpeg documentation</path>
+    </interface>
+    <interface>
+      <name>FFmpeg amix filter</name>
+      <kind>FFmpeg filter</kind>
+      <signature>[a1]volume=${track1Volume}[a1out];[a2]volume=${track2Volume}[a2out];[a1out][a2out]amix=inputs=2:duration=longest[outa]</signature>
+      <path>FFmpeg documentation</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Jest testing framework (pre-configured in electron-react-boilerplate). Unit tests for pure functions (gap detection, filter generation). Integration tests for FFmpeg command building. Manual/E2E tests for actual exports. All tests use descriptive names following pattern: "should [expected behavior] when [condition]". Mock IPC channels for renderer component tests.
+    </standards>
+    <locations>
+      src/main/utils/__tests__/ (gap detection utilities)
+      src/main/services/__tests__/ (FFmpeg service modifications)
+      src/renderer/src/components/Timeline/__tests__/ (mute button UI)
+      src/renderer/src/components/Export/__tests__/ (validation UI and logic)
+      src/renderer/src/store/__tests__/ (timeline store actions)
+    </locations>
+    <ideas>
+      <idea ac="5">Test detectGaps() with: single gap, multiple gaps, no gaps, trimmed clips with gaps, overlapping clips (should return no gaps)</idea>
+      <idea ac="5">Test generateBlackSegmentFilter() returns correct FFmpeg syntax for video and audio streams</idea>
+      <idea ac="1,2">Test multi-track audio mixing: both tracks with audio → amix filter present, only track1 → direct routing, only track2 → direct routing, track1 muted → track2 only</idea>
+      <idea ac="4">Test muted track handling: track1 muted + track2 unmuted → only track2 audio in command, both muted → video-only export</idea>
+      <idea ac="6">Test clip sorting: unsorted clips [10s, 0s, 5s] → export command uses [0s, 5s, 10s] order</idea>
+      <idea ac="7,9">Test export validation: missing intermediate file → validation fails with error, all files present → validation passes, no clips → validation fails</idea>
+      <idea ac="8">Test validation UI: renders clip count, gap count, muted tracks; shows warnings in yellow, errors in red; disables export button on errors</idea>
+      <idea ac="10">Integration test: export single-track with gap → verify black screen inserted; export multi-track with both audio → verify mixing; export with muted track → verify audio excluded</idea>
+    </ideas>
+  </tests>
+</story-context>

@@ -10,8 +10,10 @@ import { useAIStore } from '../../store/aiStore'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
-import { Alert, AlertDescription } from '../ui/alert'
-import { Key, CheckCircle2, XCircle, Loader2, Trash2 } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
+import { Key, CheckCircle2, XCircle, Loader2, Trash2, AlertCircle } from 'lucide-react'
+import { API_KEY_ERRORS } from '../../../../shared/constants/error-messages'
+import { showErrorToast, showSuccessToast, logError } from '../../utils/error-handler'
 
 /**
  * AI Settings Panel Component
@@ -25,6 +27,7 @@ export function AISettings() {
   const [apiKey, setApiKey] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
+  const [validationError, setValidationError] = useState<string | null>(null)
 
   const {
     hasApiKey,
@@ -43,10 +46,31 @@ export function AISettings() {
   }, [checkApiKey])
 
   /**
+   * Validate API key format
+   */
+  const validateApiKey = (key: string): boolean => {
+    // Clear previous validation error
+    setValidationError(null)
+
+    if (!key || key.trim().length === 0) {
+      setValidationError(API_KEY_ERRORS.MISSING)
+      return false
+    }
+
+    // OpenAI API keys start with 'sk-' and are at least 20 chars
+    if (!key.startsWith('sk-') || key.length < 20) {
+      setValidationError(API_KEY_ERRORS.INVALID)
+      return false
+    }
+
+    return true
+  }
+
+  /**
    * Handle API key save
    */
   const handleSave = async () => {
-    if (!apiKey.trim()) {
+    if (!validateApiKey(apiKey)) {
       return
     }
 
@@ -56,9 +80,21 @@ export function AISettings() {
       const success = await storeApiKey(apiKey)
 
       if (success) {
+        showSuccessToast('API key saved successfully')
         // Clear input after successful save
         setApiKey('')
+        setValidationError(null)
+      } else {
+        const errorMsg = 'Failed to store API key. Please try again.'
+        setValidationError(errorMsg)
+        showErrorToast(errorMsg)
+        logError('AISettings', 'Failed to store API key')
       }
+    } catch (error) {
+      const errorMsg = 'An error occurred while saving the API key.'
+      setValidationError(errorMsg)
+      showErrorToast(errorMsg)
+      logError('AISettings', error)
     } finally {
       setIsSaving(false)
     }
@@ -68,23 +104,55 @@ export function AISettings() {
    * Handle connection test
    */
   const handleTestConnection = async () => {
-    if (!apiKey.trim()) {
+    if (!validateApiKey(apiKey)) {
       return
     }
 
-    await testConnection(apiKey)
+    try {
+      const result = await testConnection(apiKey)
+
+      if (!result.valid) {
+        // Show specific error based on test result
+        let errorMsg = API_KEY_ERRORS.TEST_FAILED
+        if (result.message.toLowerCase().includes('invalid') || result.message.toLowerCase().includes('incorrect')) {
+          errorMsg = API_KEY_ERRORS.INVALID
+        } else if (result.message.toLowerCase().includes('unauthorized')) {
+          errorMsg = API_KEY_ERRORS.UNAUTHORIZED
+        }
+
+        setValidationError(errorMsg)
+        logError('AISettings', 'API connection test failed', { message: result.message })
+      } else {
+        setValidationError(null)
+      }
+    } catch (error) {
+      const errorMsg = 'Connection test failed. Please check your internet connection.'
+      setValidationError(errorMsg)
+      showErrorToast(errorMsg)
+      logError('AISettings', error)
+    }
   }
 
   /**
    * Handle clear API key
    */
   const handleClear = async () => {
-    const success = await clearApiKey()
+    try {
+      const success = await clearApiKey()
 
-    if (success) {
-      setApiKey('')
-      setShowClearConfirm(false)
-      clearTestResult()
+      if (success) {
+        showSuccessToast('API key removed successfully')
+        setApiKey('')
+        setShowClearConfirm(false)
+        setValidationError(null)
+        clearTestResult()
+      } else {
+        showErrorToast('Failed to clear API key. Please try again.')
+        logError('AISettings', 'Failed to clear API key')
+      }
+    } catch (error) {
+      showErrorToast('An error occurred while clearing the API key.')
+      logError('AISettings', error)
     }
   }
 
@@ -93,7 +161,8 @@ export function AISettings() {
    */
   const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setApiKey(e.target.value)
-    // Clear test result when user changes the key
+    // Clear validation error and test result when user changes the key
+    setValidationError(null)
     if (lastTestResult) {
       clearTestResult()
     }
@@ -116,6 +185,15 @@ export function AISettings() {
           <AlertDescription className="text-green-800 dark:text-green-200">
             API key is configured and stored securely
           </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Validation Error Alert */}
+      {validationError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{validationError}</AlertDescription>
         </Alert>
       )}
 
