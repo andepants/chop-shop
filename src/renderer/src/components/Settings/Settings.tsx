@@ -37,7 +37,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
       console.log('[Settings] Dialog onOpenChange called. newOpen =', newOpen)
       onOpenChange(newOpen)
     }}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-zinc-950 border border-zinc-800">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <SettingsIcon className="h-5 w-5" />

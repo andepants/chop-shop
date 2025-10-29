@@ -5,7 +5,7 @@
  * Used for filling gaps between clips with black screens and silent audio during export.
  */
 
-import type { Clip } from '@/components/Timeline/timeline.types'
+import type { Clip } from '../../renderer/src/components/Timeline/timeline.types'
 
 /**
  * Represents a gap between clips on the timeline

@@ -7,6 +7,7 @@ import {
   testExport,
   executeExport,
   executeMultiTrackExport,
+  executeMultiPassExport,
   FFmpegError,
   type ExportOptions,
   type MultiTrackExportOptions
@@ -226,8 +227,14 @@ export function registerFFmpegHandlers(): void {
         let lastProgressTime = 0
         const PROGRESS_THROTTLE_MS = 100
 
+        // Determine if we need multi-pass export (multiple clips in any track)
+        const needsMultiPass = options.tracks.main.length > 1 || options.tracks.overlay.length > 1
+
+        console.log('[Main] Multi-track export strategy:', needsMultiPass ? 'MULTI-PASS' : 'SINGLE-PASS')
+
         // Execute multi-track export with progress callback
-        const result = await executeMultiTrackExport(options, (percent) => {
+        // Use multi-pass for complex scenarios with multiple clips per track
+        const result = await (needsMultiPass ? executeMultiPassExport : executeMultiTrackExport)(options, (percent) => {
           const now = Date.now()
           if (now - lastProgressTime >= PROGRESS_THROTTLE_MS) {
             event.sender.send('export-progress', { percent })

@@ -13,6 +13,7 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import * as os from 'os'
 import ffmpegPath from 'ffmpeg-static'
+import { getFfprobePath } from '../../utils/binaryPaths'
 
 /**
  * Timeline clip structure (subset of full Clip type)
@@ -286,8 +287,8 @@ export class AudioExtractorService {
    */
   private async getAudioDuration(audioFilePath: string): Promise<number> {
     return new Promise((resolve, reject) => {
-      // Use ffprobe (bundled with ffmpeg-static) to get audio duration
-      const ffprobePath = ffmpegPath?.replace('ffmpeg', 'ffprobe') || 'ffprobe'
+      // Use ffprobe to get audio duration
+      const ffprobePath = getFfprobePath()
 
       const args = [
         '-v',

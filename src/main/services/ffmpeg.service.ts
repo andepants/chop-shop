@@ -794,6 +794,64 @@ export async function executeExport(
 }
 
 /**
+ * Normalize clip for concatenation
+ * Scales to target resolution, resets timestamps, normalizes fps and pixel format
+ * @param clipPath - Path to input clip
+ * @param targetWidth - Target width in pixels
+ * @param targetHeight - Target height in pixels
+ * @param clipId - Clip ID for temporary file naming
+ * @returns Promise with path to normalized temporary file
+ */
+async function normalizeClipForConcat(
+  clipPath: string,
+  targetWidth: number,
+  targetHeight: number,
+  clipId: string
+): Promise<string> {
+  const normalizedPath = `/tmp/normalized_${clipId}.mp4`
+
+  console.log('[FFmpeg] Normalizing clip for concat:', {
+    input: clipPath,
+    output: normalizedPath,
+    targetResolution: `${targetWidth}x${targetHeight}`
+  })
+
+  try {
+    const args = [
+      '-i', clipPath,
+      '-vf', `scale=${targetWidth}:${targetHeight},setpts=PTS-STARTPTS,fps=30`,
+      '-pix_fmt', 'yuv420p',
+      '-c:v', 'libx264',
+      '-preset', 'ultrafast', // Fast pre-processing
+      '-crf', '18', // Maintain quality
+      '-an', // No audio (audio will be handled separately)
+      '-y',
+      normalizedPath
+    ]
+
+    await executeFFmpegCommand(args)
+
+    if (!existsSync(normalizedPath)) {
+      throw new FFmpegError('Normalized file was not created', FFmpegErrorCode.EXECUTION_FAILED)
+    }
+
+    console.log('[FFmpeg] Clip normalized successfully:', normalizedPath)
+    return normalizedPath
+  } catch (error) {
+    // Clean up partial file on error
+    try {
+      if (existsSync(normalizedPath)) {
+        unlinkSync(normalizedPath)
+      }
+    } catch (cleanupError) {
+      console.error('[FFmpeg] Failed to clean up normalized file:', cleanupError)
+    }
+
+    throw error
+  }
+}
+
+/**
  * Build FFmpeg overlay filter string for PiP positioning
  * @param pipPosition - Position of overlay (top-left, top-right, bottom-left, bottom-right)
  * @param pipSize - Size as percentage (e.g., 25 for 25%)
@@ -1271,6 +1329,490 @@ export async function executeMultiTrackExport(
     }
     throw new FFmpegError(
       error instanceof Error ? error.message : 'Multi-track export failed',
+      FFmpegErrorCode.EXECUTION_FAILED
+    )
+  }
+}
+
+/**
+ * Execute multi-pass export for complex multi-track scenarios
+ * Pass 1: Concatenate each track independently
+ * Pass 2: Overlay the concatenated tracks
+ * This approach handles multiple clips per track robustly by avoiding complex filter chains
+ * @param options - Multi-track export options
+ * @param onProgress - Optional callback for progress updates
+ * @returns Promise resolving with output path on success
+ */
+export async function executeMultiPassExport(
+  options: MultiTrackExportOptions,
+  onProgress?: (percent: number) => void
+): Promise<{ outputPath: string }> {
+  const { tracks, resolution, outputPath, pipPosition = 'bottom-right', pipSize = 25 } = options
+
+  console.log('[FFmpeg] Starting multi-pass export...')
+  console.log('[FFmpeg] Track 1 clips:', tracks.main.length)
+  console.log('[FFmpeg] Track 2 clips:', tracks.overlay.length)
+  console.log('[FFmpeg] Resolution:', resolution)
+  console.log('[FFmpeg] Output:', outputPath)
+
+  // Temporary files to clean up
+  const tempFiles: string[] = []
+
+  try {
+    // Validate inputs
+    if (!tracks.main || tracks.main.length === 0) {
+      throw new FFmpegError('Track 1 must have at least one clip', FFmpegErrorCode.EXECUTION_FAILED)
+    }
+
+    if (!outputPath) {
+      throw new FFmpegError('Output path is required', FFmpegErrorCode.EXECUTION_FAILED)
+    }
+
+    // Determine target resolution
+    let targetWidth: number
+    let targetHeight: number
+
+    if (resolution === '720p') {
+      targetWidth = 1280
+      targetHeight = 720
+    } else if (resolution === '1080p') {
+      targetWidth = 1920
+      targetHeight = 1080
+    } else {
+      const firstClip = tracks.main[0]
+      targetWidth = firstClip.resolution?.width || 1920
+      targetHeight = firstClip.resolution?.height || 1080
+    }
+
+    console.log('[FFmpeg] Target resolution:', `${targetWidth}x${targetHeight}`)
+
+    // Validate resolution
+    validateH264Resolution(targetWidth, targetHeight)
+
+    // Calculate H.264 level
+    const h264Level = calculateH264Level(targetWidth, targetHeight, 30)
+
+    // Detect audio in tracks
+    const track1HasAudio = tracks.main.some((clip) => clip.hasAudio !== false) && !tracks.mainMuted
+    const track2HasAudio = tracks.overlay.length > 0 && tracks.overlay.some((clip) => clip.hasAudio !== false) && !tracks.overlayMuted
+    const hasAnyAudio = track1HasAudio || track2HasAudio
+
+    // Get track volumes
+    const track1Volume = Math.max(0.0, Math.min(1.0, tracks.mainVolume || 1.0))
+    const track2Volume = Math.max(0.0, Math.min(1.0, tracks.overlayVolume || 1.0))
+
+    console.log('[FFmpeg] Multi-pass audio config:', {
+      track1HasAudio,
+      track2HasAudio,
+      track1Volume,
+      track2Volume
+    })
+
+    // ===== PASS 1: Concatenate Track 1 =====
+    console.log('[FFmpeg] ===== PASS 1A: Concatenating Track 1 =====')
+
+    if (onProgress) onProgress(5) // 5% - starting Pass 1A
+
+    // Normalize Track 1 clips
+    const normalizedTrack1: string[] = []
+    for (let i = 0; i < tracks.main.length; i++) {
+      const clip = tracks.main[i]
+      console.log(`[FFmpeg] Normalizing Track 1 clip ${i + 1}/${tracks.main.length}:`, clip.name)
+
+      const normalizedPath = await normalizeClipForConcat(
+        clip.intermediatePath,
+        targetWidth,
+        targetHeight,
+        `t1_${clip.id}`
+      )
+      normalizedTrack1.push(normalizedPath)
+      tempFiles.push(normalizedPath)
+
+      // Update progress: 5% - 25% for normalization
+      if (onProgress) onProgress(5 + Math.floor((i + 1) / tracks.main.length * 20))
+    }
+
+    // Detect gaps in Track 1
+    const track1Gaps = detectGaps(tracks.main)
+    console.log('[FFmpeg] Track 1 gaps detected:', track1Gaps.length)
+
+    // Build Track 1 concatenation command
+    const track1ConcatPath = `/tmp/track1_concat_${Date.now()}.mp4`
+    tempFiles.push(track1ConcatPath)
+
+    const track1Args: string[] = []
+
+    // Add normalized inputs
+    normalizedTrack1.forEach(path => {
+      track1Args.push('-i', path)
+    })
+
+    // Build filter_complex for Track 1 with gaps
+    let track1Filter = ''
+
+    // Generate black screen filters for gaps
+    track1Gaps.forEach((gap, index) => {
+      const blackFilter = generateBlackSegmentFilter(index, gap.duration, targetWidth, targetHeight)
+      track1Filter += blackFilter.video + ';'
+      if (track1HasAudio) {
+        track1Filter += blackFilter.audio + ';'
+      }
+    })
+
+    // Build concat inputs with gaps
+    let track1ConcatInputs = ''
+    let gapIndex = 0
+
+    for (let i = 0; i < normalizedTrack1.length; i++) {
+      // Add normalized clip with PTS reset already applied
+      if (track1HasAudio) {
+        const clipHasAudio = tracks.main[i].hasAudio !== false
+        if (clipHasAudio) {
+          track1ConcatInputs += `[${i}:v][${i}:a]`
+        } else {
+          // Generate silent audio for video-only clips
+          track1Filter = `anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=${tracks.main[i].duration - tracks.main[i].trimIn - tracks.main[i].trimOut}[silent${i}];` + track1Filter
+          track1ConcatInputs += `[${i}:v][silent${i}]`
+        }
+      } else {
+        track1ConcatInputs += `[${i}:v]`
+      }
+
+      // Check for gap after this clip
+      const gapAfterClip = track1Gaps.find(g => g.position === i + 1)
+      if (gapAfterClip) {
+        if (track1HasAudio) {
+          track1ConcatInputs += `[gap${gapIndex}v][gap${gapIndex}a]`
+        } else {
+          track1ConcatInputs += `[gap${gapIndex}v]`
+        }
+        gapIndex++
+      }
+    }
+
+    const track1TotalSegments = normalizedTrack1.length + track1Gaps.length
+    track1Filter += `${track1ConcatInputs}concat=n=${track1TotalSegments}:v=1:a=${track1HasAudio ? 1 : 0}[outv]`
+    if (track1HasAudio) {
+      track1Filter += '[outa]'
+    }
+
+    track1Args.push('-filter_complex', track1Filter)
+    track1Args.push('-map', '[outv]')
+    if (track1HasAudio) {
+      track1Args.push('-map', '[outa]')
+    }
+
+    // Video codec settings
+    track1Args.push('-c:v', 'libx264')
+    track1Args.push('-preset', 'fast')
+    track1Args.push('-crf', '18')
+    track1Args.push('-profile:v', 'high')
+    track1Args.push('-level', h264Level)
+
+    // Audio codec settings
+    if (track1HasAudio) {
+      track1Args.push('-c:a', 'aac')
+      track1Args.push('-b:a', '192k')
+    } else {
+      track1Args.push('-an')
+    }
+
+    track1Args.push('-y', track1ConcatPath)
+
+    // Execute Track 1 concatenation
+    console.log('[FFmpeg] Executing Track 1 concat:', track1Args.join(' '))
+    await executeFFmpegCommand(track1Args)
+
+    if (!existsSync(track1ConcatPath)) {
+      throw new FFmpegError('Track 1 concatenated file was not created', FFmpegErrorCode.EXECUTION_FAILED)
+    }
+
+    console.log('[FFmpeg] Track 1 concatenation complete:', track1ConcatPath)
+    if (onProgress) onProgress(40) // 40% - Track 1 complete
+
+    // ===== PASS 1B: Concatenate Track 2 (if overlay exists) =====
+    let track2ConcatPath: string | null = null
+
+    if (tracks.overlay.length > 0) {
+      console.log('[FFmpeg] ===== PASS 1B: Concatenating Track 2 =====')
+
+      // Normalize Track 2 clips
+      const normalizedTrack2: string[] = []
+      for (let i = 0; i < tracks.overlay.length; i++) {
+        const clip = tracks.overlay[i]
+        console.log(`[FFmpeg] Normalizing Track 2 clip ${i + 1}/${tracks.overlay.length}:`, clip.name)
+
+        const normalizedPath = await normalizeClipForConcat(
+          clip.intermediatePath,
+          targetWidth,
+          targetHeight,
+          `t2_${clip.id}`
+        )
+        normalizedTrack2.push(normalizedPath)
+        tempFiles.push(normalizedPath)
+
+        // Update progress: 40% - 55% for Track 2 normalization
+        if (onProgress) onProgress(40 + Math.floor((i + 1) / tracks.overlay.length * 15))
+      }
+
+      // Detect gaps in Track 2
+      const track2Gaps = detectGaps(tracks.overlay)
+      console.log('[FFmpeg] Track 2 gaps detected:', track2Gaps.length)
+
+      // Build Track 2 concatenation command
+      track2ConcatPath = `/tmp/track2_concat_${Date.now()}.mp4`
+      tempFiles.push(track2ConcatPath)
+
+      const track2Args: string[] = []
+
+      // Add normalized inputs
+      normalizedTrack2.forEach(path => {
+        track2Args.push('-i', path)
+      })
+
+      // Build filter_complex for Track 2 with gaps
+      let track2Filter = ''
+
+      // Generate black screen filters for gaps
+      track2Gaps.forEach((gap, index) => {
+        const blackFilter = generateBlackSegmentFilter(index, gap.duration, targetWidth, targetHeight)
+        track2Filter += blackFilter.video + ';'
+        if (track2HasAudio) {
+          track2Filter += blackFilter.audio + ';'
+        }
+      })
+
+      // Build concat inputs with gaps
+      let track2ConcatInputs = ''
+      let gapIdx = 0
+
+      for (let i = 0; i < normalizedTrack2.length; i++) {
+        if (track2HasAudio) {
+          const clipHasAudio = tracks.overlay[i].hasAudio !== false
+          if (clipHasAudio) {
+            track2ConcatInputs += `[${i}:v][${i}:a]`
+          } else {
+            track2Filter = `anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=${tracks.overlay[i].duration - tracks.overlay[i].trimIn - tracks.overlay[i].trimOut}[t2_silent${i}];` + track2Filter
+            track2ConcatInputs += `[${i}:v][t2_silent${i}]`
+          }
+        } else {
+          track2ConcatInputs += `[${i}:v]`
+        }
+
+        // Check for gap after this clip
+        const gapAfterClip = track2Gaps.find(g => g.position === i + 1)
+        if (gapAfterClip) {
+          if (track2HasAudio) {
+            track2ConcatInputs += `[gap${gapIdx}v][gap${gapIdx}a]`
+          } else {
+            track2ConcatInputs += `[gap${gapIdx}v]`
+          }
+          gapIdx++
+        }
+      }
+
+      const track2TotalSegments = normalizedTrack2.length + track2Gaps.length
+      track2Filter += `${track2ConcatInputs}concat=n=${track2TotalSegments}:v=1:a=${track2HasAudio ? 1 : 0}[outv]`
+      if (track2HasAudio) {
+        track2Filter += '[outa]'
+      }
+
+      track2Args.push('-filter_complex', track2Filter)
+      track2Args.push('-map', '[outv]')
+      if (track2HasAudio) {
+        track2Args.push('-map', '[outa]')
+      }
+
+      // Video codec settings
+      track2Args.push('-c:v', 'libx264')
+      track2Args.push('-preset', 'fast')
+      track2Args.push('-crf', '18')
+      track2Args.push('-profile:v', 'high')
+      track2Args.push('-level', h264Level)
+
+      // Audio codec settings
+      if (track2HasAudio) {
+        track2Args.push('-c:a', 'aac')
+        track2Args.push('-b:a', '192k')
+      } else {
+        track2Args.push('-an')
+      }
+
+      track2Args.push('-y', track2ConcatPath)
+
+      // Execute Track 2 concatenation
+      console.log('[FFmpeg] Executing Track 2 concat:', track2Args.join(' '))
+      await executeFFmpegCommand(track2Args)
+
+      if (!existsSync(track2ConcatPath)) {
+        throw new FFmpegError('Track 2 concatenated file was not created', FFmpegErrorCode.EXECUTION_FAILED)
+      }
+
+      console.log('[FFmpeg] Track 2 concatenation complete:', track2ConcatPath)
+      if (onProgress) onProgress(60) // 60% - Track 2 complete
+    }
+
+    // ===== PASS 2: Overlay Tracks =====
+    console.log('[FFmpeg] ===== PASS 2: Overlaying Tracks =====')
+
+    const overlayArgs: string[] = []
+
+    // Add concatenated track inputs
+    overlayArgs.push('-i', track1ConcatPath)
+    if (track2ConcatPath) {
+      overlayArgs.push('-i', track2ConcatPath)
+    }
+
+    // Build overlay filter
+    let overlayFilter = ''
+
+    if (track2ConcatPath) {
+      // Scale Track 2 for PiP
+      overlayFilter = `[1:v]scale=iw*${pipSize / 100}:ih*${pipSize / 100}[pip];`
+
+      // Calculate overlay position
+      const padding = 10
+      let overlayPosition: string
+      switch (pipPosition) {
+        case 'top-left':
+          overlayPosition = `${padding}:${padding}`
+          break
+        case 'top-right':
+          overlayPosition = `W-w-${padding}:${padding}`
+          break
+        case 'bottom-left':
+          overlayPosition = `${padding}:H-h-${padding}`
+          break
+        case 'bottom-right':
+        default:
+          overlayPosition = `W-w-${padding}:H-h-${padding}`
+          break
+      }
+
+      // Apply overlay with shortest=0 to handle duration mismatches
+      overlayFilter += `[0:v][pip]overlay=${overlayPosition}:shortest=0:eof_action=pass[outv]`
+
+      // Mix audio if both tracks have audio
+      if (track1HasAudio && track2HasAudio) {
+        overlayFilter += `;[0:a]volume=${track1Volume}[a1];[1:a]volume=${track2Volume}[a2];[a1][a2]amix=inputs=2:duration=longest[outa]`
+      } else if (track1HasAudio) {
+        overlayFilter += ';[0:a]volume=${track1Volume}[outa]'
+      } else if (track2HasAudio) {
+        overlayFilter += ';[1:a]volume=${track2Volume}[outa]'
+      }
+    } else {
+      // No overlay - just pass through Track 1
+      overlayFilter = '[0:v]copy[outv]'
+      if (track1HasAudio) {
+        overlayFilter += ';[0:a]volume=${track1Volume}[outa]'
+      }
+    }
+
+    overlayArgs.push('-filter_complex', overlayFilter)
+    overlayArgs.push('-map', '[outv]')
+    if (hasAnyAudio) {
+      overlayArgs.push('-map', '[outa]')
+    }
+
+    // Final video codec settings
+    overlayArgs.push('-c:v', 'libx264')
+    overlayArgs.push('-preset', 'slow')
+    overlayArgs.push('-crf', '18')
+    overlayArgs.push('-profile:v', 'high')
+    overlayArgs.push('-level', h264Level)
+
+    // Add buffer constraints for final output
+    overlayArgs.push('-max_muxing_queue_size', '9999')
+    if (targetWidth >= 1920 || targetHeight >= 1080) {
+      const maxrate = targetWidth >= 3840 ? '300M' : '80M'
+      const bufsize = targetWidth >= 3840 ? '600M' : '160M'
+      overlayArgs.push('-maxrate', maxrate)
+      overlayArgs.push('-bufsize', bufsize)
+    }
+
+    // Audio codec settings
+    if (hasAnyAudio) {
+      overlayArgs.push('-c:a', 'aac')
+      overlayArgs.push('-b:a', '192k')
+    } else {
+      overlayArgs.push('-an')
+    }
+
+    overlayArgs.push('-y', outputPath)
+
+    // Execute overlay
+    console.log('[FFmpeg] Executing overlay:', overlayArgs.join(' '))
+
+    // Calculate total duration for progress
+    const track1Duration = calculateTotalDuration(tracks.main)
+    const track2Duration = tracks.overlay.length > 0 ? calculateTotalDuration(tracks.overlay) : 0
+    const totalDuration = Math.max(track1Duration, track2Duration)
+
+    await executeFFmpegCommand(
+      overlayArgs,
+      onProgress
+        ? (progress) => {
+            // Map remaining 60-100% to overlay pass
+            onProgress(60 + Math.floor(progress.percent * 0.4))
+          }
+        : undefined,
+      totalDuration
+    )
+
+    if (!existsSync(outputPath)) {
+      throw new FFmpegError('Final output file was not created', FFmpegErrorCode.EXECUTION_FAILED)
+    }
+
+    console.log('[FFmpeg] Multi-pass export completed successfully:', outputPath)
+    if (onProgress) onProgress(100)
+
+    // Clean up temporary files
+    console.log('[FFmpeg] Cleaning up temporary files:', tempFiles.length)
+    for (const tempFile of tempFiles) {
+      try {
+        if (existsSync(tempFile)) {
+          unlinkSync(tempFile)
+          console.log('[FFmpeg] Cleaned up:', tempFile)
+        }
+      } catch (cleanupError) {
+        console.warn('[FFmpeg] Failed to clean up temp file:', tempFile, cleanupError)
+      }
+    }
+
+    return { outputPath }
+
+  } catch (error) {
+    console.error('[FFmpeg] Multi-pass export failed:', error)
+
+    // Clean up all temporary files on error
+    console.log('[FFmpeg] Cleaning up temporary files after error:', tempFiles.length)
+    for (const tempFile of tempFiles) {
+      try {
+        if (existsSync(tempFile)) {
+          unlinkSync(tempFile)
+          console.log('[FFmpeg] Cleaned up:', tempFile)
+        }
+      } catch (cleanupError) {
+        console.warn('[FFmpeg] Failed to clean up temp file:', tempFile, cleanupError)
+      }
+    }
+
+    // Clean up partial output file
+    try {
+      if (existsSync(outputPath)) {
+        unlinkSync(outputPath)
+        console.log('[FFmpeg] Cleaned up partial output file')
+      }
+    } catch (cleanupError) {
+      console.error('[FFmpeg] Failed to clean up partial output file:', cleanupError)
+    }
+
+    // Re-throw error
+    if (error instanceof FFmpegError) {
+      throw error
+    }
+    throw new FFmpegError(
+      error instanceof Error ? error.message : 'Multi-pass export failed',
       FFmpegErrorCode.EXECUTION_FAILED
     )
   }

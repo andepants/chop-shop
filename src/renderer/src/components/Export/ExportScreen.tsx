@@ -102,11 +102,18 @@ export function ExportScreen(): React.JSX.Element {
     }
 
     // Determine if multi-track export is needed
-    const isMultiTrack = track1Clips.length > 0 && track2Clips.length > 0
+    // Use multi-track handler if:
+    // 1. Both tracks have clips (traditional multi-track), OR
+    // 2. Any single track has multiple clips (needs multi-pass concat)
+    const hasMultipleClipsInAnyTrack = track1Clips.length > 1 || track2Clips.length > 1
+    const hasBothTracks = track1Clips.length > 0 && track2Clips.length > 0
+    const needsMultiTrackHandler = hasBothTracks || hasMultipleClipsInAnyTrack
 
     try {
       console.log('[ExportScreen] Starting export...')
-      console.log('[ExportScreen] Multi-track:', isMultiTrack)
+      console.log('[ExportScreen] Needs multi-track handler:', needsMultiTrackHandler)
+      console.log('[ExportScreen] Has both tracks:', hasBothTracks)
+      console.log('[ExportScreen] Has multiple clips in any track:', hasMultipleClipsInAnyTrack)
       console.log('[ExportScreen] Track 1 clips:', track1Clips.length)
       console.log('[ExportScreen] Track 2 clips:', track2Clips.length)
       console.log('[ExportScreen] Resolution:', resolution)
@@ -114,7 +121,7 @@ export function ExportScreen(): React.JSX.Element {
 
       startExport()
 
-      if (isMultiTrack) {
+      if (needsMultiTrackHandler) {
         // Use multi-track export with overlay compositing
         // Read track mute and volume state (AC #3, #4, #2)
         const track1Muted = tracks[0]?.isMuted || false

@@ -14,6 +14,7 @@ import * as path from 'path'
 import * as os from 'os'
 import { spawn } from 'child_process'
 import ffmpegPath from 'ffmpeg-static'
+import { getFfprobePath } from '../../utils/binaryPaths'
 
 /**
  * Whisper API constraints
@@ -433,7 +434,7 @@ export class WhisperService {
    */
   private async getAudioDuration(audioFilePath: string): Promise<number> {
     return new Promise((resolve, reject) => {
-      const ffprobePath = ffmpegPath?.replace('ffmpeg', 'ffprobe') || 'ffprobe'
+      const ffprobePath = getFfprobePath()
 
       const args = [
         '-v',
