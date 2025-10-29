@@ -172,11 +172,12 @@ async function autoImportRecordings(
         mediaStore.addFiles([mediaFile])
         console.log('[RecordingStore] Webcam recording added to media library')
 
-        // Add to Track 2 (overlay track)
+        // Add to Track 1 (standalone webcam) or Track 2 (PiP overlay)
         const tracks = timelineStore.tracks
-        const track2 = tracks.find((t) => t.id === 2)
+        const targetTrackId = mode === 'pip' ? 2 : 1
+        const targetTrack = tracks.find((t) => t.id === targetTrackId)
 
-        if (track2) {
+        if (targetTrack) {
           // Calculate start time (align with screen if PiP, or after existing clips)
           let startTime = 0
           if (mode === 'pip') {
@@ -185,8 +186,8 @@ async function autoImportRecordings(
             const screenClip = track1?.clips[track1.clips.length - 1]
             startTime = screenClip?.startTime || 0
           } else {
-            // Webcam-only: after existing clips
-            const lastClip = track2.clips[track2.clips.length - 1]
+            // Webcam-only: after existing clips on target track
+            const lastClip = targetTrack.clips[targetTrack.clips.length - 1]
             startTime = lastClip ? lastClip.startTime + lastClip.duration : 0
           }
 
@@ -204,19 +205,19 @@ async function autoImportRecordings(
           }
 
           // DEBUG: Log clip data before adding to timeline
-          console.log('[RecordingStore] 🎬 Adding webcam clip to Track 2:', {
+          console.log(`[RecordingStore] 🎬 Adding webcam clip to Track ${targetTrackId}:`, {
             name: clipData.name,
             startTime: clipData.startTime,
             duration: clipData.duration,
             hasThumbnail: !!clipData.thumbnail,
             hasAudio: clipData.hasAudio,
             resolution: clipData.resolution,
-            trackId: 2
+            trackId: targetTrackId
           })
 
-          timelineStore.addClipToTrack(clipData, 2)
+          timelineStore.addClipToTrack(clipData, targetTrackId)
 
-          console.log('[RecordingStore] ✅ Webcam recording added to Track 2 at', startTime)
+          console.log(`[RecordingStore] ✅ Webcam recording added to Track ${targetTrackId} at`, startTime)
         }
       }
     }
