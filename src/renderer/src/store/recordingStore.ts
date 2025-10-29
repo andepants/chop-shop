@@ -73,6 +73,19 @@ async function autoImportRecordings(
       if (screenMediaFile.success && screenMediaFile.data) {
         const mediaFile = screenMediaFile.data
 
+        // DEBUG: Log complete mediaFile object
+        console.log('[RecordingStore] 📦 Screen mediaFile received:', {
+          id: mediaFile.id,
+          name: mediaFile.name,
+          path: mediaFile.path,
+          duration: mediaFile.duration,
+          hasThumbnail: !!mediaFile.thumbnail,
+          thumbnailLength: mediaFile.thumbnail?.length,
+          hasAudio: mediaFile.hasAudio,
+          resolution: mediaFile.resolution,
+          intermediatePath: mediaFile.intermediatePath
+        })
+
         // Override duration if FFprobe returned 0 (WebM without duration metadata)
         if (mediaFile.duration === 0 && actualDuration && actualDuration > 0) {
           console.log(
@@ -94,21 +107,33 @@ async function autoImportRecordings(
           const lastClip = track1.clips[track1.clips.length - 1]
           const startTime = lastClip ? lastClip.startTime + lastClip.duration : 0
 
-          timelineStore.addClipToTrack(
-            {
-              id: `clip-${Date.now()}-screen`,
-              sourceFile: mediaFile.path,
-              intermediatePath: mediaFile.intermediatePath || mediaFile.path,
-              startTime,
-              duration: mediaFile.duration,
-              trimIn: 0,
-              trimOut: 0,
-              trackId: 1
-            },
-            1
-          )
+          const clipData = {
+            name: mediaFile.name,
+            sourceFile: mediaFile.path,
+            intermediatePath: mediaFile.intermediatePath || mediaFile.path,
+            startTime,
+            duration: mediaFile.duration,
+            trimIn: 0,
+            trimOut: 0,
+            thumbnail: mediaFile.thumbnail,
+            hasAudio: mediaFile.hasAudio,
+            resolution: mediaFile.resolution
+          }
 
-          console.log('[RecordingStore] Screen recording added to Track 1 at', startTime)
+          // DEBUG: Log clip data before adding to timeline
+          console.log('[RecordingStore] 🎬 Adding screen clip to Track 1:', {
+            name: clipData.name,
+            startTime: clipData.startTime,
+            duration: clipData.duration,
+            hasThumbnail: !!clipData.thumbnail,
+            hasAudio: clipData.hasAudio,
+            resolution: clipData.resolution,
+            trackId: 1
+          })
+
+          timelineStore.addClipToTrack(clipData, 1)
+
+          console.log('[RecordingStore] ✅ Screen recording added to Track 1 at', startTime)
         }
       }
     }
@@ -121,6 +146,19 @@ async function autoImportRecordings(
 
       if (webcamMediaFile.success && webcamMediaFile.data) {
         const mediaFile = webcamMediaFile.data
+
+        // DEBUG: Log complete mediaFile object
+        console.log('[RecordingStore] 📦 Webcam mediaFile received:', {
+          id: mediaFile.id,
+          name: mediaFile.name,
+          path: mediaFile.path,
+          duration: mediaFile.duration,
+          hasThumbnail: !!mediaFile.thumbnail,
+          thumbnailLength: mediaFile.thumbnail?.length,
+          hasAudio: mediaFile.hasAudio,
+          resolution: mediaFile.resolution,
+          intermediatePath: mediaFile.intermediatePath
+        })
 
         // Override duration if FFprobe returned 0 (WebM without duration metadata)
         if (mediaFile.duration === 0 && actualDuration && actualDuration > 0) {
@@ -152,21 +190,33 @@ async function autoImportRecordings(
             startTime = lastClip ? lastClip.startTime + lastClip.duration : 0
           }
 
-          timelineStore.addClipToTrack(
-            {
-              id: `clip-${Date.now()}-webcam`,
-              sourceFile: mediaFile.path,
-              intermediatePath: mediaFile.intermediatePath || mediaFile.path,
-              startTime,
-              duration: mediaFile.duration,
-              trimIn: 0,
-              trimOut: 0,
-              trackId: 2
-            },
-            2
-          )
+          const clipData = {
+            name: mediaFile.name,
+            sourceFile: mediaFile.path,
+            intermediatePath: mediaFile.intermediatePath || mediaFile.path,
+            startTime,
+            duration: mediaFile.duration,
+            trimIn: 0,
+            trimOut: 0,
+            thumbnail: mediaFile.thumbnail,
+            hasAudio: mediaFile.hasAudio,
+            resolution: mediaFile.resolution
+          }
 
-          console.log('[RecordingStore] Webcam recording added to Track 2 at', startTime)
+          // DEBUG: Log clip data before adding to timeline
+          console.log('[RecordingStore] 🎬 Adding webcam clip to Track 2:', {
+            name: clipData.name,
+            startTime: clipData.startTime,
+            duration: clipData.duration,
+            hasThumbnail: !!clipData.thumbnail,
+            hasAudio: clipData.hasAudio,
+            resolution: clipData.resolution,
+            trackId: 2
+          })
+
+          timelineStore.addClipToTrack(clipData, 2)
+
+          console.log('[RecordingStore] ✅ Webcam recording added to Track 2 at', startTime)
         }
       }
     }

@@ -44,42 +44,6 @@ ipcMain.handle(
 )
 
 /**
- * Get webcam source for recording
- * Returns default webcam deviceId for renderer to use with getUserMedia
- */
-ipcMain.handle(
-  'recording:get-webcam-source',
-  async (): Promise<IPCResponse<{ deviceId: string }>> => {
-    try {
-      console.log('[Main] Webcam source requested')
-
-      const defaultWebcam = await recordingService.getDefaultWebcam()
-
-      return {
-        success: true,
-        data: {
-          deviceId: defaultWebcam.deviceId
-        }
-      }
-    } catch (error) {
-      console.error('[Main] Failed to get webcam source:', error)
-
-      if (error instanceof RecordingError) {
-        return {
-          success: false,
-          error: error.message
-        }
-      }
-
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to get webcam source'
-      }
-    }
-  }
-)
-
-/**
  * Handle recording:start IPC request
  * Starts recording coordination in main process
  * Renderer will handle actual MediaRecorder capture
@@ -120,7 +84,7 @@ ipcMain.handle(
  */
 ipcMain.handle(
   'recording:stop',
-  async (_, { recordingData }: { recordingData: Uint8Array }): Promise<IPCResponse<{ outputFiles: RecordingOutputFiles }>> => {
+  async (_, { recordingData }: { recordingData: Uint8Array }): Promise<IPCResponse<{ outputFiles: RecordingOutputFiles; duration?: number }>> => {
     try {
       console.log('[Main] Recording stop requested with data size:', recordingData.length)
 

@@ -162,69 +162,6 @@ class RecordingService {
   }
 
   /**
-   * Get default webcam device for recording
-   * Auto-selects the first videoinput device with fallback logic
-   * @returns Default webcam device info
-   * @throws RecordingError if no webcam is available
-   */
-  async getDefaultWebcam(): Promise<MediaDeviceInfo> {
-    try {
-      console.log('[Recording] Requesting default webcam device...')
-      const devices = await navigator.mediaDevices.enumerateDevices()
-      const videoDevices = devices.filter((device) => device.kind === 'videoinput')
-
-      if (videoDevices.length === 0) {
-        throw new RecordingError(
-          'No webcam found. Please connect a camera and try again.',
-          RecordingErrorCode.NO_DEVICES_FOUND
-        )
-      }
-
-      // Auto-select first available webcam
-      const defaultWebcam = videoDevices[0]
-      console.log(
-        `[Recording] Auto-selected webcam: ${defaultWebcam.label || 'Default Camera'} (ID: ${defaultWebcam.deviceId})`
-      )
-
-      return defaultWebcam
-    } catch (error) {
-      if (error instanceof RecordingError) {
-        throw error
-      }
-
-      // Handle permission errors (NotAllowedError)
-      if (error instanceof Error && error.name === 'NotAllowedError') {
-        throw new RecordingError(
-          'Camera permission denied. Please enable camera access in System Preferences > Privacy & Security > Camera.',
-          RecordingErrorCode.PERMISSION_DENIED
-        )
-      }
-
-      // Handle device not found errors (NotFoundError)
-      if (error instanceof Error && error.name === 'NotFoundError') {
-        throw new RecordingError(
-          'No webcam found. Please connect a camera and try again.',
-          RecordingErrorCode.NO_DEVICES_FOUND
-        )
-      }
-
-      // Handle device busy errors (NotReadableError)
-      if (error instanceof Error && error.name === 'NotReadableError') {
-        throw new RecordingError(
-          'Camera is busy or already in use by another application. Please close other apps using the camera and try again.',
-          RecordingErrorCode.DEVICE_BUSY
-        )
-      }
-
-      console.error('[Recording] Failed to get default webcam:', error)
-      throw new RecordingError(
-        'Failed to access webcam. Please try again.',
-        RecordingErrorCode.UNKNOWN_ERROR
-      )
-    }
-  }
-
-  /**
    * Ensure recording directory exists with proper error handling
    * Creates temp directory at os.tmpdir()/chop-shop/recordings/
    * @throws RecordingError if directory creation fails

@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, session } from 'electron'
 import { join } from 'path'
 import { electronApp, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -95,6 +95,22 @@ function createWindow(): void {
 app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
+
+  // Configure media permission handler
+  // Automatically grants webcam and microphone access when requested by renderer
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    console.log('[Main] Permission requested:', permission)
+
+    // Auto-grant media permissions (camera, microphone)
+    if (permission === 'media' || permission === 'mediaKeySystem') {
+      console.log('[Main] Granting media permission')
+      callback(true)
+    } else {
+      // Deny other permissions by default
+      console.log('[Main] Denying permission:', permission)
+      callback(false)
+    }
+  })
 
   // NOTE: Replaced optimizer.watchWindowShortcuts with custom implementation
   // in createWindow() to allow zoom shortcuts (Cmd/Ctrl + -, =, 0) to pass through

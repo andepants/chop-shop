@@ -578,4 +578,231 @@ So that [benefit/value].
 
 ---
 
+## Epic 6: AI-Powered Social Media Content Generator
+
+**Expanded Goal:**
+
+Enable users to automatically transcribe audio from their timeline and generate optimized social media posts for YouTube, Twitter, and LinkedIn using AI. This epic transforms Chop Shop from a video editor into a complete content creation platform by adding intelligent post-generation capabilities. Users can extract audio, add context/guidance, select voice personas, and receive platform-optimized content ready for copy-paste distribution.
+
+**Value Delivery:**
+
+Eliminates the time-consuming task of writing platform-specific social media descriptions. Users can go from finished video to published content 10x faster. This feature differentiates Chop Shop from basic editors by providing end-to-end content workflow: record → edit → export → distribute.
+
+---
+
+### Story Breakdown
+
+**Story 6.1: AI Settings & Secure API Key Management**
+
+As a content creator,
+I want to securely store my OpenAI API key in the application,
+So that I can use AI features without exposing my credentials.
+
+**Acceptance Criteria:**
+
+1. AI Settings panel accessible from main application settings
+2. Input field for OpenAI API key with password masking
+3. API key stored using Electron's safeStorage (encrypted, per-project)
+4. "Test Connection" button validates API key with OpenAI
+5. Success/error messages displayed for connection test
+6. Key persists across application restarts
+7. Option to clear/reset stored API key
+8. Settings panel uses shadcn/ui components (Input, Button, Label)
+
+**Prerequisites:** Story 2.6 (shadcn/ui setup)
+
+---
+
+**Story 6.2: AI Generator UI Layout & Navigation**
+
+As a content creator,
+I want a dedicated AI Generator page with organized tabs,
+So that I can easily navigate between transcription, generation, and history.
+
+**Acceptance Criteria:**
+
+1. "AI Generator" button added next to Record button in sidebar
+2. Button always visible/enabled (validation happens on action)
+3. Clicking button opens dedicated AI Generator page/modal (separate from timeline)
+4. Page contains tab navigation: History, Transcribe, Generate, Results
+5. Tab system implemented with shadcn/ui Tabs component
+6. Navigation between tabs maintains state within session
+7. "Back to Editor" button returns to main timeline view
+8. Layout responsive and matches dark theme
+
+**Prerequisites:** Story 6.1
+
+---
+
+**Story 6.3: Audio Extraction & Transcription Service (Whisper API)**
+
+As a content creator,
+I want to automatically extract and transcribe audio from my timeline,
+So that I can use it as context for social media post generation.
+
+**Acceptance Criteria:**
+
+1. Main process service extracts audio from all timeline clips (concatenated)
+2. Extracted audio converted to format compatible with Whisper API (MP3/WAV)
+3. Service validates timeline has audio/video clips before extraction
+4. Whisper API integration transcribes audio using `whisper-1` model
+5. Progress indicator shows transcription status (percentage if possible)
+6. Transcription result returned to renderer process via IPC
+7. Error handling for API failures with user-friendly messages
+8. Service properly handles large audio files (up to 25MB Whisper limit)
+
+**Prerequisites:** Story 6.2
+
+---
+
+**Story 6.4: Transcription Tab UI & Editing**
+
+As a content creator,
+I want to view, edit, and control the transcription before generating posts,
+So that I can ensure accuracy and add missing context.
+
+**Acceptance Criteria:**
+
+1. Transcribe tab displays "Transcribe Audio" button
+2. Button checks for timeline clips; shows error if none exist
+3. Clicking button triggers audio extraction and transcription
+4. Progress indicator visible during transcription process
+5. Transcription auto-populates into editable textarea (shadcn/ui Textarea)
+6. Checkbox: "Include transcription in post generation prompt"
+7. Second textarea: "Additional Guidance" (optional user input)
+8. Both fields editable and optional (can be left empty)
+9. Validation: At least one field must have content to enable Generate button
+10. Transcription persists in session (cached until cleared)
+
+**Prerequisites:** Story 6.3
+
+---
+
+**Story 6.5: Voice Persona Selection System**
+
+As a content creator,
+I want to select voice personas to influence the tone and style of generated posts,
+So that my content matches my brand personality.
+
+**Acceptance Criteria:**
+
+1. Multi-select dropdown implemented with shadcn/ui Select component
+2. Dropdown includes 12+ voice personas:
+   - **Business/Tech**: Naval Ravikant, Elon Musk, Gary Vaynerchuk, Tim Ferriss
+   - **Creative/Humor**: Scott Adams, Seth Godin, Casey Neistat, MKBHD
+   - **Professional**: Simon Sinek, Brené Brown, Adam Grant, Malcolm Gladwell
+3. Users can select multiple personas (style blending)
+4. Selected personas shown as tags/chips with remove option
+5. System prompt generator blends selected personas into unified style instructions
+6. Default state: No personas selected (neutral/professional tone)
+7. Persona selection persists across session
+8. Dropdown searchable/filterable for easy selection
+
+**Prerequisites:** Story 6.4
+
+---
+
+**Story 6.6: Content Generation Service (GPT-4o-mini with Streaming)**
+
+As a content creator,
+I want AI to generate platform-optimized social media posts in real-time,
+So that I can immediately use content tailored for YouTube, Twitter, and LinkedIn.
+
+**Acceptance Criteria:**
+
+1. Generate tab shows platform checkboxes: YouTube, Twitter, LinkedIn (multi-select)
+2. "Include Emojis" toggle checkbox (default: off)
+3. "Generate Posts" button enabled when at least one platform selected
+4. Main process service calls GPT-4o-mini API with streaming enabled
+5. System prompts crafted as expert social media strategist per platform:
+   - YouTube: SEO-optimized descriptions with timestamps, no emojis by default
+   - Twitter: 280 char max, engaging hooks, hashtags, no emojis by default
+   - LinkedIn: Professional tone, 1-3 paragraphs, value-focused, no emojis by default
+6. Selected voice personas blended into system prompt
+7. Transcription and/or user guidance included in prompt if checked
+8. Emoji setting explicitly instructed in system prompts
+9. Parallel generation: All selected platforms generate simultaneously
+10. Streaming responses sent via IPC to renderer as chunks arrive
+11. Error handling for API failures, rate limits, and network issues
+
+**Prerequisites:** Story 6.5
+
+---
+
+**Story 6.7: Results Display with Streaming & Copy Controls**
+
+As a content creator,
+I want to see generated posts stream in real-time with copy buttons and character counts,
+So that I can quickly distribute my content across platforms.
+
+**Acceptance Criteria:**
+
+1. Results tab automatically activated when generation starts
+2. Platform sections display in parallel (YouTube, Twitter, LinkedIn)
+3. Generated text streams into each section as API returns chunks
+4. Real-time character count displayed below each platform's text
+5. Warning indicator if character count exceeds platform limits:
+   - Twitter: 280 chars
+   - YouTube: No hard limit, but show count
+   - LinkedIn: 3000 chars
+6. Individual "Copy to Clipboard" button per platform (shadcn/ui Button)
+7. Copy button shows confirmation feedback ("Copied!") on click
+8. Generated content remains in view until session ends or cleared
+9. Loading spinner shown while generation in progress
+10. Smooth UI updates during streaming (no flickering/jumping)
+
+**Prerequisites:** Story 6.6
+
+---
+
+**Story 6.8: Transcription & Post History with Caching**
+
+As a content creator,
+I want to access my previous transcriptions and generated posts,
+So that I can reuse content or generate new variations.
+
+**Acceptance Criteria:**
+
+1. History tab displays chronological list of past generations
+2. Each history entry shows: timestamp, transcription snippet, generated platforms
+3. Clicking history entry loads that transcription and posts into respective tabs
+4. Transcriptions cached in project data (persists across sessions)
+5. Generated posts cached in project data (persists across sessions)
+6. "Clear Cache" button at top of History tab
+7. Clear Cache shows confirmation dialog before deleting
+8. Clearing cache removes all transcriptions and posts from storage
+9. History list scrollable if content exceeds visible area
+10. Cache stored efficiently (JSON format, reasonable file size limits)
+
+**Prerequisites:** Story 6.7
+
+---
+
+**Story 6.9: Error Handling & Validation**
+
+As a content creator,
+I want clear error messages and validation feedback,
+So that I understand what went wrong and how to fix issues.
+
+**Acceptance Criteria:**
+
+1. API key validation: Show specific error if key is invalid/missing
+2. Timeline validation: Show error if no audio/video clips exist before transcription
+3. Whisper API errors: Display user-friendly messages (e.g., "Audio too large", "API quota exceeded")
+4. GPT-4o-mini API errors: Display rate limit warnings, network failures, etc.
+5. Empty input validation: Warn if trying to generate with no transcription or guidance
+6. Platform limit warnings: Clear visual indicators when exceeding character limits
+7. Network error handling: Retry logic with user notification
+8. Loading states: Disable buttons during processing to prevent duplicate requests
+9. Error messages use shadcn/ui Alert/Toast components
+10. All error states allow user to retry or return to previous step
+
+**Prerequisites:** Story 6.8
+
+---
+
+**📅 Epic 6 Target Completion: After Epic 5 (Recording Capabilities) is complete**
+
+---
+
 **For implementation:** Use the `create-story` workflow to generate individual story implementation plans from this epic breakdown.

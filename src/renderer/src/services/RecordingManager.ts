@@ -31,11 +31,16 @@ class RecordingManager {
         throw new Error(screenResponse.error || 'Failed to get screen source')
       }
 
-      // Get webcam source
-      const webcamResponse = await window.electron.ipcRenderer.invoke('recording:get-webcam-source')
-      if (!webcamResponse.success || !webcamResponse.data?.deviceId) {
-        throw new Error(webcamResponse.error || 'Failed to get webcam source')
+      // Enumerate webcams in renderer process
+      const videoDevices = await this.enumerateWebcams()
+
+      if (videoDevices.length === 0) {
+        throw new Error('No webcam devices found. Please connect a camera.')
       }
+
+      // Auto-select first available webcam
+      const selectedDevice = videoDevices[0]
+      console.log(`[RecordingManager] Selected webcam: ${selectedDevice.label}`)
 
       // Get screen stream
       const screenStream = await navigator.mediaDevices.getUserMedia({
@@ -56,22 +61,37 @@ class RecordingManager {
 
       console.log('[RecordingManager] Screen stream acquired')
 
-      // Get webcam stream
-      const webcamStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          deviceId: { exact: webcamResponse.data.deviceId },
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          frameRate: { ideal: 30 }
-        },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      })
-
-      console.log('[RecordingManager] Webcam stream acquired')
+      // Get webcam stream with fallback for audio
+      let webcamStream: MediaStream
+      try {
+        console.log('[RecordingManager] Requesting webcam with audio...')
+        webcamStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            deviceId: { exact: selectedDevice.deviceId },
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            frameRate: { ideal: 30 }
+          },
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        })
+        console.log('[RecordingManager] Webcam stream acquired with audio')
+      } catch (error: any) {
+        console.warn('[RecordingManager] Failed to get audio, trying video-only webcam:', error.name)
+        webcamStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            deviceId: { exact: selectedDevice.deviceId },
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            frameRate: { ideal: 30 }
+          },
+          audio: false
+        })
+        console.log('[RecordingManager] Webcam stream acquired (video-only)')
+      }
 
       // Composite streams using canvas
       const compositeStream = await this.compositeStreams(screenStream, webcamStream)
@@ -185,6 +205,53 @@ class RecordingManager {
   }
 
   /**
+   * Enumerate available webcam devices
+   * MUST run in renderer process where navigator.mediaDevices is available
+   * @returns Array of video input devices, or empty array if none found
+   */
+  private async enumerateWebcams(): Promise<MediaDeviceInfo[]> {
+    try {
+      console.log('[RecordingManager] Enumerating webcam devices...')
+
+      // Request permission first by calling getUserMedia
+      // This triggers the OS permission prompt if needed
+      const tempStream = await navigator.mediaDevices.getUserMedia({ video: true })
+
+      // Immediately stop the temporary stream - we just needed it for permission
+      tempStream.getTracks().forEach(track => track.stop())
+
+      // Now enumerate devices (requires permission first)
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const videoDevices = devices.filter(device => device.kind === 'videoinput')
+
+      console.log(`[RecordingManager] Found ${videoDevices.length} webcam device(s)`)
+      videoDevices.forEach((device, index) => {
+        console.log(`  [${index}] ${device.label} (${device.deviceId})`)
+      })
+
+      return videoDevices
+    } catch (error: any) {
+      console.error('[RecordingManager] Failed to enumerate webcams:', error)
+
+      // Handle specific error types with user-friendly messages
+      if (error.name === 'NotAllowedError') {
+        throw new Error(
+          'Camera permission denied. Please:\n' +
+          '1. Open System Settings > Privacy & Security > Camera\n' +
+          '2. Enable camera access for Chop Shop\n' +
+          '3. Restart the application'
+        )
+      } else if (error.name === 'NotFoundError') {
+        throw new Error('No camera devices found. Please connect a camera.')
+      } else if (error.name === 'NotReadableError') {
+        throw new Error('Camera is busy or in use by another application.')
+      }
+
+      throw new Error(`Failed to access webcam: ${error.message || 'Unknown error'}`)
+    }
+  }
+
+  /**
    * Start webcam-only recording
    * Captures webcam video and audio with auto-selected device
    */
@@ -192,30 +259,51 @@ class RecordingManager {
     try {
       console.log('[RecordingManager] Starting webcam recording...')
 
-      // Request webcam source from main process
-      const response = await window.electron.ipcRenderer.invoke('recording:get-webcam-source')
-      if (!response.success || !response.data?.deviceId) {
-        throw new Error(response.error || 'Failed to get webcam source')
+      // Enumerate webcams in renderer process (where navigator.mediaDevices exists)
+      const videoDevices = await this.enumerateWebcams()
+
+      if (videoDevices.length === 0) {
+        throw new Error('No webcam devices found. Please connect a camera.')
       }
 
-      const deviceId = response.data.deviceId
+      // Auto-select first available webcam
+      const selectedDevice = videoDevices[0]
+      console.log(`[RecordingManager] Selected webcam: ${selectedDevice.label}`)
 
-      // Get webcam stream with video and audio
-      const webcamStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          deviceId: { exact: deviceId },
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          frameRate: { ideal: 30 }
-        },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      })
+      let webcamStream: MediaStream
 
-      console.log('[RecordingManager] Webcam stream acquired')
+      // Try to get webcam stream with video and audio
+      try {
+        console.log('[RecordingManager] Requesting video + audio stream...')
+        webcamStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            deviceId: { exact: selectedDevice.deviceId },
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            frameRate: { ideal: 30 }
+          },
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        })
+        console.log('[RecordingManager] Webcam stream acquired with audio')
+      } catch (error: any) {
+        // If requesting audio fails (microphone permission denied), try video-only
+        console.warn('[RecordingManager] Failed to get audio, trying video-only:', error.name)
+
+        webcamStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            deviceId: { exact: selectedDevice.deviceId },
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            frameRate: { ideal: 30 }
+          },
+          audio: false
+        })
+        console.log('[RecordingManager] Webcam stream acquired (video-only, no audio)')
+      }
 
       this.mediaStream = webcamStream
 
