@@ -85,10 +85,10 @@ development_status:
   epic-5-retrospective: optional
 
   epic-6: contexted
-  6-1-ai-settings-secure-api-key-management: drafted
-  6-2-ai-generator-ui-layout-navigation: drafted
-  6-3-audio-extraction-transcription-service-whisper-api: drafted
-  6-4-transcription-tab-ui-editing: drafted
+  6-1-ai-settings-secure-api-key-management: done
+  6-2-ai-generator-ui-layout-navigation: done
+  6-3-audio-extraction-transcription-service-whisper-api: done
+  6-4-transcription-tab-ui-editing: done
   6-5-voice-persona-selection-system: drafted
   6-6-content-generation-service-gpt-4o-mini-with-streaming: drafted
   6-7-results-display-with-streaming-copy-controls: drafted

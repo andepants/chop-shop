@@ -23,10 +23,20 @@ interface RecordingModalState {
   isModalOpen: boolean
 }
 
+interface SettingsState {
+  isOpen: boolean
+}
+
+interface AIGeneratorState {
+  isVisible: boolean
+}
+
 interface UIStoreState {
   error: ErrorState
   export: ExportState
   recordingModal: RecordingModalState
+  settings: SettingsState
+  aiGenerator: AIGeneratorState
 }
 
 interface UIStoreActions {
@@ -41,6 +51,10 @@ interface UIStoreActions {
   resetExport: () => void
   openRecordingModal: () => void
   closeRecordingModal: () => void
+  openSettings: () => void
+  closeSettings: () => void
+  showAIGenerator: () => void
+  hideAIGenerator: () => void
 }
 
 type UIStore = UIStoreState & UIStoreActions
@@ -67,6 +81,14 @@ export const useUIStore = create<UIStore>((set) => ({
 
   recordingModal: {
     isModalOpen: false
+  },
+
+  settings: {
+    isOpen: false
+  },
+
+  aiGenerator: {
+    isVisible: false
   },
 
   // Error actions
@@ -172,6 +194,40 @@ export const useUIStore = create<UIStore>((set) => ({
       recordingModal: {
         ...state.recordingModal,
         isModalOpen: false
+      }
+    })),
+
+  // Settings actions
+  openSettings: () =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        isOpen: true
+      }
+    })),
+
+  closeSettings: () =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        isOpen: false
+      }
+    })),
+
+  // AI Generator actions
+  showAIGenerator: () =>
+    set((state) => ({
+      aiGenerator: {
+        ...state.aiGenerator,
+        isVisible: true
+      }
+    })),
+
+  hideAIGenerator: () =>
+    set((state) => ({
+      aiGenerator: {
+        ...state.aiGenerator,
+        isVisible: false
       }
     }))
 }))

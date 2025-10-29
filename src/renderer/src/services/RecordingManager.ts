@@ -133,7 +133,7 @@ class RecordingManager {
       // Create webcam MediaRecorder
       this.webcamRecorder = new MediaRecorder(this.webcamStream, {
         mimeType,
-        videoBitsPerSecond: 2_500_000 // 2.5 Mbps for webcam
+        videoBitsPerSecond: 3_500_000 // 3.5 Mbps for webcam (increased to reduce compression artifacts)
       })
 
       this.webcamChunks = []

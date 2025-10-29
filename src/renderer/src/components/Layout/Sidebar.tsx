@@ -8,7 +8,7 @@ import { useMediaStore } from '../../store/mediaStore'
 import { useUIStore } from '../../store/uiStore'
 import { useRecordingStore } from '../../store/recordingStore'
 import { Button } from '@/components/ui/button'
-import { Circle } from 'lucide-react'
+import { Circle, Sparkles } from 'lucide-react'
 
 /**
  * Sidebar component with polished design and refined button styling
@@ -19,6 +19,7 @@ export function Sidebar(): React.JSX.Element {
   const addFiles = useMediaStore((state) => state.addFiles)
   const showError = useUIStore((state) => state.showError)
   const openRecordingModal = useUIStore((state) => state.openRecordingModal)
+  const showAIGenerator = useUIStore((state) => state.showAIGenerator)
   const isRecording = useRecordingStore((state) => state.isRecording)
 
   /**
@@ -77,7 +78,7 @@ export function Sidebar(): React.JSX.Element {
   return (
     <aside className="w-[280px] flex flex-col pb-16 bg-slate-900/95 border-r border-slate-700/50">
       <div className="px-4 py-3.5 border-b border-slate-700/50 bg-slate-950/50">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-2">
           <h2 className="text-base font-semibold text-slate-100 tracking-tight">Media</h2>
           <div className="flex gap-2">
             <Button
@@ -109,6 +110,16 @@ export function Sidebar(): React.JSX.Element {
             </Button>
           </div>
         </div>
+
+        {/* AI Generator Button */}
+        <Button
+          onClick={showAIGenerator}
+          size="sm"
+          className="w-full bg-purple-600 hover:bg-purple-500 text-white shadow-md hover:shadow-lg transition-all duration-150"
+        >
+          <Sparkles className="h-3 w-3 mr-1.5" />
+          AI Generator
+        </Button>
       </div>
       <MediaLibrary />
     </aside>

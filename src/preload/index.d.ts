@@ -38,6 +38,13 @@ export interface API {
   stopRecording: () => Promise<IPCResponse<{ outputFiles: RecordingOutputFiles }>>
   getRecordingState: () => Promise<IPCResponse<{ isRecording: boolean; currentMode: RecordingMode | null }>>
   resetRecordingState: () => Promise<IPCResponse<{ success: boolean }>>
+  storeApiKey: (apiKey: string) => Promise<IPCResponse<{ success: boolean }>>
+  getApiKey: () => Promise<IPCResponse<{ key: string | null }>>
+  clearApiKey: () => Promise<IPCResponse<{ success: boolean }>>
+  testApiConnection: (apiKey: string) => Promise<IPCResponse<{ valid: boolean; message: string }>>
+  hasApiKey: () => Promise<IPCResponse<{ hasKey: boolean }>>
+  transcribeAudio: (clips: unknown[]) => Promise<IPCResponse<{ text: string; duration: number; warning?: string }>>
+  onTranscriptionProgress: (callback: (data: { percentage: number; message: string }) => void) => () => void
 }
 
 declare global {

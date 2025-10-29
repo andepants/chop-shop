@@ -614,7 +614,7 @@ export class VideoCompositor {
     pipWidth: number,
     pipHeight: number
   ): { x: number; y: number } {
-    const padding = 20
+    const padding = 0
     let position = clip.pipPosition ?? 'bottom-right'
 
     // Validate position, default to 'bottom-right' if invalid
@@ -680,15 +680,19 @@ export class VideoCompositor {
       const clipElapsed = this.state.currentTime - clip.startTime
       const sourceTime = clip.trimIn + clipElapsed
 
-      // Frame staleness detection: Skip if video frame hasn't advanced
-      if (source.lastRenderedTime === video.currentTime && source.lastRenderedTime !== -1) {
-        // Same frame as last render - skip to prevent ghosting at split boundaries
+      // Frame staleness detection: Relaxed to reduce flickering with variable framerate recordings
+      // Only skip if frame is significantly stale (hasn't advanced in >0.05s of playback time)
+      const frameAge = this.state.currentTime - (source.lastRenderedTime || 0)
+      if (source.lastRenderedTime === video.currentTime &&
+          source.lastRenderedTime !== -1 &&
+          frameAge > 0.05) {
+        // Frame stuck for >0.05s - skip to prevent ghosting
         continue
       }
 
-      // Verify video is at correct time (tighter tolerance for frame-accurate transitions)
+      // Verify video is at correct time (relaxed tolerance for smoother playback)
       const timeDiff = Math.abs(video.currentTime - sourceTime)
-      if (timeDiff > 0.016) { // ~1 frame at 60fps (reduced from 0.033s)
+      if (timeDiff > 0.033) { // ~2 frames at 30fps (relaxed to reduce flickering)
         // Video element out of sync, seek it
         video.currentTime = sourceTime
         // Skip this frame until video seeks to correct position

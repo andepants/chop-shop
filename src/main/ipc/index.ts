@@ -3,6 +3,7 @@
  * Central registration point for all IPC handlers
  */
 import { registerFFmpegHandlers } from './ffmpeg.handlers'
+import { registerAIHandlers } from './ai.handlers'
 import './file.handlers' // File import/export handlers (self-registering)
 import './transcode.handlers' // Transcode handlers (self-registering)
 import './recording.handlers' // Recording handlers (self-registering)
@@ -14,6 +15,7 @@ export function registerIPCHandlers(): void {
   console.log('[Main] Registering IPC handlers...')
 
   registerFFmpegHandlers()
+  registerAIHandlers()
 
   console.log('[Main] All IPC handlers registered successfully')
 }

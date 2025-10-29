@@ -17,13 +17,23 @@ interface RecordingState {
   mode: RecordingMode | null
   duration: number
   outputFiles: RecordingOutputFiles
+  pipSize: number
+  pipPosition: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+}
+
+/**
+ * PiP configuration options
+ */
+interface PipConfig {
+  pipSize: number
+  pipPosition: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 }
 
 /**
  * Recording store actions
  */
 interface RecordingActions {
-  startRecording: (mode: RecordingMode) => Promise<void>
+  startRecording: (mode: RecordingMode, config?: PipConfig) => Promise<void>
   stopRecording: () => Promise<void>
   updateDuration: (duration: number) => void
   reset: () => void
@@ -38,7 +48,9 @@ const initialState: RecordingState = {
   isRecording: false,
   mode: null,
   duration: 0,
-  outputFiles: {}
+  outputFiles: {},
+  pipSize: 0.2, // Default: 20%
+  pipPosition: 'bottom-right' // Default: bottom-right
 }
 
 /**
@@ -47,11 +59,15 @@ const initialState: RecordingState = {
  * @param outputFiles - Recording output file paths
  * @param mode - Recording mode (screen, webcam, pip)
  * @param actualDuration - Actual recording duration in seconds (from wall-clock time)
+ * @param pipSize - PiP overlay size (0.1-0.5, default 0.2)
+ * @param pipPosition - PiP overlay position (default 'bottom-right')
  */
 async function autoImportRecordings(
   outputFiles: RecordingOutputFiles,
   mode: RecordingMode,
-  actualDuration?: number
+  actualDuration?: number,
+  pipSize: number = 0.2,
+  pipPosition: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' = 'bottom-right'
 ): Promise<void> {
   try {
     console.log('[RecordingStore] Auto-importing recordings...', { outputFiles, mode })
@@ -86,10 +102,10 @@ async function autoImportRecordings(
           intermediatePath: mediaFile.intermediatePath
         })
 
-        // Override duration if FFprobe returned 0 (WebM without duration metadata)
-        if (mediaFile.duration === 0 && actualDuration && actualDuration > 0) {
+        // Always use actualDuration for freshly recorded files (wall-clock time is more accurate than FFprobe for WebM)
+        if (actualDuration && actualDuration > 0) {
           console.log(
-            `[RecordingStore] Overriding screen duration: 0 → ${actualDuration.toFixed(2)}s`
+            `[RecordingStore] Using wall-clock duration for screen: ${mediaFile.duration.toFixed(2)}s → ${actualDuration.toFixed(2)}s`
           )
           mediaFile.duration = actualDuration
         }
@@ -160,10 +176,10 @@ async function autoImportRecordings(
           intermediatePath: mediaFile.intermediatePath
         })
 
-        // Override duration if FFprobe returned 0 (WebM without duration metadata)
-        if (mediaFile.duration === 0 && actualDuration && actualDuration > 0) {
+        // Always use actualDuration for freshly recorded files (wall-clock time is more accurate than FFprobe for WebM)
+        if (actualDuration && actualDuration > 0) {
           console.log(
-            `[RecordingStore] Overriding webcam duration: 0 → ${actualDuration.toFixed(2)}s`
+            `[RecordingStore] Using wall-clock duration for webcam: ${mediaFile.duration.toFixed(2)}s → ${actualDuration.toFixed(2)}s`
           )
           mediaFile.duration = actualDuration
         }
@@ -201,7 +217,12 @@ async function autoImportRecordings(
             trimOut: 0,
             thumbnail: mediaFile.thumbnail,
             hasAudio: mediaFile.hasAudio,
-            resolution: mediaFile.resolution
+            resolution: mediaFile.resolution,
+            // Add PiP positioning for Track 2 overlay (use configured values)
+            ...(targetTrackId === 2 && {
+              pipPosition: pipPosition as 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right',
+              pipSize: pipSize
+            })
           }
 
           // DEBUG: Log clip data before adding to timeline
@@ -241,9 +262,15 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
    * Start recording with selected mode
    * Coordinates with main process and starts MediaRecorder in renderer
    */
-  startRecording: async (mode: RecordingMode) => {
+  startRecording: async (mode: RecordingMode, config?: PipConfig) => {
     try {
-      console.log('[RecordingStore] Starting recording with mode:', mode)
+      const pipSize = config?.pipSize ?? 0.2
+      const pipPosition = config?.pipPosition ?? 'bottom-right'
+
+      console.log('[RecordingStore] Starting recording with mode:', mode, {
+        pipSize,
+        pipPosition
+      })
 
       // PRE-FLIGHT CHECK: Verify main process state before starting
       const stateResponse = await window.api.getRecordingState()
@@ -274,7 +301,9 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
         isRecording: true,
         mode,
         duration: 0,
-        outputFiles: {}
+        outputFiles: {},
+        pipSize,
+        pipPosition
       })
 
       console.log('[RecordingStore] Recording started successfully')
@@ -341,7 +370,8 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
           console.log('[RecordingStore] Actual duration:', actualDuration.toFixed(2), 'seconds')
 
           // Auto-import both recordings to media library and timeline
-          await autoImportRecordings(outputFiles, 'pip', actualDuration)
+          const { pipSize, pipPosition } = useRecordingStore.getState()
+          await autoImportRecordings(outputFiles, 'pip', actualDuration, pipSize, pipPosition)
         } else {
           throw new Error(response.error || 'Failed to stop PiP recording')
         }
@@ -380,7 +410,8 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
 
           // Auto-import recordings to media library and timeline
           if (currentMode) {
-            await autoImportRecordings(outputFiles, currentMode, actualDuration)
+            const { pipSize, pipPosition } = useRecordingStore.getState()
+            await autoImportRecordings(outputFiles, currentMode, actualDuration, pipSize, pipPosition)
           }
         } else {
           throw new Error(response.error || 'Failed to stop recording')

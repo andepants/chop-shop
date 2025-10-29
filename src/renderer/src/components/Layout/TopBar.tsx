@@ -7,7 +7,7 @@ import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { useTimelineStore } from '../../store/timelineStore'
 import { useUIStore } from '../../store/uiStore'
-import { Download } from 'lucide-react'
+import { Download, Settings } from 'lucide-react'
 
 /**
  * Top bar with application branding and export button
@@ -15,6 +15,7 @@ import { Download } from 'lucide-react'
 export function TopBar(): React.JSX.Element {
   const tracks = useTimelineStore((state) => state.tracks)
   const openExportModal = useUIStore((state) => state.openExportModal)
+  const openSettings = useUIStore((state) => state.openSettings)
 
   // Calculate total clips count
   const totalClips = tracks.reduce((count, track) => count + track.clips.length, 0)
@@ -60,16 +61,29 @@ export function TopBar(): React.JSX.Element {
         chop shop
       </span>
 
-      {/* Export Button */}
-      <Button
+      {/* Action Buttons */}
+      <div className="flex items-center gap-2">
+        {/* Settings Button */}
+        <Button
+          onClick={openSettings}
+          size="sm"
+          variant="ghost"
+          className="h-8 w-8 p-0"
+        >
+          <Settings className="h-4 w-4" />
+        </Button>
+
+        {/* Export Button */}
+        <Button
         onClick={handleExport}
         disabled={!hasClips}
         size="sm"
         className="bg-cyan-500 hover:bg-cyan-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <Download className="mr-1 h-3 w-3" />
-        Export
-      </Button>
+          <Download className="mr-1 h-3 w-3" />
+          Export
+        </Button>
+      </div>
     </div>
   )
 }

@@ -163,7 +163,64 @@ const api = {
    * @returns Promise with success result
    */
   resetRecordingState: () =>
-    ipcRenderer.invoke('recording:reset-state')
+    ipcRenderer.invoke('recording:reset-state'),
+
+  /**
+   * Store OpenAI API key securely using safeStorage
+   * @param apiKey - The API key to store
+   * @returns Promise with store result
+   */
+  storeApiKey: (apiKey: string) =>
+    ipcRenderer.invoke('ai:store-key', apiKey),
+
+  /**
+   * Retrieve stored API key
+   * @returns Promise with decrypted API key or null
+   */
+  getApiKey: () =>
+    ipcRenderer.invoke('ai:get-key'),
+
+  /**
+   * Clear stored API key
+   * @returns Promise with success result
+   */
+  clearApiKey: () =>
+    ipcRenderer.invoke('ai:clear-key'),
+
+  /**
+   * Test connection to OpenAI with provided API key
+   * @param apiKey - API key to test
+   * @returns Promise with validation result and message
+   */
+  testApiConnection: (apiKey: string) =>
+    ipcRenderer.invoke('ai:test-connection', apiKey),
+
+  /**
+   * Check if an API key is currently stored
+   * @returns Promise with boolean indicating if key exists
+   */
+  hasApiKey: () =>
+    ipcRenderer.invoke('ai:has-key'),
+
+  /**
+   * Transcribe audio from timeline clips using Whisper API
+   * @param clips - Array of timeline clips to transcribe
+   * @returns Promise with transcription result (text, duration, warning)
+   */
+  transcribeAudio: (clips: unknown[]) =>
+    ipcRenderer.invoke('ai:transcribe-audio', clips),
+
+  /**
+   * Subscribe to transcription progress events
+   * @param callback - Callback function receiving progress updates
+   * @returns Cleanup function to remove the listener
+   */
+  onTranscriptionProgress: (callback: (data: { percentage: number; message: string }) => void) => {
+    const listener = (_event: unknown, data: { percentage: number; message: string }) =>
+      callback(data)
+    ipcRenderer.on('ai-transcription-progress', listener)
+    return () => ipcRenderer.removeListener('ai-transcription-progress', listener)
+  }
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to
