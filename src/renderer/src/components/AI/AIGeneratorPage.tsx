@@ -88,7 +88,7 @@ export function AIGeneratorPage() {
             </TabsContent>
 
             <TabsContent value="generate" className="m-0 h-full">
-              <GenerationPanel />
+              <GenerationPanel onGenerationStart={() => setActiveTab('results')} />
             </TabsContent>
 
             <TabsContent value="results" className="m-0 h-full">

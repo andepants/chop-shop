@@ -5,7 +5,7 @@
  */
 
 import { useState } from 'react'
-import type { MediaFile } from '../../../../shared/types'
+import type { MediaFile } from '@shared/types'
 import { cn, formatTime, formatFileSize } from '../../utils'
 import { useMediaStore } from '../../store/mediaStore'
 

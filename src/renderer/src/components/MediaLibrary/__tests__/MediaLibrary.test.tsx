@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MediaLibrary } from '../MediaLibrary'
 import { useMediaStore } from '../../../store/mediaStore'
-import type { MediaFile } from '../../../../../shared/types'
+import type { MediaFile } from '@shared/types'
 
 describe('MediaLibrary', () => {
   beforeEach(() => {

@@ -40,6 +40,21 @@ export interface TranscriptionResult {
 }
 
 /**
+ * Generation status states
+ */
+export type GenerationStatus = 'idle' | 'generating' | 'complete' | 'error'
+
+/**
+ * Platform types for content generation
+ */
+export type Platform = 'youtube' | 'twitter' | 'linkedin'
+
+/**
+ * Streaming status for individual platforms
+ */
+export type StreamingStatus = 'idle' | 'streaming' | 'complete' | 'error'
+
+/**
  * AI store state
  */
 interface AIState {
@@ -65,6 +80,23 @@ interface AIState {
   // Voice persona selection state
   selectedPersonas: string[]
 
+  // Generation state
+  selectedPlatforms: Platform[]
+  includeEmojis: boolean
+  generationStatus: GenerationStatus
+
+  // Generated posts state
+  generatedPosts: {
+    youtube: string
+    twitter: string
+    linkedin: string
+  }
+  streamingStatus: {
+    youtube: StreamingStatus
+    twitter: StreamingStatus
+    linkedin: StreamingStatus
+  }
+
   // Actions
   setHasApiKey: (hasKey: boolean) => void
   setApiKeyStatus: (status: AIState['apiKeyStatus']) => void
@@ -84,6 +116,17 @@ interface AIState {
   addPersona: (id: string) => void
   removePersona: (id: string) => void
   clearPersonas: () => void
+
+  // Generation actions
+  setPlatforms: (platforms: Platform[]) => void
+  togglePlatform: (platform: Platform) => void
+  setIncludeEmojis: (include: boolean) => void
+  setGenerationStatus: (status: GenerationStatus) => void
+
+  // Generated posts actions
+  appendStreamChunk: (platform: Platform, content: string) => void
+  setStreamingStatus: (platform: Platform, status: StreamingStatus) => void
+  clearGeneratedPosts: () => void
 
   // Async operations
   checkApiKey: () => Promise<void>
@@ -116,6 +159,23 @@ export const useAIStore = create<AIState>((set) => ({
 
   // Voice persona initial state
   selectedPersonas: [],
+
+  // Generation initial state
+  selectedPlatforms: [],
+  includeEmojis: false,
+  generationStatus: 'idle',
+
+  // Generated posts initial state
+  generatedPosts: {
+    youtube: '',
+    twitter: '',
+    linkedin: ''
+  },
+  streamingStatus: {
+    youtube: 'idle',
+    twitter: 'idle',
+    linkedin: 'idle'
+  },
 
   // Synchronous actions
   setHasApiKey: (hasKey) => set({ hasApiKey: hasKey }),
@@ -187,6 +247,53 @@ export const useAIStore = create<AIState>((set) => ({
     })),
 
   clearPersonas: () => set({ selectedPersonas: [] }),
+
+  // Generation actions
+  setPlatforms: (platforms) => set({ selectedPlatforms: platforms }),
+
+  togglePlatform: (platform) =>
+    set((state) => {
+      if (state.selectedPlatforms.includes(platform)) {
+        return { selectedPlatforms: state.selectedPlatforms.filter((p) => p !== platform) }
+      }
+      return { selectedPlatforms: [...state.selectedPlatforms, platform] }
+    }),
+
+  setIncludeEmojis: (include) => set({ includeEmojis: include }),
+
+  setGenerationStatus: (status) => set({ generationStatus: status }),
+
+  // Generated posts actions
+  appendStreamChunk: (platform, content) =>
+    set((state) => ({
+      generatedPosts: {
+        ...state.generatedPosts,
+        [platform]: state.generatedPosts[platform] + content
+      }
+    })),
+
+  setStreamingStatus: (platform, status) =>
+    set((state) => ({
+      streamingStatus: {
+        ...state.streamingStatus,
+        [platform]: status
+      }
+    })),
+
+  clearGeneratedPosts: () =>
+    set({
+      generatedPosts: {
+        youtube: '',
+        twitter: '',
+        linkedin: ''
+      },
+      streamingStatus: {
+        youtube: 'idle',
+        twitter: 'idle',
+        linkedin: 'idle'
+      },
+      generationStatus: 'idle'
+    }),
 
   // Async operations
   /**

@@ -8,7 +8,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { Timeline } from '../Timeline'
 import { useMediaStore } from '@/store/mediaStore'
 import { useTimelineStore } from '@/store/timelineStore'
-import type { MediaFile } from '../../../../../../shared/types'
+import type { MediaFile } from '@shared/types'
 
 describe('Timeline', () => {
   const mockMediaFile: MediaFile = {

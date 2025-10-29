@@ -5,7 +5,7 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { MediaFile } from '../../../shared/types'
+import type { MediaFile } from '@shared/types'
 
 interface MediaStoreState {
   files: MediaFile[]

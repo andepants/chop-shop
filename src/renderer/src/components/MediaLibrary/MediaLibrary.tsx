@@ -6,11 +6,12 @@
 
 import { useState, useEffect } from 'react'
 import { useMediaStore } from '../../store/mediaStore'
+import { useTimelineStore } from '../../store/timelineStore'
 import { useUIStore } from '../../store/uiStore'
 import { MediaItem } from './MediaItem'
 import { EmptyState } from './EmptyState'
 import { cn } from '../../utils'
-import type { MediaFile } from '../../../../shared/types'
+import type { MediaFile } from '@shared/types'
 
 const SUPPORTED_FORMATS = ['.mp4', '.mov', '.webm']
 const SUPPORTED_FORMATS_STRING = 'MP4, MOV, WebM'
@@ -37,6 +38,7 @@ export function MediaLibrary(): React.JSX.Element {
   const addFile = useMediaStore((state) => state.addFile)
   const isImporting = useMediaStore((state) => state.isImporting)
   const setIsImporting = useMediaStore((state) => state.setIsImporting)
+  const clearTimelineSelection = useTimelineStore((state) => state.clearSelection)
   const showError = useUIStore((state) => state.showError)
 
   const [isDragOver, setIsDragOver] = useState(false)
@@ -248,7 +250,10 @@ export function MediaLibrary(): React.JSX.Element {
             key={file.id}
             file={file}
             isSelected={file.id === selectedFileId}
-            onSelect={() => selectFile(file.id)}
+            onSelect={() => {
+              selectFile(file.id)
+              clearTimelineSelection() // Clear timeline selection to prevent simultaneous selection conflicts
+            }}
           />
         ))}
       </div>

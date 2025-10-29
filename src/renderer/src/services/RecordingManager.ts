@@ -4,7 +4,7 @@
  * Works with main process recording.service for state management and file writing
  */
 
-import type { RecordingMode } from '../../../shared/types'
+import type { RecordingMode } from '@shared/types'
 
 /**
  * Recording Manager

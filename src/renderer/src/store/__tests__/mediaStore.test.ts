@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useMediaStore } from '../mediaStore'
-import type { MediaFile } from '../../../../shared/types'
+import type { MediaFile } from '@shared/types'
 
 describe('mediaStore', () => {
   beforeEach(() => {

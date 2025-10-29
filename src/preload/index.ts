@@ -220,6 +220,44 @@ const api = {
       callback(data)
     ipcRenderer.on('ai-transcription-progress', listener)
     return () => ipcRenderer.removeListener('ai-transcription-progress', listener)
+  },
+
+  /**
+   * Generate platform-optimized social media posts
+   * @param request - Generation request (platforms, personas, transcription, guidance, emojis)
+   * @returns Promise with generation result
+   */
+  generatePosts: (request: {
+    transcription?: string
+    userGuidance?: string
+    personas: string[]
+    platforms: ('youtube' | 'twitter' | 'linkedin')[]
+    includeEmojis: boolean
+  }) =>
+    ipcRenderer.invoke('ai:generate-posts', request),
+
+  /**
+   * Subscribe to AI stream chunk events (content generation streaming)
+   * @param callback - Callback function receiving stream chunks
+   * @returns Cleanup function to remove the listener
+   */
+  onAIStreamChunk: (callback: (data: { platform: string; content: string; complete: boolean }) => void) => {
+    const listener = (_event: unknown, data: { platform: string; content: string; complete: boolean }) =>
+      callback(data)
+    ipcRenderer.on('ai-stream-chunk', listener)
+    return () => ipcRenderer.removeListener('ai-stream-chunk', listener)
+  },
+
+  /**
+   * Subscribe to AI generation retry events
+   * @param callback - Callback function receiving retry notifications
+   * @returns Cleanup function to remove the listener
+   */
+  onAIGenerationRetry: (callback: (data: { platform: string; attempt: number; maxAttempts: number; delay: number }) => void) => {
+    const listener = (_event: unknown, data: { platform: string; attempt: number; maxAttempts: number; delay: number }) =>
+      callback(data)
+    ipcRenderer.on('ai-generation-retry', listener)
+    return () => ipcRenderer.removeListener('ai-generation-retry', listener)
   }
 }
 

@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ImportZone } from '../ImportZone'
-import type { IPCResponse, MediaFile } from '../../../../../shared/types'
+import type { IPCResponse, MediaFile } from '@shared/types'
 
 // Mock window.api
 const mockImportFileFromObject = vi.fn()

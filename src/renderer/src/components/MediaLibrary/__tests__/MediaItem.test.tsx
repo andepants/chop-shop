@@ -6,7 +6,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MediaItem } from '../MediaItem'
-import type { MediaFile } from '../../../../../shared/types'
+import type { MediaFile } from '@shared/types'
 
 describe('MediaItem', () => {
   const mockMediaFile: MediaFile = {

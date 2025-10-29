@@ -12,6 +12,10 @@ import {
   type TimelineClip
 } from '../services/ai/audio-extractor.service'
 import { whisperService } from '../services/ai/whisper.service'
+import {
+  contentGeneratorService,
+  type GenerationRequest
+} from '../services/ai/content-generator.service'
 import OpenAI from 'openai'
 
 /**
@@ -306,6 +310,91 @@ export function registerAIHandlers(): void {
         return {
           success: false,
           error: 'An unknown error occurred during transcription'
+        }
+      }
+    }
+  )
+
+  /**
+   * Generate platform-optimized social media posts
+   * Channel: ai:generate-posts
+   *
+   * Orchestrates content generation for selected platforms:
+   * 1. Retrieve API key
+   * 2. Initialize content generator service
+   * 3. Generate posts for all platforms in parallel with streaming
+   * 4. Return success/error response
+   *
+   * Emits streaming events: ai-stream-chunk, ai-generation-retry
+   */
+  ipcMain.handle(
+    'ai:generate-posts',
+    async (
+      event,
+      request: GenerationRequest
+    ): Promise<IPCResponse<{ success: boolean }>> => {
+      try {
+        // Get main window for sending streaming events
+        const mainWindow = BrowserWindow.fromWebContents(event.sender)
+
+        if (!mainWindow) {
+          return {
+            success: false,
+            error: 'Main window not found'
+          }
+        }
+
+        // Get API key
+        const apiKey = await apiKeyManager.getKey()
+
+        if (!apiKey) {
+          return {
+            success: false,
+            error: 'No API key found. Please add your OpenAI API key in AI Settings.'
+          }
+        }
+
+        // Initialize content generator service with API key
+        contentGeneratorService.initialize(apiKey)
+
+        // Generate posts for all selected platforms
+        const results = await contentGeneratorService.generatePosts(request, mainWindow)
+
+        // Check if any platforms failed
+        const failedPlatforms = results.filter((r) => r.error)
+
+        if (failedPlatforms.length === results.length) {
+          // All platforms failed
+          return {
+            success: false,
+            error: `Generation failed for all platforms: ${failedPlatforms.map((r) => r.error).join(', ')}`
+          }
+        }
+
+        if (failedPlatforms.length > 0) {
+          // Partial failure
+          console.warn('[AIHandlers] Partial generation failure:', failedPlatforms)
+          // Return success but log failures (chunks were still streamed for successful platforms)
+        }
+
+        return {
+          success: true,
+          data: { success: true }
+        }
+      } catch (error) {
+        console.error('[AIHandlers] Generation failed:', error)
+
+        // Return user-friendly error message
+        if (error instanceof Error) {
+          return {
+            success: false,
+            error: error.message
+          }
+        }
+
+        return {
+          success: false,
+          error: 'An unknown error occurred during content generation'
         }
       }
     }

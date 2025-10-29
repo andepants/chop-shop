@@ -85,7 +85,7 @@ export function Timeline(): React.JSX.Element {
   const [snapPoints, setSnapPoints] = useState<SnapPoint[]>([])
   const [dragPreview, setDragPreview] = useState<{ position: number; clipId: string; duration: number } | null>(null)
 
-  const { files } = useMediaStore()
+  const { files, selectFile } = useMediaStore()
   const {
     tracks,
     totalDuration,
@@ -320,6 +320,8 @@ export function Timeline(): React.JSX.Element {
       }
     } else {
       // Select or Trim tool: Handle clip selection with modifier keys
+      // Clear media library selection to prevent simultaneous selection conflicts
+      selectFile(null)
 
       // Cmd/Ctrl+click: Toggle clip in/out of selection
       if (e.metaKey || e.ctrlKey) {
@@ -411,6 +413,7 @@ export function Timeline(): React.JSX.Element {
       // Clip manipulation shortcuts
       if (e.key === 'Escape') {
         clearSelection()
+        selectFile(null) // Also clear media library selection
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedClipIds.length > 0) {
         e.preventDefault() // Prevent browser back navigation on Backspace
 
@@ -422,7 +425,7 @@ export function Timeline(): React.JSX.Element {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedClipIds, clearSelection, removeClip, rippleDeleteClips, zoomIn, zoomOut, setZoomLevel, fitToTimeline, undo, redo])
+  }, [selectedClipIds, clearSelection, removeClip, rippleDeleteClips, zoomIn, zoomOut, setZoomLevel, fitToTimeline, undo, redo, selectFile])
 
   /**
    * Track mouse position on timeline for cursor-aware zoom

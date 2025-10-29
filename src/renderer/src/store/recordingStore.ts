@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand'
-import type { RecordingMode, RecordingOutputFiles } from '../../../shared/types'
+import type { RecordingMode, RecordingOutputFiles } from '@shared/types'
 import { recordingManager } from '../services/RecordingManager'
 import { useMediaStore } from './mediaStore'
 import { useTimelineStore } from './timelineStore'

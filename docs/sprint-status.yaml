@@ -90,8 +90,8 @@ development_status:
   6-3-audio-extraction-transcription-service-whisper-api: done
   6-4-transcription-tab-ui-editing: done
   6-5-voice-persona-selection-system: drafted
-  6-6-content-generation-service-gpt-4o-mini-with-streaming: drafted
-  6-7-results-display-with-streaming-copy-controls: drafted
+  6-6-content-generation-service-gpt-4o-mini-with-streaming: review
+  6-7-results-display-with-streaming-copy-controls: review
   6-8-transcription-post-history-with-caching: drafted
   6-9-error-handling-validation: drafted
   epic-6-retrospective: optional

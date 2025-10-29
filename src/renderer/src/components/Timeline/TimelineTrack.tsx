@@ -99,9 +99,11 @@ export function TimelineTrack({
 
   /**
    * Handle drop event and clear visual feedback
+   * Stops event propagation to prevent parent Timeline from handling the drop again
    */
   function handleDrop(e: React.DragEvent): void {
     e.preventDefault()
+    e.stopPropagation() // Prevent event bubbling to parent Timeline container
     setIsDragOver(false)
     onDrop?.(e)
   }
