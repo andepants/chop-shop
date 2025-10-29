@@ -175,12 +175,16 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
       {
         id: 1,
         clips: [],
-        height: 100
+        height: 100,
+        isMuted: false,
+        volume: 1.0
       },
       {
         id: 2,
         clips: [],
-        height: 100
+        height: 100,
+        isMuted: false,
+        volume: 1.0
       }
     ],
     playheadPosition: 0,
@@ -1130,6 +1134,56 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
           totalDuration: snapshot.totalDuration,
           selectedClipIds: [...snapshot.selectedClipIds],
           historyIndex: nextIndex
+        }
+      }),
+
+    /**
+     * Toggle track mute state
+     * Muted tracks have their audio excluded from export
+     *
+     * @param trackId - Track identifier (1 or 2)
+     */
+    toggleTrackMute: (trackId: number) =>
+      set((state) => {
+        const updatedTracks = state.tracks.map((track) => {
+          if (track.id === trackId) {
+            return {
+              ...track,
+              isMuted: !track.isMuted
+            }
+          }
+          return track
+        })
+
+        return {
+          tracks: updatedTracks
+        }
+      }),
+
+    /**
+     * Set track volume level
+     * Volume is clamped to valid range (0.0 to 1.0)
+     *
+     * @param trackId - Track identifier (1 or 2)
+     * @param volume - Volume level (0.0 = silent, 1.0 = full volume)
+     */
+    setTrackVolume: (trackId: number, volume: number) =>
+      set((state) => {
+        // Clamp volume to valid range
+        const clampedVolume = Math.max(0.0, Math.min(1.0, volume))
+
+        const updatedTracks = state.tracks.map((track) => {
+          if (track.id === trackId) {
+            return {
+              ...track,
+              volume: clampedVolume
+            }
+          }
+          return track
+        })
+
+        return {
+          tracks: updatedTracks
         }
       })
   }

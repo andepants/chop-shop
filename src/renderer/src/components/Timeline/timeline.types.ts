@@ -50,6 +50,10 @@ export interface Track {
   clips: Clip[]
   /** Height of track in pixels (default: 80px) */
   height: number
+  /** Whether track audio is muted (default: false) */
+  isMuted: boolean
+  /** Track audio volume level (0.0 = silent, 1.0 = full volume, default: 1.0) */
+  volume: number
 }
 
 /**
@@ -128,4 +132,8 @@ export interface TimelineState {
   undo: () => void
   /** Redo the last undone action */
   redo: () => void
+  /** Toggle track mute state (for audio muting in export) */
+  toggleTrackMute: (trackId: number) => void
+  /** Set track volume level (0.0 to 1.0) */
+  setTrackVolume: (trackId: number, volume: number) => void
 }

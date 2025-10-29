@@ -50,7 +50,7 @@ export function validateTranscriptionInput(
  */
 export function TranscriptionPanel() {
   // State from stores
-  const clips = useTimelineStore((state) => state.clips)
+  const tracks = useTimelineStore((state) => state.tracks)
   const transcriptionStatus = useAIStore((state) => state.transcriptionStatus)
   const transcriptionProgress = useAIStore((state) => state.transcriptionProgress)
   const transcriptionText = useAIStore((state) => state.transcriptionText)
@@ -72,8 +72,9 @@ export function TranscriptionPanel() {
   const [showClearDialog, setShowClearDialog] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
 
-  // Check if timeline has clips
-  const hasClips = clips.length > 0
+  // Check if timeline has clips and audio
+  const hasClips = tracks.some((track) => track.clips.length > 0)
+  const hasAudio = tracks.some((track) => track.clips.some((clip) => clip.hasAudio !== false))
   const isTranscribing = transcriptionStatus === 'extracting' || transcriptionStatus === 'transcribing'
 
   /**
@@ -84,7 +85,15 @@ export function TranscriptionPanel() {
     if (!hasClips) {
       const errorMsg = TIMELINE_ERRORS.NO_CLIPS
       setTranscriptionError(errorMsg)
-      logError('TranscriptionPanel', errorMsg, { clipCount: clips.length })
+      logError('TranscriptionPanel', errorMsg, { hasClips: false })
+      return
+    }
+
+    // Validate timeline has audio
+    if (!hasAudio) {
+      const errorMsg = 'No audio detected in timeline clips'
+      setTranscriptionError(errorMsg)
+      logError('TranscriptionPanel', errorMsg, { hasAudio: false })
       return
     }
 
@@ -93,8 +102,8 @@ export function TranscriptionPanel() {
       setTranscriptionError(null)
       setValidationError(null)
 
-      // Call IPC to transcribe audio
-      const response = await window.api.transcribeAudio()
+      // Call IPC to transcribe audio - pass tracks instead of clips
+      const response = await window.api.transcribeAudio(tracks)
 
       if (response.success && response.data) {
         setTranscription(response.data.text, response.data.duration, response.data.warning)
@@ -172,7 +181,7 @@ export function TranscriptionPanel() {
         {/* Transcribe Button */}
         <Button
           onClick={handleTranscribe}
-          disabled={!hasClips || isTranscribing}
+          disabled={!hasClips || !hasAudio || isTranscribing}
           className="bg-cyan-600 hover:bg-cyan-700 text-white"
         >
           {isTranscribing ? (

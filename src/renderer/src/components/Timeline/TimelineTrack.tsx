@@ -13,6 +13,7 @@ import { TimelineClip } from './TimelineClip'
 import type { Track } from './timeline.types'
 import { Tooltip } from '../Tooltip'
 import { useState } from 'react'
+import { useTimelineStore } from '@/store/timelineStore'
 
 interface TimelineTrackProps {
   /** Track data including ID and clips */
@@ -63,6 +64,15 @@ export function TimelineTrack({
   onDrop
 }: TimelineTrackProps): React.JSX.Element {
   const [isDragOver, setIsDragOver] = useState(false)
+  const toggleTrackMute = useTimelineStore((state) => state.toggleTrackMute)
+
+  /**
+   * Handle mute button click
+   * Toggles track audio mute state for export
+   */
+  function handleMuteClick(): void {
+    toggleTrackMute(track.id)
+  }
 
   /**
    * Handle track click for timeline seeking (AC #6)
@@ -158,12 +168,21 @@ export function TimelineTrack({
 
           {/* Track controls - Premiere Pro style icons */}
           <div className="flex flex-col gap-1">
-            {/* Mute/Solo/Lock buttons - placeholder for now */}
+            {/* Mute/Solo/Lock buttons */}
             <div className="flex items-center justify-center gap-1">
               {/* Mute button */}
-              <Tooltip text="Mute track">
-                <button className="w-5 h-5 flex items-center justify-center rounded hover:bg-zinc-700 transition-colors text-zinc-500 hover:text-zinc-300">
-                  <span className="text-[10px]">M</span>
+              <Tooltip text="Mute/Unmute Track Audio">
+                <button
+                  onClick={handleMuteClick}
+                  className={`w-5 h-5 flex items-center justify-center rounded hover:bg-zinc-700 transition-colors ${
+                    track.isMuted
+                      ? 'bg-red-600 text-white'
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                  aria-label={track.isMuted ? 'Unmute track' : 'Mute track'}
+                  aria-pressed={track.isMuted}
+                >
+                  <span className="text-[10px] font-semibold">M</span>
                 </button>
               </Tooltip>
               {/* Solo button */}

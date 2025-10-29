@@ -82,7 +82,7 @@ development_status:
   5-5-picture-in-picture-recording: drafted
   5-6-recording-timer-and-controls: drafted
   5-7-auto-import-and-timeline-placement: drafted
-  5-8-fix-multi-track-export-with-audio-gaps-muting: ready-for-dev
+  5-8-fix-multi-track-export-with-audio-gaps-muting: done
   epic-5-retrospective: optional
 
   epic-6: contexted

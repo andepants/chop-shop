@@ -6,18 +6,18 @@
  */
 
 import { ipcMain, BrowserWindow } from 'electron'
+import { unlink } from 'fs/promises'
 import { apiKeyManager } from '../services/ai/api-key-manager.service'
-import {
-  audioExtractorService,
-  type TimelineClip
-} from '../services/ai/audio-extractor.service'
+import { audioExtractorService } from '../services/ai/audio-extractor.service'
 import { whisperService } from '../services/ai/whisper.service'
 import {
   contentGeneratorService,
   type GenerationRequest
 } from '../services/ai/content-generator.service'
 import * as cacheService from '../services/ai/cache.service'
+import { exportTimelineForTranscription } from '../services/ai/temp-export.service'
 import type { CacheEntry } from '../../renderer/src/types/cache.types'
+import type { Track } from '../../shared/types'
 import OpenAI from 'openai'
 
 /**
@@ -197,14 +197,15 @@ export function registerAIHandlers(): void {
   })
 
   /**
-   * Transcribe audio from timeline clips
+   * Transcribe audio from timeline tracks (multi-track support)
    * Channel: ai:transcribe-audio
    *
    * Orchestrates the complete transcription workflow:
-   * 1. Extract audio from timeline clips
-   * 2. Transcribe using Whisper API
-   * 3. Return transcription result
-   * 4. Clean up temporary files
+   * 1. Export timeline to temporary video (with multi-track audio mixing)
+   * 2. Extract audio from temporary video
+   * 3. Transcribe using Whisper API
+   * 4. Return transcription result
+   * 5. Clean up temporary files
    *
    * Emits progress events: ai-transcription-progress
    */
@@ -212,7 +213,7 @@ export function registerAIHandlers(): void {
     'ai:transcribe-audio',
     async (
       event,
-      clips: TimelineClip[]
+      tracks: Track[]
     ): Promise<
       IPCResponse<{
         text: string
@@ -220,6 +221,7 @@ export function registerAIHandlers(): void {
         warning?: string
       }>
     > => {
+      let tempVideoPath: string | null = null
       let audioFilePath: string | null = null
 
       try {
@@ -235,11 +237,31 @@ export function registerAIHandlers(): void {
           }
         }
 
-        // Validate clips
-        if (!clips || clips.length === 0) {
+        // Validate tracks
+        if (!tracks || tracks.length === 0) {
+          return {
+            success: false,
+            error: 'No tracks found on timeline. Please add video clips before transcribing.'
+          }
+        }
+
+        // Validate at least one track has clips
+        const hasClips = tracks.some((track) => track.clips.length > 0)
+        if (!hasClips) {
           return {
             success: false,
             error: 'No clips found on timeline. Please add video clips before transcribing.'
+          }
+        }
+
+        // Validate at least one clip has audio
+        const hasAudio = tracks.some((track) =>
+          track.clips.some((clip) => clip.hasAudio !== false)
+        )
+        if (!hasAudio) {
+          return {
+            success: false,
+            error: 'No audio detected in timeline clips.'
           }
         }
 
@@ -254,10 +276,18 @@ export function registerAIHandlers(): void {
           }
         }
 
-        // Step 1: Extract audio from timeline clips (0-50%)
-        sendProgress(10, 'Extracting audio from timeline...')
+        // Step 1: Export timeline to temporary video (0-40%)
+        sendProgress(10, 'Exporting timeline with mixed audio...')
 
-        const extractionResult = await audioExtractorService.extractAudioFromTimeline(clips, {
+        const tempExportResult = await exportTimelineForTranscription({ tracks })
+        tempVideoPath = tempExportResult.videoPath
+
+        sendProgress(40, 'Export complete. Extracting audio...')
+
+        // Step 2: Extract audio from temporary video (40-60%)
+        sendProgress(50, 'Extracting audio from exported video...')
+
+        const extractionResult = await audioExtractorService.extractAudioFromVideo(tempVideoPath, {
           bitrate: '128k',
           sampleRate: 44100,
           format: 'mp3'
@@ -265,21 +295,28 @@ export function registerAIHandlers(): void {
 
         audioFilePath = extractionResult.audioFilePath
 
-        sendProgress(50, 'Audio extraction complete. Starting transcription...')
+        sendProgress(60, 'Audio extraction complete. Starting transcription...')
 
-        // Step 2: Transcribe using Whisper API (50-90%)
-        sendProgress(60, 'Transcribing audio with Whisper API...')
+        // Step 3: Transcribe using Whisper API (60-90%)
+        sendProgress(70, 'Transcribing audio with Whisper API...')
 
         const transcriptionResult = await whisperService.transcribeAudio(audioFilePath, {
           apiKey,
           temperature: 0
         })
 
-        sendProgress(90, 'Transcription complete. Finalizing...')
+        sendProgress(90, 'Transcription complete. Cleaning up...')
 
-        // Step 3: Clean up temporary audio file
+        // Step 4: Clean up temporary files
         await audioExtractorService.cleanupAudioFile(audioFilePath)
         audioFilePath = null // Mark as cleaned up
+
+        if (tempVideoPath) {
+          await unlink(tempVideoPath).catch((err) => {
+            console.warn('[AIHandlers] Failed to delete temporary video:', err)
+          })
+          tempVideoPath = null // Mark as cleaned up
+        }
 
         sendProgress(100, 'Transcription complete!')
 
@@ -294,10 +331,16 @@ export function registerAIHandlers(): void {
       } catch (error) {
         console.error('[AIHandlers] Transcription failed:', error)
 
-        // Clean up audio file if it exists
+        // Clean up temporary files if they exist
         if (audioFilePath) {
           await audioExtractorService.cleanupAudioFile(audioFilePath).catch((cleanupErr) => {
             console.error('[AIHandlers] Failed to cleanup audio file:', cleanupErr)
+          })
+        }
+
+        if (tempVideoPath) {
+          await unlink(tempVideoPath).catch((cleanupErr) => {
+            console.error('[AIHandlers] Failed to cleanup temp video:', cleanupErr)
           })
         }
 

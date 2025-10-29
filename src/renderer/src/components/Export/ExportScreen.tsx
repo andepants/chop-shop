@@ -6,9 +6,11 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useUIStore } from '../../store/uiStore'
 import { useTimelineStore } from '../../store/timelineStore'
-import { FolderOpen, X, CheckCircle2, XCircle, ExternalLink } from 'lucide-react'
+import { useWorkflowStore } from '../../store/workflowStore'
+import { FolderOpen, X, CheckCircle2, XCircle, ExternalLink, AlertCircle, Film } from 'lucide-react'
 import type { ExportResolution } from '../../../../main/services/ffmpeg.service'
 
 /**
@@ -25,11 +27,16 @@ export function ExportScreen(): React.JSX.Element {
   const resetExport = useUIStore((state) => state.resetExport)
 
   const tracks = useTimelineStore((state) => state.tracks)
+  const setCurrentTab = useWorkflowStore((state) => state.setCurrentTab)
+  const setExportedVideoPath = useWorkflowStore((state) => state.setExportedVideoPath)
 
   const [resolution, setResolution] = useState<ExportResolution>('1080p')
   const [outputPath, setOutputPath] = useState<string | null>(null)
 
   const { isExporting, progress, error, successPath } = exportState
+
+  // Validation: Check if timeline has clips
+  const hasClips = tracks.some((track) => track.clips.length > 0)
 
   /**
    * Subscribe to export events from main process
@@ -43,6 +50,8 @@ export function ExportScreen(): React.JSX.Element {
     const cleanupComplete = window.api.onExportComplete((data) => {
       console.log('[ExportScreen] Export complete:', data.outputPath)
       completeExport(data.outputPath)
+      // Save exported video path to workflow store for Generate tab
+      setExportedVideoPath(data.outputPath)
     })
 
     const cleanupError = window.api.onExportError((data) => {
@@ -82,9 +91,9 @@ export function ExportScreen(): React.JSX.Element {
   async function handleExport(): Promise<void> {
     if (!outputPath) return
 
-    // Separate clips by track
-    const track1Clips = tracks[0]?.clips || []
-    const track2Clips = tracks[1]?.clips || []
+    // Separate clips by track and explicitly sort by startTime (AC #6)
+    const track1Clips = (tracks[0]?.clips || []).sort((a, b) => a.startTime - b.startTime)
+    const track2Clips = (tracks[1]?.clips || []).sort((a, b) => a.startTime - b.startTime)
     const allClips = tracks.flatMap((track) => track.clips)
 
     if (allClips.length === 0) {
@@ -107,10 +116,27 @@ export function ExportScreen(): React.JSX.Element {
 
       if (isMultiTrack) {
         // Use multi-track export with overlay compositing
+        // Read track mute and volume state (AC #3, #4, #2)
+        const track1Muted = tracks[0]?.isMuted || false
+        const track2Muted = tracks[1]?.isMuted || false
+        const track1Volume = tracks[0]?.volume || 1.0
+        const track2Volume = tracks[1]?.volume || 1.0
+
+        console.log('[ExportScreen] Track audio state:', {
+          track1Muted,
+          track2Muted,
+          track1Volume,
+          track2Volume
+        })
+
         await window.api.startMultiTrackExport({
           tracks: {
             main: track1Clips,
-            overlay: track2Clips
+            overlay: track2Clips,
+            mainMuted: track1Muted,
+            overlayMuted: track2Muted,
+            mainVolume: track1Volume,
+            overlayVolume: track2Volume
           },
           resolution,
           outputPath,
@@ -176,6 +202,25 @@ export function ExportScreen(): React.JSX.Element {
           <div className="space-y-8">
             <p className="text-gray-400">Configure export settings for your video</p>
 
+            {/* Validation Alert - No Clips */}
+            {!hasClips && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="flex items-center justify-between">
+                  <span>No clips found on timeline. Add clips to the Edit tab before exporting.</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentTab('edit')}
+                    className="ml-4 border-red-600 text-red-400 hover:bg-red-600/10"
+                  >
+                    <Film className="mr-2 h-4 w-4" />
+                    Go to Edit
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Resolution Selection */}
             <div className="space-y-4">
               <label className="text-sm font-medium text-white">Resolution</label>
@@ -230,8 +275,8 @@ export function ExportScreen(): React.JSX.Element {
               </Button>
               <Button
                 onClick={handleExport}
-                disabled={!outputPath}
-                className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-white"
+                disabled={!outputPath || !hasClips}
+                className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-white disabled:bg-zinc-700 disabled:text-zinc-500"
               >
                 Export
               </Button>

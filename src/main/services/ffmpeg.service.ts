@@ -6,6 +6,7 @@ import { spawn, ChildProcess } from 'child_process'
 import { existsSync, unlinkSync } from 'fs'
 import { getFfmpegPath as getBinaryPath } from '../utils/binaryPaths'
 import type { Clip } from '../../renderer/src/components/Timeline/timeline.types'
+import { detectGaps, generateBlackSegmentFilter } from '../utils/timeline.utils'
 
 /**
  * FFmpeg error codes
@@ -382,6 +383,10 @@ export interface MultiTrackExportOptions extends Omit<ExportOptions, 'clips'> {
   tracks: {
     main: Clip[]       // Track 1 clips (full-screen)
     overlay: Clip[]    // Track 2 clips (PiP overlay)
+    mainMuted?: boolean      // Track 1 mute state (default: false)
+    overlayMuted?: boolean   // Track 2 mute state (default: false)
+    mainVolume?: number      // Track 1 volume (0.0-1.0, default: 1.0)
+    overlayVolume?: number   // Track 2 volume (0.0-1.0, default: 1.0)
   }
   pipPosition?: PipPosition  // Position of overlay (default: bottom-right)
   pipSize?: number           // Size as percentage (default: 25)
@@ -569,21 +574,54 @@ export function buildFFmpegCommand(
     clipAudioStatus: clips.map((c) => ({ name: c.name, hasAudio: c.hasAudio ?? true }))
   })
 
+  // Detect gaps between clips (AC #5)
+  const gaps = detectGaps(clips)
+  console.log('[FFmpeg] Gap detection:', {
+    gapCount: gaps.length,
+    gaps: gaps.map((g) => ({ startTime: g.startTime.toFixed(2), duration: g.duration.toFixed(2) }))
+  })
+
   // Build filter_complex for concatenation if multiple clips
   if (clips.length > 1) {
     let filterComplex = ''
 
-    // Build concat inputs - only include audio streams if clips have audio
+    // Generate black screen filters for gaps (AC #5)
+    gaps.forEach((gap, index) => {
+      const blackFilter = generateBlackSegmentFilter(index, gap.duration, outputWidth, outputHeight)
+      filterComplex += blackFilter.video + ';'
+      if (hasAnyAudio) {
+        filterComplex += blackFilter.audio + ';'
+      }
+    })
+
+    // Build concat inputs - interleave clips and gaps
+    let concatInputs = ''
+    let gapIndex = 0
+
     for (let i = 0; i < clips.length; i++) {
       const clipHasAudio = clips[i].hasAudio !== false // Default true for backwards compatibility
+
+      // Add clip segment
       if (hasAnyAudio && clipHasAudio) {
-        filterComplex += `[${i}:v][${i}:a]`
+        concatInputs += `[${i}:v][${i}:a]`
       } else if (hasAnyAudio && !clipHasAudio) {
         // Clip has no audio but other clips do - generate silent audio
-        filterComplex += `[${i}:v][silent${i}]`
+        concatInputs += `[${i}:v][silent${i}]`
       } else {
         // No clips have audio
-        filterComplex += `[${i}:v]`
+        concatInputs += `[${i}:v]`
+      }
+
+      // Check if there's a gap after this clip
+      const gapAfterClip = gaps.find((g) => g.position === i + 1)
+      if (gapAfterClip) {
+        // Add gap segment
+        if (hasAnyAudio) {
+          concatInputs += `[gap${gapIndex}v][gap${gapIndex}a]`
+        } else {
+          concatInputs += `[gap${gapIndex}v]`
+        }
+        gapIndex++
       }
     }
 
@@ -600,10 +638,13 @@ export function buildFFmpegCommand(
       filterComplex = silentAudioFilters + filterComplex
     }
 
-    // Add concat filter - include audio streams only if any clips have audio
+    // Calculate total segment count (clips + gaps)
+    const totalSegments = clips.length + gaps.length
+
+    // Add concat filter with concatInputs - include audio streams only if any clips have audio
     const audioOutputs = hasAnyAudio ? ':a=1[concatv][outa]' : ':a=0[concatv]'
     if (resolution === '720p' || resolution === '1080p') {
-      filterComplex += `concat=n=${clips.length}:v=1${audioOutputs}`
+      filterComplex += `${concatInputs}concat=n=${totalSegments}:v=1${audioOutputs}`
 
       // Add scaling filter in the same filter_complex chain
       if (resolution === '720p') {
@@ -614,7 +655,7 @@ export function buildFFmpegCommand(
     } else {
       // Source quality - no scaling needed
       const outputLabels = hasAnyAudio ? '[outv][outa]' : '[outv]'
-      filterComplex += `concat=n=${clips.length}:v=1${audioOutputs.replace('[concatv][outa]', outputLabels).replace('[concatv]', outputLabels)}`
+      filterComplex += `${concatInputs}concat=n=${totalSegments}:v=1${audioOutputs.replace('[concatv][outa]', outputLabels).replace('[concatv]', outputLabels)}`
     }
 
     args.push('-filter_complex', filterComplex)
@@ -898,32 +939,83 @@ export function buildMultiTrackFFmpegCommand(options: MultiTrackExportOptions): 
   const h264Level = calculateH264Level(outputWidth, outputHeight, 30)
   console.log('[FFmpeg] Multi-track using H.264 Level:', h264Level)
 
-  // Detect audio in tracks (default to true for backwards compatibility)
-  const track1HasAudio = tracks.main.some((clip) => clip.hasAudio !== false)
-  const track2HasAudio = hasOverlay && tracks.overlay.some((clip) => clip.hasAudio !== false)
+  // Detect audio in tracks and apply mute state (AC #3, #4)
+  const track1HasClipsWithAudio = tracks.main.some((clip) => clip.hasAudio !== false)
+  const track2HasClipsWithAudio = hasOverlay && tracks.overlay.some((clip) => clip.hasAudio !== false)
+
+  // Track has audio only if clips have audio AND track is not muted
+  const track1Muted = tracks.mainMuted || false
+  const track2Muted = tracks.overlayMuted || false
+  const track1HasAudio = track1HasClipsWithAudio && !track1Muted
+  const track2HasAudio = track2HasClipsWithAudio && !track2Muted
   const hasAnyAudio = track1HasAudio || track2HasAudio
+
+  // Get configurable track volumes (AC #2)
+  const track1Volume = Math.max(0.0, Math.min(1.0, tracks.mainVolume || 1.0))
+  const track2Volume = Math.max(0.0, Math.min(1.0, tracks.overlayVolume || 1.0))
 
   console.log('[FFmpeg] Multi-track audio detection:', {
     track1HasAudio,
     track2HasAudio,
+    track1Muted,
+    track2Muted,
+    track1Volume,
+    track2Volume,
     hasAnyAudio,
     track1Clips: tracks.main.map((c) => ({ name: c.name, hasAudio: c.hasAudio ?? true })),
     track2Clips: tracks.overlay.map((c) => ({ name: c.name, hasAudio: c.hasAudio ?? true }))
   })
 
+  // Detect gaps for each track (AC #5)
+  const track1Gaps = detectGaps(tracks.main)
+  const track2Gaps = hasOverlay ? detectGaps(tracks.overlay) : []
+
+  console.log('[FFmpeg] Multi-track gap detection:', {
+    track1Gaps: track1Gaps.length,
+    track2Gaps: track2Gaps.length,
+    track1GapDetails: track1Gaps.map((g) => ({ startTime: g.startTime.toFixed(2), duration: g.duration.toFixed(2) })),
+    track2GapDetails: track2Gaps.map((g) => ({ startTime: g.startTime.toFixed(2), duration: g.duration.toFixed(2) }))
+  })
+
   // Build complex filter
   let filterComplex = ''
 
+  // Generate black screen filters for Track 1 gaps (AC #5)
+  track1Gaps.forEach((gap, index) => {
+    const blackFilter = generateBlackSegmentFilter(index, gap.duration, outputWidth, outputHeight)
+    filterComplex += blackFilter.video + ';'
+    if (track1HasAudio) {
+      filterComplex += blackFilter.audio + ';'
+    }
+  })
+
   // Concatenate Track 1 clips if multiple
   if (tracks.main.length > 1) {
+    let track1Inputs = ''
+    let gapIndex = 0
+
     for (let i = 0; i < tracks.main.length; i++) {
       const clipHasAudio = tracks.main[i].hasAudio !== false
+
+      // Add clip segment
       if (track1HasAudio && clipHasAudio) {
-        filterComplex += `[${i}:v][${i}:a]`
+        track1Inputs += `[${i}:v][${i}:a]`
       } else if (track1HasAudio && !clipHasAudio) {
-        filterComplex += `[${i}:v][silent_t1_${i}]`
+        track1Inputs += `[${i}:v][silent_t1_${i}]`
       } else {
-        filterComplex += `[${i}:v]`
+        track1Inputs += `[${i}:v]`
+      }
+
+      // Check if there's a gap after this clip
+      const gapAfterClip = track1Gaps.find((g) => g.position === i + 1)
+      if (gapAfterClip) {
+        // Add gap segment
+        if (track1HasAudio) {
+          track1Inputs += `[gap${gapIndex}v][gap${gapIndex}a]`
+        } else {
+          track1Inputs += `[gap${gapIndex}v]`
+        }
+        gapIndex++
       }
     }
 
@@ -938,18 +1030,21 @@ export function buildMultiTrackFFmpegCommand(options: MultiTrackExportOptions): 
       filterComplex = silentFilters + filterComplex
     }
 
-    filterComplex += `concat=n=${tracks.main.length}:v=1:a=${track1HasAudio ? 1 : 0}[main]${track1HasAudio ? '[a1]' : ''}`
+    // Calculate total Track 1 segments (clips + gaps)
+    const track1TotalSegments = tracks.main.length + track1Gaps.length
+
+    filterComplex += `${track1Inputs}concat=n=${track1TotalSegments}:v=1:a=${track1HasAudio ? 1 : 0}[main]${track1HasAudio ? '[a1]' : ''}`
   } else {
     // Single Track 1 clip - just label it
     const clipHasAudio = tracks.main[0].hasAudio !== false
     if (track1HasAudio && clipHasAudio) {
-      filterComplex += '[0:v]copy[main];[0:a]copy[a1]'
+      filterComplex += '[0:v]null[main];[0:a]anull[a1]'
     } else if (track1HasAudio && !clipHasAudio) {
       // Generate silent audio
       const clip = tracks.main[0]
-      filterComplex += `anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=${clip.duration - clip.trimIn - clip.trimOut}[a1];[0:v]copy[main]`
+      filterComplex += `anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=${clip.duration - clip.trimIn - clip.trimOut}[a1];[0:v]null[main]`
     } else {
-      filterComplex += '[0:v]copy[main]'
+      filterComplex += '[0:v]null[main]'
     }
   }
 
@@ -957,16 +1052,43 @@ export function buildMultiTrackFFmpegCommand(options: MultiTrackExportOptions): 
   if (hasOverlay) {
     filterComplex += ';'
 
+    // Generate black screen filters for Track 2 gaps (use t2_gap prefix to avoid conflicts)
+    track2Gaps.forEach((gap, index) => {
+      const blackFilter = generateBlackSegmentFilter(index, gap.duration, outputWidth, outputHeight)
+      // Use t2_gap prefix for Track 2 gap labels
+      filterComplex += blackFilter.video.replace(`gap${index}v`, `t2_gap${index}v`) + ';'
+      if (track2HasAudio) {
+        filterComplex += blackFilter.audio.replace(`gap${index}a`, `t2_gap${index}a`) + ';'
+      }
+    })
+
     if (tracks.overlay.length > 1) {
+      let track2Inputs = ''
+      let gapIndex = 0
+
       for (let i = 0; i < tracks.overlay.length; i++) {
         const inputIndex = track1InputCount + i
         const clipHasAudio = tracks.overlay[i].hasAudio !== false
+
+        // Add clip segment
         if (track2HasAudio && clipHasAudio) {
-          filterComplex += `[${inputIndex}:v][${inputIndex}:a]`
+          track2Inputs += `[${inputIndex}:v][${inputIndex}:a]`
         } else if (track2HasAudio && !clipHasAudio) {
-          filterComplex += `[${inputIndex}:v][silent_t2_${i}]`
+          track2Inputs += `[${inputIndex}:v][silent_t2_${i}]`
         } else {
-          filterComplex += `[${inputIndex}:v]`
+          track2Inputs += `[${inputIndex}:v]`
+        }
+
+        // Check if there's a gap after this clip
+        const gapAfterClip = track2Gaps.find((g) => g.position === i + 1)
+        if (gapAfterClip) {
+          // Add gap segment
+          if (track2HasAudio) {
+            track2Inputs += `[t2_gap${gapIndex}v][t2_gap${gapIndex}a]`
+          } else {
+            track2Inputs += `[t2_gap${gapIndex}v]`
+          }
+          gapIndex++
         }
       }
 
@@ -983,19 +1105,22 @@ export function buildMultiTrackFFmpegCommand(options: MultiTrackExportOptions): 
         filterComplex = filterComplex.substring(0, concatStart) + silentFilters + filterComplex.substring(concatStart)
       }
 
-      filterComplex += `concat=n=${tracks.overlay.length}:v=1:a=${track2HasAudio ? 1 : 0}[overlay]${track2HasAudio ? '[a2]' : ''}`
+      // Calculate total Track 2 segments (clips + gaps)
+      const track2TotalSegments = tracks.overlay.length + track2Gaps.length
+
+      filterComplex += `${track2Inputs}concat=n=${track2TotalSegments}:v=1:a=${track2HasAudio ? 1 : 0}[overlay]${track2HasAudio ? '[a2]' : ''}`
     } else {
       // Single Track 2 clip
       const overlayInputIndex = track1InputCount
       const clipHasAudio = tracks.overlay[0].hasAudio !== false
       if (track2HasAudio && clipHasAudio) {
-        filterComplex += `[${overlayInputIndex}:v]copy[overlay];[${overlayInputIndex}:a]copy[a2]`
+        filterComplex += `[${overlayInputIndex}:v]null[overlay];[${overlayInputIndex}:a]anull[a2]`
       } else if (track2HasAudio && !clipHasAudio) {
         // Generate silent audio
         const clip = tracks.overlay[0]
-        filterComplex += `anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=${clip.duration - clip.trimIn - clip.trimOut}[a2];[${overlayInputIndex}:v]copy[overlay]`
+        filterComplex += `anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=${clip.duration - clip.trimIn - clip.trimOut}[a2];[${overlayInputIndex}:v]null[overlay]`
       } else {
-        filterComplex += `[${overlayInputIndex}:v]copy[overlay]`
+        filterComplex += `[${overlayInputIndex}:v]null[overlay]`
       }
     }
 
@@ -1006,21 +1131,21 @@ export function buildMultiTrackFFmpegCommand(options: MultiTrackExportOptions): 
 
     // Mix audio only if tracks have audio
     if (track1HasAudio && track2HasAudio) {
-      // Both tracks have audio - mix them
-      filterComplex += ';[a1]volume=1.0[a1out];[a2]volume=0.5[a2out];[a1out][a2out]amix=inputs=2:duration=longest[outa]'
+      // Both tracks have audio - mix them with configurable volumes (AC #1, #2)
+      filterComplex += `;[a1]volume=${track1Volume}[a1out];[a2]volume=${track2Volume}[a2out];[a1out][a2out]amix=inputs=2:duration=longest[outa]`
     } else if (track1HasAudio) {
-      // Only Track 1 has audio
-      filterComplex += ';[a1]copy[outa]'
+      // Only Track 1 has audio - use anull filter (AC #1, #2)
+      filterComplex += ';[a1]anull[outa]'
     } else if (track2HasAudio) {
-      // Only Track 2 has audio
-      filterComplex += ';[a2]copy[outa]'
+      // Only Track 2 has audio - use anull filter (AC #1, #2)
+      filterComplex += ';[a2]anull[outa]'
     }
     // If no tracks have audio, no audio filter needed
   } else {
     // No overlay - just use Track 1 video and audio
-    filterComplex += ';[main]copy[outv]'
+    filterComplex += ';[main]null[outv]'
     if (track1HasAudio) {
-      filterComplex += ';[a1]copy[outa]'
+      filterComplex += ';[a1]anull[outa]'
     }
   }
 

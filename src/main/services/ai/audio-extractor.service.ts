@@ -125,6 +125,59 @@ export class AudioExtractorService {
   }
 
   /**
+   * Extract audio from a video file
+   *
+   * Simplified extraction for already-exported video files (e.g., temporary exports for transcription).
+   * Faster than timeline extraction since the video is already merged.
+   *
+   * @param videoFilePath - Path to video file
+   * @param options - Audio extraction options
+   * @returns Audio extraction result with file path and metadata
+   * @throws Error if FFmpeg extraction fails
+   */
+  async extractAudioFromVideo(
+    videoFilePath: string,
+    options: AudioExtractionOptions = {}
+  ): Promise<AudioExtractionResult> {
+    const { bitrate = '128k', sampleRate = 44100, format = 'mp3' } = options
+
+    // Ensure temp directory exists
+    await this.ensureTempDirectory()
+
+    // Generate output path
+    const timestamp = Date.now()
+    const random = Math.random().toString(36).substring(2, 8)
+    const outputPath = path.join(this.tempDir, `video-audio-${timestamp}-${random}.${format}`)
+
+    // Build FFmpeg command for audio extraction
+    const args = [
+      '-i',
+      videoFilePath,
+      '-vn', // No video
+      '-acodec',
+      format === 'mp3' ? 'libmp3lame' : 'pcm_s16le',
+      '-ar',
+      sampleRate.toString(),
+      '-ab',
+      bitrate,
+      '-y', // Overwrite
+      outputPath
+    ]
+
+    await this.runFFmpeg(args, 'Extracting audio from video')
+
+    // Get file metadata
+    const stats = await fs.stat(outputPath)
+    const duration = await this.getAudioDuration(outputPath)
+
+    return {
+      audioFilePath: outputPath,
+      duration,
+      fileSize: stats.size
+    }
+  }
+
+  /**
    * Extract audio from a single clip
    *
    * @param clip - Timeline clip to extract audio from

@@ -6,10 +6,8 @@
  */
 
 import { useState } from 'react'
-import { Button } from '../ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
-import { useUIStore } from '../../store/uiStore'
-import { ArrowLeft, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import { HistoryPanel } from './HistoryPanel'
 import { TranscriptionPanel } from './TranscriptionPanel'
 import { GenerationPanel } from './GenerationPanel'
@@ -18,32 +16,21 @@ import { ResultsPanel } from './ResultsPanel'
 /**
  * AI Generator Page Component
  *
- * Full-screen page for AI content generation with tab navigation
+ * Full-screen page for AI content generation with tab navigation.
+ * Part of the 3-step workflow (Edit → Export → Generate Posts).
  */
 export function AIGeneratorPage() {
   const [activeTab, setActiveTab] = useState('transcribe')
-  const hideAIGenerator = useUIStore((state) => state.hideAIGenerator)
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-zinc-950">
+    <div className="flex flex-col h-full w-full bg-zinc-950">
       {/* Top Bar */}
-      <div className="h-12 border-b border-zinc-800 flex items-center justify-between px-4">
+      <div className="h-12 border-b border-zinc-800 flex items-center px-4">
         {/* Title */}
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-cyan-500" />
-          <h1 className="text-lg font-semibold text-zinc-100">AI Generator</h1>
+          <h1 className="text-lg font-semibold text-zinc-100">Generate Posts</h1>
         </div>
-
-        {/* Back to Editor Button */}
-        <Button
-          onClick={hideAIGenerator}
-          variant="ghost"
-          size="sm"
-          className="text-zinc-400 hover:text-zinc-100"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Editor
-        </Button>
       </div>
 
       {/* Tab Navigation */}
