@@ -1,7 +1,7 @@
 /**
  * MediaItem Component
- * Vertical card media file display with large thumbnail and compact metadata
- * Adobe Premiere Pro inspired design - clean and minimal
+ * Vertical card media file display with refined Adobe Premiere Pro styling
+ * Clean, modern design with improved spacing, typography, and shadows
  */
 
 import { useState } from 'react'
@@ -16,8 +16,8 @@ interface MediaItemProps {
 }
 
 /**
- * Grid-optimized media card with large thumbnail, delete button, and minimal metadata
- * Supports click selection and drag-to-timeline functionality
+ * Grid-optimized media card with polished Adobe Premiere Pro aesthetic
+ * Features refined spacing, shadows, and professional styling
  */
 export function MediaItem({ file, isSelected, onSelect }: MediaItemProps): React.JSX.Element {
   const [isHovered, setIsHovered] = useState(false)
@@ -34,7 +34,6 @@ export function MediaItem({ file, isSelected, onSelect }: MediaItemProps): React
 
   /**
    * Handle delete button click
-   * Removes file from media store and deselects if currently selected
    */
   function handleDelete(e: React.MouseEvent): void {
     e.stopPropagation()
@@ -50,13 +49,14 @@ export function MediaItem({ file, isSelected, onSelect }: MediaItemProps): React
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={cn(
-        'rounded overflow-hidden cursor-grab active:cursor-grabbing',
-        'border transition-all duration-150',
-        'bg-zinc-900',
+        'rounded-md overflow-hidden cursor-grab active:cursor-grabbing',
+        'border transition-all duration-200',
+        'bg-slate-800',
         'flex flex-col',
+        'shadow-sm hover:shadow-md',
         isSelected
-          ? 'ring-2 ring-cyan-500 border-cyan-500'
-          : 'border-zinc-700 hover:border-zinc-600'
+          ? 'ring-2 ring-cyan-500 border-cyan-500 shadow-lg shadow-cyan-500/10'
+          : 'border-slate-700/50 hover:border-slate-600'
       )}
     >
       {/* Thumbnail with Delete Button */}
@@ -72,11 +72,12 @@ export function MediaItem({ file, isSelected, onSelect }: MediaItemProps): React
           <button
             onClick={handleDelete}
             className={cn(
-              'absolute top-1 right-1 p-1 rounded',
+              'absolute top-1.5 right-1.5 p-1 rounded-md',
               'bg-red-600/90 hover:bg-red-500',
-              'text-white',
-              'transition-all',
-              'focus:outline-none focus:ring-1 focus:ring-red-400'
+              'text-white shadow-lg',
+              'transition-all duration-150',
+              'focus:outline-none focus:ring-2 focus:ring-red-400/50',
+              'hover:scale-110'
             )}
             title="Delete"
           >
@@ -92,15 +93,18 @@ export function MediaItem({ file, isSelected, onSelect }: MediaItemProps): React
         )}
       </div>
 
-      {/* Metadata - Compact and Clean */}
-      <div className="p-2 space-y-0.5">
-        {/* Filename */}
-        <p className="text-xs text-zinc-200 truncate leading-tight" title={file.name}>
+      {/* Metadata - Refined Spacing and Typography */}
+      <div className="p-3 space-y-1">
+        {/* Filename - Better Typography */}
+        <p
+          className="text-sm font-medium text-slate-100 truncate leading-snug"
+          title={file.name}
+        >
           {file.name}
         </p>
 
-        {/* Duration, Resolution, Size - Single compact line */}
-        <p className="text-[10px] text-zinc-500 font-mono leading-tight">
+        {/* Duration, Resolution, Size - Compact Metadata */}
+        <p className="text-[10px] text-slate-400 font-mono leading-relaxed">
           {formatTime(file.duration)} • {file.resolution.width}×{file.resolution.height} •{' '}
           {formatFileSize(file.size)}
         </p>

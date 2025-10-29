@@ -46,6 +46,7 @@ export interface MediaFile {
   thumbnail?: string // data URL or file path
   createdAt: number // timestamp
   intermediatePath?: string // Path to H.264 Intra intermediate file for editing
+  hasAudio: boolean // Whether the media file contains an audio stream
 }
 
 /**

@@ -24,6 +24,9 @@ import type {
 import { AudioMixer } from './AudioMixer'
 
 export class VideoCompositor {
+  // Time precision epsilon for floating-point boundary comparisons (1ms)
+  private static readonly TIME_EPSILON = 0.001
+
   // Canvas and rendering
   private canvas: HTMLCanvasElement
   private ctx: CanvasRenderingContext2D
@@ -48,13 +51,20 @@ export class VideoCompositor {
 
   // Performance tracking
   private frameCount: number = 0
+  private lastFrameTime: number = 0
+
+  // Transition state tracking
+  private isTransitioning: boolean = false
+  private lastTransitionTime: number = 0
+  private noClipsStartTime: number = 0 // Track when we first detected no active clips
+  private isLoadingSources: boolean = false // Prevent updateActiveClips while loading sources
 
   constructor(options: CompositorOptions) {
     this.canvas = options.canvas
     this.width = options.width
     this.height = options.height
     this.maxVideoElements = options.maxVideoElements ?? 10
-    this.preloadAhead = options.preloadAhead ?? 2 // seconds
+    this.preloadAhead = options.preloadAhead ?? 3 // seconds (increased from 2)
 
     // Get 2D context
     const ctx = this.canvas.getContext('2d', {
@@ -82,12 +92,6 @@ export class VideoCompositor {
 
     // Initialize audio mixer
     this.audioMixer = new AudioMixer()
-
-    console.log('[VideoCompositor] Initialized', {
-      width: this.width,
-      height: this.height,
-      maxVideoElements: this.maxVideoElements
-    })
   }
 
   /**
@@ -95,8 +99,6 @@ export class VideoCompositor {
    * @param tracks Array of tracks with clips
    */
   async loadTimeline(tracks: CompositorTrack[]): Promise<void> {
-    console.log('[VideoCompositor] Loading timeline', { trackCount: tracks.length })
-
     // Stop playback if active
     if (this.state.isPlaying) {
       this.pause()
@@ -113,8 +115,6 @@ export class VideoCompositor {
     this.timelineDuration = this.calculateTimelineDuration()
     this.state.duration = this.timelineDuration
 
-    console.log('[VideoCompositor] Timeline duration:', this.timelineDuration)
-
     // Collect unique intermediate files for playback
     const sourceFiles = new Set<string>()
     for (const track of this.tracks) {
@@ -124,8 +124,6 @@ export class VideoCompositor {
       }
     }
 
-    console.log('[VideoCompositor] Unique sources:', sourceFiles.size)
-
     // Unload sources no longer needed
     for (const [filePath] of this.sources) {
       if (!sourceFiles.has(filePath)) {
@@ -133,21 +131,79 @@ export class VideoCompositor {
       }
     }
 
-    // Load sources for clips near current time
-    const currentSources = this.getSourcesNearTime(this.state.currentTime)
-    for (const sourceFile of currentSources) {
-      if (!this.sources.has(sourceFile)) {
-        await this.loadVideoSource(sourceFile).catch((error) => {
-          console.error('[VideoCompositor] Failed to load source:', sourceFile, error)
-        })
-      }
-    }
+    // Load ALL timeline sources upfront (emits sourcesLoading/sourcesReady events)
+    await this.loadAllTimelineSources()
 
     // Update active clips
     this.updateActiveClips()
 
-    // Emit event
+    // Emit event (kept for backward compatibility)
     this.emit({ type: 'sourceloaded', currentTime: this.state.currentTime })
+  }
+
+  /**
+   * Load all timeline sources upfront (regardless of time position)
+   * Emits 'sourcesLoading' event at start and 'sourcesReady' when complete
+   * @returns Promise that resolves when all sources are loaded
+   */
+  private async loadAllTimelineSources(): Promise<void> {
+    // Collect unique intermediate files for ALL clips on timeline
+    const sourceFiles = new Set<string>()
+    for (const track of this.tracks) {
+      for (const clip of track.clips) {
+        sourceFiles.add(clip.intermediatePath)
+      }
+    }
+
+    const totalSources = sourceFiles.size
+    let loadedSources = 0
+
+    // Emit loading started event
+    this.emit({
+      type: 'sourcesLoading',
+      loaded: 0,
+      total: totalSources
+    })
+
+    console.log('[VideoCompositor] Loading all timeline sources:', {
+      total: totalSources,
+      files: Array.from(sourceFiles)
+    })
+
+    // Load all sources
+    const loadPromises: Promise<void>[] = []
+    for (const sourceFile of sourceFiles) {
+      if (!this.sources.has(sourceFile)) {
+        const loadPromise = this.loadVideoSource(sourceFile)
+          .then(() => {
+            loadedSources++
+            console.log(`[VideoCompositor] Source loaded (${loadedSources}/${totalSources}):`, sourceFile)
+          })
+          .catch((err) => {
+            loadedSources++
+            console.error(`[VideoCompositor] Failed to load source (${loadedSources}/${totalSources}):`, sourceFile, err)
+          })
+        loadPromises.push(loadPromise)
+      } else {
+        // Source already loaded
+        loadedSources++
+      }
+    }
+
+    // Wait for all sources to load
+    await Promise.all(loadPromises)
+
+    // Emit ready event
+    this.emit({
+      type: 'sourcesReady',
+      loaded: loadedSources,
+      total: totalSources
+    })
+
+    console.log('[VideoCompositor] All sources loaded:', {
+      loaded: loadedSources,
+      total: totalSources
+    })
   }
 
   /**
@@ -156,10 +212,13 @@ export class VideoCompositor {
   async play(): Promise<void> {
     if (this.state.isPlaying) return
 
-    console.log('[VideoCompositor] Play from', this.state.currentTime)
+    console.log('[Playback] Starting playback:', {
+      currentTime: this.state.currentTime.toFixed(2),
+      activeClips: this.state.activeClips.length
+    })
 
-    // Start all active video elements
-    const playPromises: Promise<void>[] = []
+    // Start all active video elements with retry logic
+    const playPromises: Promise<boolean>[] = []
     for (const clip of this.state.activeClips) {
       const source = this.sources.get(clip.intermediatePath)
       if (source && source.isLoaded) {
@@ -169,9 +228,7 @@ export class VideoCompositor {
 
         source.element.currentTime = sourceTime
         playPromises.push(
-          source.element.play().catch((err) => {
-            console.error('[VideoCompositor] Play failed for', clip.intermediatePath, err)
-          })
+          this.playVideoWithRetry(source.element, clip.id, 'play()')
         )
       }
     }
@@ -188,8 +245,6 @@ export class VideoCompositor {
    */
   pause(): void {
     if (!this.state.isPlaying) return
-
-    console.log('[VideoCompositor] Pause at', this.state.currentTime)
 
     // Pause all video elements
     for (const source of this.sources.values()) {
@@ -209,8 +264,6 @@ export class VideoCompositor {
 
     // Clamp time to valid range
     time = Math.max(0, Math.min(time, this.state.duration))
-
-    console.log('[VideoCompositor] Seek to', time)
 
     // Pause if playing
     if (wasPlaying) {
@@ -281,11 +334,29 @@ export class VideoCompositor {
   }
 
   /**
+   * Resize the compositor canvas and update rendering dimensions
+   * @param width New canvas width
+   * @param height New canvas height
+   */
+  resize(width: number, height: number): void {
+    // Update internal dimensions
+    this.width = width
+    this.height = height
+
+    // Update canvas dimensions
+    this.canvas.width = width
+    this.canvas.height = height
+
+    // Re-render current frame at new dimensions
+    this.renderFrame()
+
+    console.log('[VideoCompositor] Resized to', { width, height })
+  }
+
+  /**
    * Dispose of compositor and free resources
    */
   dispose(): void {
-    console.log('[VideoCompositor] Disposing')
-
     // Stop playback
     this.pause()
 
@@ -337,21 +408,110 @@ export class VideoCompositor {
   }
 
   /**
+   * Verify time consistency across all active video elements
+   * Resyncs any videos that are >0.15s out of sync
+   */
+  private verifyTimeConsistency(): void {
+    for (const clip of this.state.activeClips) {
+      const source = this.sources.get(clip.intermediatePath)
+      if (!source || !source.isLoaded) continue
+
+      const clipElapsed = this.state.currentTime - clip.startTime
+      const expectedSourceTime = clip.trimIn + clipElapsed
+      const actualSourceTime = source.element.currentTime
+      const timeDiff = Math.abs(actualSourceTime - expectedSourceTime)
+
+      // If video is >0.15s out of sync, resync it immediately
+      if (timeDiff > 0.15) {
+        console.warn('[Playback] Time consistency check failed, resyncing:', {
+          clipId: clip.id,
+          expected: expectedSourceTime.toFixed(3),
+          actual: actualSourceTime.toFixed(3),
+          diff: timeDiff.toFixed(3)
+        })
+        source.element.currentTime = expectedSourceTime
+      }
+    }
+  }
+
+  /**
+   * Play video element with retry logic for robustness
+   * Retries up to 3 times with exponential backoff if play fails
+   */
+  private async playVideoWithRetry(
+    video: HTMLVideoElement,
+    clipId: string,
+    context: string,
+    maxRetries: number = 3
+  ): Promise<boolean> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await video.play()
+        if (attempt > 1) {
+          console.log(`[Playback] Video play succeeded on attempt ${attempt}:`, {
+            clipId,
+            context,
+            currentTime: video.currentTime.toFixed(2)
+          })
+        }
+        return true
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+
+        if (attempt === maxRetries) {
+          console.error(`[Playback] Failed to play video after ${maxRetries} attempts:`, {
+            clipId,
+            context,
+            error: errorMessage,
+            videoSrc: video.src,
+            readyState: video.readyState,
+            networkState: video.networkState
+          })
+          return false
+        }
+
+        // Log retry attempt
+        console.warn(`[Playback] Video play failed (attempt ${attempt}/${maxRetries}):`, {
+          clipId,
+          context,
+          error: errorMessage,
+          retryingIn: `${50 * attempt}ms`
+        })
+
+        // Exponential backoff: 50ms, 100ms, 150ms
+        await new Promise(resolve => setTimeout(resolve, 50 * attempt))
+      }
+    }
+
+    return false
+  }
+
+  /**
    * Start the render loop
    */
   private startRenderLoop(): void {
     if (this.state.rafHandle !== null) return
 
     this.frameCount = 0
+    this.lastFrameTime = 0
 
-    const render = (_timestamp: number): void => {
+    const render = (timestamp: number): void => {
       if (!this.state.isPlaying) return
+
+      // Initialize lastFrameTime on first frame
+      if (this.lastFrameTime === 0) {
+        this.lastFrameTime = timestamp
+      }
+
+      // Calculate delta time in seconds
+      const deltaTime = (timestamp - this.lastFrameTime) / 1000
+      this.lastFrameTime = timestamp
 
       // Update frame tracking
       this.frameCount++
 
-      // Update current time based on video element times
-      this.updateCurrentTimeFromVideos()
+      // Update current time using RAF delta time
+      this.updateCurrentTimeFromVideos(deltaTime)
 
       // Check if reached end
       if (this.state.currentTime >= this.state.duration) {
@@ -501,6 +661,11 @@ export class VideoCompositor {
     this.ctx.fillStyle = '#000000'
     this.ctx.fillRect(0, 0, this.width, this.height)
 
+    // If no active clips, return early (canvas already cleared)
+    if (this.state.activeClips.length === 0) {
+      return
+    }
+
     // Render clips in order (bottom to top based on track index)
     const sortedClips = [...this.state.activeClips].sort((a, b) => a.trackIndex - b.trackIndex)
 
@@ -515,37 +680,54 @@ export class VideoCompositor {
       const clipElapsed = this.state.currentTime - clip.startTime
       const sourceTime = clip.trimIn + clipElapsed
 
-      // Verify video is at correct time (allow small tolerance)
+      // Frame staleness detection: Skip if video frame hasn't advanced
+      if (source.lastRenderedTime === video.currentTime && source.lastRenderedTime !== -1) {
+        // Same frame as last render - skip to prevent ghosting at split boundaries
+        continue
+      }
+
+      // Verify video is at correct time (tighter tolerance for frame-accurate transitions)
       const timeDiff = Math.abs(video.currentTime - sourceTime)
-      if (timeDiff > 0.1) {
+      if (timeDiff > 0.016) { // ~1 frame at 60fps (reduced from 0.033s)
         // Video element out of sync, seek it
         video.currentTime = sourceTime
+        // Skip this frame until video seeks to correct position
+        continue
       }
 
       // Draw video to canvas with opacity
       this.ctx.globalAlpha = clip.opacity
 
       if (clip.trackIndex === 0) {
-        // Track 1: Render full-screen with aspect-fit (existing behavior)
+        // Track 1: Render full-screen with aspect-fill (like Adobe Premiere Pro)
+        // Video fills entire canvas, crops edges if needed to maintain aspect ratio
         const videoAspect = video.videoWidth / video.videoHeight
         const canvasAspect = this.width / this.height
 
-        let drawWidth = this.width
-        let drawHeight = this.height
-        let drawX = 0
-        let drawY = 0
+        let sourceX = 0
+        let sourceY = 0
+        let sourceWidth = video.videoWidth
+        let sourceHeight = video.videoHeight
 
         if (videoAspect > canvasAspect) {
-          // Video is wider - fit width
-          drawHeight = this.width / videoAspect
-          drawY = (this.height - drawHeight) / 2
+          // Video is wider than canvas - crop left/right edges
+          sourceWidth = video.videoHeight * canvasAspect
+          sourceX = (video.videoWidth - sourceWidth) / 2
         } else {
-          // Video is taller - fit height
-          drawWidth = this.height * videoAspect
-          drawX = (this.width - drawWidth) / 2
+          // Video is taller than canvas - crop top/bottom edges
+          sourceHeight = video.videoWidth / canvasAspect
+          sourceY = (video.videoHeight - sourceHeight) / 2
         }
 
-        this.ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight)
+        // Draw cropped portion to fill entire canvas
+        this.ctx.drawImage(
+          video,
+          sourceX, sourceY, sourceWidth, sourceHeight,  // source crop rectangle
+          0, 0, this.width, this.height                  // destination (full canvas)
+        )
+
+        // Update last rendered time to prevent stale frame rendering
+        source.lastRenderedTime = video.currentTime
       } else {
         // Track 2+: Render as PiP overlay
         // Skip if video dimensions not ready
@@ -564,6 +746,9 @@ export class VideoCompositor {
             this.ctx.strokeRect(x, y, width, height)
             this.ctx.restore()
           }
+
+          // Update last rendered time to prevent stale frame rendering
+          source.lastRenderedTime = video.currentTime
         }
       }
     }
@@ -573,45 +758,296 @@ export class VideoCompositor {
   }
 
   /**
-   * Update current time based on video element playback
-   * Use the most advanced video element time as source of truth
+   * Update current time based on RAF delta time
+   * Uses independent time tracking with video elements for sync verification
    */
-  private updateCurrentTimeFromVideos(): void {
-    if (this.state.activeClips.length === 0) return
+  private updateCurrentTimeFromVideos(deltaTime: number): void {
+    // Pause time advancement while loading sources to prevent currentTime drift
+    if (this.isLoadingSources) {
+      console.log('[Playback] Time advancement paused while loading sources')
+      return
+    }
 
-    // Find the most advanced clip time
-    let maxTime = this.state.currentTime
+    // Advance time independently using RAF delta
+    this.state.currentTime = Math.min(this.state.currentTime + deltaTime, this.state.duration)
 
+    // Detect if we're approaching a clip boundary (within 0.25s)
+    // This forces early transition to prevent playback stalls
+    // Uses time-based detection only for reliability
     for (const clip of this.state.activeClips) {
-      const source = this.sources.get(clip.intermediatePath)
-      if (!source || !source.isLoaded) continue
+      // Note: clip.duration is already the effective duration (after trim applied)
+      const clipEnd = clip.startTime + clip.duration
+      const timeUntilClipEnds = clipEnd - this.state.currentTime
 
-      const videoTime = source.element.currentTime
-      const clipElapsed = videoTime - clip.trimIn
-      const globalTime = clip.startTime + clipElapsed
+      // Early transition detection: Check if next clip is ready when within 0.5s of current clip end
+      if (timeUntilClipEnds > 0.25 && timeUntilClipEnds <= 0.5) {
+        // Find the next clip that starts at or after this clip ends
+        for (const track of this.tracks) {
+          for (const nextClip of track.clips) {
+            if (nextClip.startTime >= clipEnd - 0.01) { // Small tolerance for floating point
+              const nextSource = this.sources.get(nextClip.intermediatePath)
+              if (nextSource && nextSource.isLoaded) {
+                if (nextSource.element.readyState < 2) {
+                  console.warn('[Playback] Next clip not ready for transition:', {
+                    currentClipId: clip.id,
+                    nextClipId: nextClip.id,
+                    timeUntilTransition: timeUntilClipEnds.toFixed(3),
+                    nextClipReadyState: nextSource.element.readyState
+                  })
+                }
+              } else {
+                console.warn('[Playback] Next clip source not loaded:', {
+                  currentClipId: clip.id,
+                  nextClipId: nextClip.id,
+                  timeUntilTransition: timeUntilClipEnds.toFixed(3),
+                  hasSource: !!nextSource,
+                  isLoaded: nextSource?.isLoaded
+                })
+              }
+              break // Only check the first clip that starts after current
+            }
+          }
+        }
+      }
 
-      if (globalTime > maxTime) {
-        maxTime = globalTime
+      // More forgiving boundary detection: 0.25s window (was 0.1s)
+      if (timeUntilClipEnds > 0 && timeUntilClipEnds <= 0.25) {
+        // Force jump to clip boundary to trigger transition
+        // No longer waiting for video.ended - just use time-based detection for reliability
+        this.state.currentTime = clipEnd
+        console.log('[Playback] Clip boundary detected, forcing transition:', {
+          clipId: clip.id,
+          clipEnd: clipEnd.toFixed(2),
+          timeUntilEnd: timeUntilClipEnds.toFixed(3)
+        })
+        break
       }
     }
 
-    this.state.currentTime = Math.min(maxTime, this.state.duration)
+    // Handle gaps in timeline: if no active clips, find and jump to next clip
+    if (this.state.activeClips.length === 0) {
+      // Track how long we've had no active clips for stuck transition detection
+      if (this.noClipsStartTime === 0) {
+        this.noClipsStartTime = this.state.currentTime
+      }
+
+      const noClipsDuration = this.state.currentTime - this.noClipsStartTime
+
+      // If we've had no clips for >3.0s, this is likely a stuck transition - force recovery
+      // (Increased from 0.7s now that we preload all sources upfront)
+      if (noClipsDuration > 3.0) {
+        console.error('[Playback] STUCK TRANSITION DETECTED - forcing recovery:', {
+          stuckDuration: noClipsDuration.toFixed(3),
+          currentTime: this.state.currentTime.toFixed(2)
+        })
+      }
+
+      // We're in a gap - find the next clip that starts after current time
+      let nextClipStartTime: number | null = null
+
+      for (const track of this.tracks) {
+        for (const clip of track.clips) {
+          if (clip.startTime > this.state.currentTime) {
+            if (nextClipStartTime === null || clip.startTime < nextClipStartTime) {
+              nextClipStartTime = clip.startTime
+            }
+          }
+        }
+      }
+
+      if (nextClipStartTime !== null) {
+        // Log gap detection (error level if stuck, regular log otherwise)
+        const logMessage = {
+          currentTime: this.state.currentTime.toFixed(2),
+          nextClipAt: nextClipStartTime.toFixed(2),
+          gap: (nextClipStartTime - this.state.currentTime).toFixed(2),
+          noClipsDuration: noClipsDuration.toFixed(3)
+        }
+
+        if (noClipsDuration > 3.0) {
+          console.error('[Playback] Gap recovery:', logMessage)
+        } else {
+          console.log('[Playback] Gap detected:', logMessage)
+        }
+
+        // Jump to the next clip's start time
+        this.state.currentTime = nextClipStartTime
+
+        // CRITICAL: Load sources for clips at this time BEFORE updating active clips
+        // This prevents stuck transitions when sources aren't loaded yet
+        const sourcesNeeded = this.getSourcesNearTime(this.state.currentTime)
+        const loadPromises: Promise<void>[] = []
+        for (const sourceFile of sourcesNeeded) {
+          if (!this.sources.has(sourceFile)) {
+            console.log('[Playback] Loading missing source for gap jump:', sourceFile)
+            loadPromises.push(
+              this.loadVideoSource(sourceFile).catch((err) => {
+                console.error('[Playback] Failed to load source for gap jump:', sourceFile, err)
+              })
+            )
+          }
+        }
+
+        // Wait for sources to load before continuing
+        if (loadPromises.length > 0) {
+          // Block updateActiveClips() while loading
+          this.isLoadingSources = true
+          console.log('[Playback] Blocking updateActiveClips while loading sources...')
+
+          Promise.all(loadPromises)
+            .then(() => {
+              // Sources loaded, unblock and update active clips
+              this.isLoadingSources = false
+              console.log('[Playback] Sources loaded, resuming updateActiveClips')
+              this.updateActiveClips()
+
+              // If playing, resume playback on the newly active clips
+              if (this.state.isPlaying) {
+                const resumePromises: Promise<boolean>[] = []
+                for (const clip of this.state.activeClips) {
+                  const source = this.sources.get(clip.intermediatePath)
+                  if (source && source.isLoaded) {
+                    // Seek to correct position in source video
+                    const clipElapsed = this.state.currentTime - clip.startTime
+                    const sourceTime = clip.trimIn + clipElapsed
+                    source.element.currentTime = sourceTime
+
+                    // Resume playback with retry logic
+                    resumePromises.push(
+                      this.playVideoWithRetry(source.element, clip.id, 'gap-resume')
+                    )
+                  }
+                }
+
+                // Fire off all resume attempts without blocking the render loop
+                Promise.all(resumePromises).then(() => {
+                  console.log('[Playback] Gap jump complete:', {
+                    newTime: this.state.currentTime.toFixed(2),
+                    activeClips: this.state.activeClips.length
+                  })
+                })
+              }
+            })
+            .catch((err) => {
+              // Even if loading failed, unblock to prevent permanent stuck state
+              this.isLoadingSources = false
+              console.error('[Playback] Source loading failed, unblocking:', err)
+              this.updateActiveClips()
+            })
+        } else {
+          // Sources already loaded, proceed immediately
+          this.updateActiveClips()
+
+          // If playing, resume playback on the newly active clips
+          if (this.state.isPlaying) {
+            const resumePromises: Promise<boolean>[] = []
+            for (const clip of this.state.activeClips) {
+              const source = this.sources.get(clip.intermediatePath)
+              if (source && source.isLoaded) {
+                // Seek to correct position in source video
+                const clipElapsed = this.state.currentTime - clip.startTime
+                const sourceTime = clip.trimIn + clipElapsed
+                source.element.currentTime = sourceTime
+
+                // Resume playback with retry logic
+                resumePromises.push(
+                  this.playVideoWithRetry(source.element, clip.id, 'gap-resume')
+                )
+              }
+            }
+
+            // Fire off all resume attempts without blocking the render loop
+            Promise.all(resumePromises).then(() => {
+              console.log('[Playback] Gap jump complete:', {
+                newTime: this.state.currentTime.toFixed(2),
+                activeClips: this.state.activeClips.length
+              })
+            })
+          }
+        }
+      }
+      return
+    } else {
+      // We have active clips - reset stuck transition tracker
+      this.noClipsStartTime = 0
+    }
+
+    // Periodic sync correction: use video times to verify we're not drifting
+    // Check every 5 frames (~12 times per second) for tighter sync control
+    if (this.frameCount % 5 === 0) {
+      for (const clip of this.state.activeClips) {
+        const source = this.sources.get(clip.intermediatePath)
+        if (!source || !source.isLoaded) continue
+
+        const videoTime = source.element.currentTime
+        const clipElapsed = videoTime - clip.trimIn
+        const globalTime = clip.startTime + clipElapsed
+
+        // If we're drifting more than 0.1s from video time, sync up (was 0.2s)
+        const drift = Math.abs(globalTime - this.state.currentTime)
+        if (drift > 0.1) {
+          console.log('[Playback] Sync correction applied:', {
+            drift: drift.toFixed(3),
+            from: this.state.currentTime.toFixed(2),
+            to: globalTime.toFixed(2),
+            clipId: clip.id
+          })
+          this.state.currentTime = Math.min(globalTime, this.state.duration)
+          break // Only correct once per check
+        }
+      }
+    }
   }
 
   /**
    * Update active clips based on current time
+   * Only includes clips whose video sources are loaded AND have metadata (readyState >= 1)
+   * Rendering will wait for readyState >= 2 before drawing frames
    */
   private updateActiveClips(): void {
+    // Don't update active clips while sources are being loaded
+    // This prevents race conditions during gap jumps
+    if (this.isLoadingSources) {
+      return
+    }
+
     const previousClipIds = this.state.activeClips.map((c) => c.id)
     const newActiveClips: CompositorClip[] = []
 
     for (const track of this.tracks) {
       for (const clip of track.clips) {
-        // Calculate effective duration accounting for trim
-        const effectiveDuration = clip.duration - clip.trimIn - clip.trimOut
-        const clipEnd = clip.startTime + effectiveDuration
-        if (this.state.currentTime >= clip.startTime && this.state.currentTime < clipEnd) {
-          newActiveClips.push(clip)
+        // Note: clip.duration is already the effective duration (after trim applied)
+        const clipEnd = clip.startTime + clip.duration
+
+        // Epsilon-based boundary check to prevent floating-point overlap at split points
+        // Use >= for start (inclusive) and < for end (exclusive) with epsilon buffer
+        // Single epsilon (1ms) is sufficient - double epsilon was causing premature clip deactivation
+        const isInTimeRange =
+          this.state.currentTime >= clip.startTime - VideoCompositor.TIME_EPSILON &&
+          this.state.currentTime < clipEnd - VideoCompositor.TIME_EPSILON
+
+        if (isInTimeRange) {
+          // Verify source is loaded AND has metadata before marking clip as active
+          const source = this.sources.get(clip.intermediatePath)
+          if (source && source.isLoaded) {
+            // Check readyState: 1 = HAVE_METADATA (basic info ready, allows early activation)
+            // Rendering will wait for readyState >= 2 (HAVE_CURRENT_DATA) before drawing
+            if (source.element.readyState >= 1) {
+              newActiveClips.push(clip)
+            } else {
+              console.warn('[Playback] Clip source not ready yet:', {
+                clipId: clip.id,
+                readyState: source.element.readyState,
+                networkState: source.element.networkState
+              })
+            }
+          } else {
+            console.warn('[Playback] Clip source not loaded:', {
+              clipId: clip.id,
+              hasSource: !!source,
+              isLoaded: source?.isLoaded
+            })
+          }
         }
       }
     }
@@ -623,38 +1059,69 @@ export class VideoCompositor {
       previousClipIds.some((id, i) => id !== newClipIds[i])
 
     if (clipsChanged) {
-      console.log('[VideoCompositor] Active clips changed', {
-        previous: previousClipIds,
-        new: newClipIds,
-        time: this.state.currentTime
-      })
+      // Clear canvas immediately to prevent stale frames during transition
+      this.ctx.fillStyle = '#000000'
+      this.ctx.fillRect(0, 0, this.width, this.height)
 
       this.state.activeClips = newActiveClips
+
+      // Reset lastRenderedTime for newly activated clips to ensure fresh render
+      for (const clip of newActiveClips) {
+        const source = this.sources.get(clip.intermediatePath)
+        if (source && !previousClipIds.includes(clip.id)) {
+          source.lastRenderedTime = -1
+        }
+      }
+
+      this.isTransitioning = true
+      this.lastTransitionTime = this.state.currentTime
+
+      console.log('[Playback] Clip transition detected:', {
+        previousClips: previousClipIds,
+        newClips: newClipIds,
+        currentTime: this.state.currentTime.toFixed(2)
+      })
+
       this.emit({ type: 'clipchange', clipIds: newClipIds, currentTime: this.state.currentTime })
 
       // Start playing new clips if in playback mode
       if (this.state.isPlaying) {
+        const transitionPromises: Promise<boolean>[] = []
         for (const clip of newActiveClips) {
           const source = this.sources.get(clip.intermediatePath)
           if (source && source.isLoaded) {
             const clipElapsed = this.state.currentTime - clip.startTime
             const sourceTime = clip.trimIn + clipElapsed
             source.element.currentTime = sourceTime
-            source.element.play().catch((err) => {
-              console.error('[VideoCompositor] Failed to play clip', clip.id, err)
-            })
+            transitionPromises.push(
+              this.playVideoWithRetry(source.element, clip.id, 'clip-transition')
+            )
           }
         }
+
+        // Wait for all transitions to complete, then verify time consistency
+        Promise.all(transitionPromises).then(() => {
+          this.isTransitioning = false
+          // Verify all videos are at correct time after transition
+          this.verifyTimeConsistency()
+          console.log('[Playback] Clip transition complete, time verified')
+        })
+      } else {
+        this.isTransitioning = false
       }
     }
   }
 
   /**
    * Preload upcoming clips to reduce transition lag
-   * Pre-seeks video elements for clips starting within 0.5 seconds
+   * Pre-seeks video elements for clips starting within 3 seconds
+   * Pre-buffers clips within 1.0 seconds and verifies readyState
+   * Pre-plays clips starting within 0.2 seconds for seamless transitions
    */
   private preloadUpcomingClips(): void {
-    const PRELOAD_WINDOW = 0.5 // Pre-seek clips starting within 0.5 seconds
+    const PRELOAD_WINDOW = 3.0 // Pre-seek clips starting within 3 seconds
+    const PREBUFFER_WINDOW = 1.0 // Verify readyState for clips within 1.0s
+    const PREPLAY_WINDOW = 0.2 // Start playing clips within 0.2 seconds
 
     for (const track of this.tracks) {
       for (const clip of track.clips) {
@@ -670,7 +1137,29 @@ export class VideoCompositor {
             // Only seek if we're not already at the right position
             if (Math.abs(source.element.currentTime - targetTime) > 0.1) {
               source.element.currentTime = targetTime
-              console.log('[VideoCompositor] Preloaded clip', clip.id, 'at', targetTime, 's')
+            }
+
+            // If clip starts soon (within 0.5s), verify readyState
+            if (timeUntilClipStarts <= PREBUFFER_WINDOW) {
+              if (source.element.readyState < 2) {
+                console.warn('[Playback] Upcoming clip not ready:', {
+                  clipId: clip.id,
+                  startsIn: timeUntilClipStarts.toFixed(2),
+                  readyState: source.element.readyState,
+                  networkState: source.element.networkState
+                })
+              }
+            }
+
+            // If clip starts very soon (within 0.2s), pre-play it for seamless transition
+            if (timeUntilClipStarts <= PREPLAY_WINDOW && source.element.paused) {
+              // Only pre-play if video is ready
+              if (source.element.readyState >= 2) {
+                this.playVideoWithRetry(source.element, clip.id, 'preload').catch(() => {
+                  // Pre-play failed - will try again on actual transition
+                  console.warn('[Playback] Preload play failed for clip:', clip.id)
+                })
+              }
             }
           }
         }
@@ -707,9 +1196,8 @@ export class VideoCompositor {
 
     for (const track of this.tracks) {
       for (const clip of track.clips) {
-        // Calculate effective duration accounting for trim
-        const effectiveDuration = clip.duration - clip.trimIn - clip.trimOut
-        const clipEnd = clip.startTime + effectiveDuration
+        // Note: clip.duration is already the effective duration (after trim applied)
+        const clipEnd = clip.startTime + clip.duration
         // Include if clip overlaps with [time, preloadEnd]
         // Use intermediate path for playback (H.264 Intra optimized for editing)
         if (clip.startTime < preloadEnd && clipEnd > time) {
@@ -726,8 +1214,6 @@ export class VideoCompositor {
    */
   private async loadVideoSource(filePath: string): Promise<void> {
     if (this.sources.has(filePath)) return
-
-    console.log('[VideoCompositor] Loading source:', filePath)
 
     // Check pool limit
     if (this.sources.size >= this.maxVideoElements) {
@@ -746,7 +1232,8 @@ export class VideoCompositor {
       element: video,
       isLoaded: false,
       duration: 0,
-      lastAccessed: Date.now()
+      lastAccessed: Date.now(),
+      lastRenderedTime: -1 // Initialize to -1 (no frame rendered yet)
     }
 
     this.sources.set(filePath, source)
@@ -756,7 +1243,6 @@ export class VideoCompositor {
       const onLoadedMetadata = (): void => {
         source.isLoaded = true
         source.duration = video.duration
-        console.log('[VideoCompositor] Source loaded:', filePath, 'duration:', video.duration)
 
         // Connect to AudioMixer for per-track gain control
         const trackIndex = this.getTrackIndexForSource(filePath)
@@ -767,8 +1253,7 @@ export class VideoCompositor {
         resolve()
       }
 
-      const onError = (err: Event): void => {
-        console.error('[VideoCompositor] Source load error:', filePath, err)
+      const onError = (): void => {
         video.removeEventListener('loadedmetadata', onLoadedMetadata)
         video.removeEventListener('error', onError)
         this.sources.delete(filePath)
@@ -793,8 +1278,6 @@ export class VideoCompositor {
   private unloadVideoSource(filePath: string): void {
     const source = this.sources.get(filePath)
     if (!source) return
-
-    console.log('[VideoCompositor] Unloading source:', filePath)
 
     // Disconnect from AudioMixer
     this.audioMixer.disconnectVideo(source.element)
@@ -826,7 +1309,6 @@ export class VideoCompositor {
     }
 
     if (oldestPath) {
-      console.log('[VideoCompositor] Evicting LRU source:', oldestPath)
       this.unloadVideoSource(oldestPath)
     }
   }
@@ -839,9 +1321,8 @@ export class VideoCompositor {
 
     for (const track of this.tracks) {
       for (const clip of track.clips) {
-        // Calculate effective duration accounting for trim
-        const effectiveDuration = clip.duration - clip.trimIn - clip.trimOut
-        const clipEnd = clip.startTime + effectiveDuration
+        // Note: clip.duration is already the effective duration (after trim applied)
+        const clipEnd = clip.startTime + clip.duration
         if (clipEnd > maxEnd) {
           maxEnd = clipEnd
         }

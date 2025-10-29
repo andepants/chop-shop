@@ -29,6 +29,10 @@ export interface PlaybackState {
   isMuted: boolean
   /** IDs of clips currently being rendered */
   activeClipIds: string[]
+  /** Whether video sources are currently loading */
+  isLoadingSources: boolean
+  /** Progress of source loading (loaded/total) */
+  sourcesLoadProgress: { loaded: number; total: number }
 
   // Actions
   /** Start playback */
@@ -49,6 +53,8 @@ export interface PlaybackState {
   initializeCompositor: (canvas: HTMLCanvasElement, width: number, height: number) => void
   /** Load timeline into compositor */
   loadTimeline: () => Promise<void>
+  /** Resize the compositor canvas */
+  resize: (width: number, height: number) => void
   /** Internal: Update current time from compositor */
   _setCurrentTime: (time: number) => void
   /** Internal: Update playing state from compositor */
@@ -57,6 +63,10 @@ export interface PlaybackState {
   _setDuration: (duration: number) => void
   /** Internal: Update active clips from compositor */
   _setActiveClips: (clipIds: string[]) => void
+  /** Internal: Update sources loading state */
+  _setIsLoadingSources: (isLoading: boolean) => void
+  /** Internal: Update sources load progress */
+  _setSourcesLoadProgress: (loaded: number, total: number) => void
 }
 
 /**
@@ -73,12 +83,19 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => {
       get()._setIsPlaying(isPlaying)
     },
     onPlaybackEnd: () => {
-      console.log('[PlaybackStore] Playback ended')
       // Keep playhead at end (per user requirement)
       get()._setIsPlaying(false)
     },
     onActiveClipsChange: (clipIds: string[]) => {
       get()._setActiveClips(clipIds)
+    },
+    onSourcesLoading: (loaded: number, total: number) => {
+      get()._setIsLoadingSources(true)
+      get()._setSourcesLoadProgress(loaded, total)
+    },
+    onSourcesReady: (loaded: number, total: number) => {
+      get()._setIsLoadingSources(false)
+      get()._setSourcesLoadProgress(loaded, total)
     }
   })
 
@@ -90,6 +107,8 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => {
     volume: 100,
     isMuted: false,
     activeClipIds: [],
+    isLoadingSources: false,
+    sourcesLoadProgress: { loaded: 0, total: 0 },
 
     // Actions
 
@@ -98,7 +117,6 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => {
      * Should be called once by PreviewPlayer on mount
      */
     initializeCompositor: (canvas: HTMLCanvasElement, width: number, height: number) => {
-      console.log('[PlaybackStore] Initializing compositor', { width, height })
       playbackOrchestrator.initializeCompositor(canvas, width, height)
     },
 
@@ -107,8 +125,6 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => {
      * Called when timeline changes or on initial load
      */
     loadTimeline: async () => {
-      console.log('[PlaybackStore] Loading timeline into compositor')
-
       const timelineState = useTimelineStore.getState()
 
       // Pause if playing before reloading (per user requirement)
@@ -122,10 +138,20 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => {
         // Update duration
         const duration = playbackOrchestrator.getDuration()
         set({ duration })
-
-        console.log('[PlaybackStore] Timeline loaded, duration:', duration)
       } catch (error) {
-        console.error('[PlaybackStore] Failed to load timeline:', error)
+        // Failed to load timeline
+      }
+    },
+
+    /**
+     * Resize the compositor canvas
+     * Updates canvas and compositor dimensions for proper rendering
+     */
+    resize: (width: number, height: number) => {
+      try {
+        playbackOrchestrator.resize(width, height)
+      } catch (error) {
+        // Compositor not initialized yet, ignore
       }
     },
 
@@ -133,13 +159,11 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => {
      * Start video playback
      */
     play: async () => {
-      console.log('[PlaybackStore] Play')
-
       try {
         await playbackOrchestrator.play()
         // State will be updated via callback
       } catch (error) {
-        console.error('[PlaybackStore] Play failed:', error)
+        // Play failed
       }
     },
 
@@ -147,7 +171,6 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => {
      * Pause video playback
      */
     pause: () => {
-      console.log('[PlaybackStore] Pause')
       playbackOrchestrator.pause()
       // State will be updated via callback
     },
@@ -156,8 +179,6 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => {
      * Seek to a specific time on the global timeline
      */
     seek: async (time: number) => {
-      console.log('[PlaybackStore] Seek to', time)
-
       const { duration } = get()
       const clampedTime = Math.max(0, Math.min(time, duration))
 
@@ -165,7 +186,7 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => {
         await playbackOrchestrator.seek(clampedTime)
         // State will be updated via callback
       } catch (error) {
-        console.error('[PlaybackStore] Seek failed:', error)
+        // Seek failed
       }
     },
 
@@ -260,6 +281,22 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => {
      */
     _setActiveClips: (clipIds: string[]) => {
       set({ activeClipIds: clipIds })
+    },
+
+    /**
+     * Internal: Update sources loading state
+     * Called by orchestrator callback
+     */
+    _setIsLoadingSources: (isLoading: boolean) => {
+      set({ isLoadingSources: isLoading })
+    },
+
+    /**
+     * Internal: Update sources load progress
+     * Called by orchestrator callback
+     */
+    _setSourcesLoadProgress: (loaded: number, total: number) => {
+      set({ sourcesLoadProgress: { loaded, total } })
     }
   }
 })

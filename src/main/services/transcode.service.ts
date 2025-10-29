@@ -12,9 +12,8 @@ import { join, basename } from 'path'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 import { randomUUID } from 'crypto'
-import ffmpegStatic from 'ffmpeg-static'
-import ffprobeStatic from 'ffprobe-static'
 import { app } from 'electron'
+import { getFfmpegPath, getFfprobePath } from '../utils/binaryPaths'
 
 const execAsync = promisify(exec)
 
@@ -70,7 +69,7 @@ export function getIntermediatePath(sourceFile: string): string {
  * @returns Promise resolving to true if VFR detected, false if CFR
  */
 export async function detectVFR(filePath: string): Promise<boolean> {
-  const ffprobePath = ffprobeStatic.path
+  const ffprobePath = getFfprobePath()
 
   try {
     // Get frame rate info from ffprobe
@@ -139,7 +138,7 @@ function parseTranscodeProgress(stderr: string, totalDuration: number): number |
  * @returns Duration in seconds
  */
 async function getVideoDuration(filePath: string): Promise<number> {
-  const ffprobePath = ffprobeStatic.path
+  const ffprobePath = getFfprobePath()
 
   try {
     const command = `"${ffprobePath}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`
@@ -165,7 +164,9 @@ export async function transcodeToProRes(
   outputPath: string,
   progressCallback?: TranscodeProgressCallback
 ): Promise<void> {
-  if (!ffmpegStatic) {
+  const ffmpegPath = getFfmpegPath()
+
+  if (!ffmpegPath) {
     throw new Error('FFmpeg binary not found')
   }
 
@@ -190,12 +191,12 @@ export async function transcodeToProRes(
   const args = [
     '-i', sourcePath,           // Input file
     '-c:v', 'libx264',          // H.264 video codec
-    '-preset', 'ultrafast',     // Fast encoding (editing workflow priority)
-    '-crf', '15',               // High quality (lower = better, 0-51 scale)
+    '-preset', 'medium',        // Balanced encoding (better compression than ultrafast)
+    '-crf', '18',               // High quality (lower = better, 0-51 scale) - optimized for file size
     '-g', '1',                  // GOP size 1 (all I-frames for frame-accurate seeking)
     '-pix_fmt', 'yuv420p',      // 8-bit 4:2:0 (Chromium compatible)
     '-c:a', 'aac',              // AAC audio (widely supported)
-    '-b:a', '256k',             // High quality audio
+    '-b:a', '192k',             // High quality audio (reduced from 256k for better efficiency)
     '-vsync', 'cfr',            // Force constant frame rate
     '-movflags', '+faststart',  // Enable fast start for web playback
     '-y',                       // Overwrite output file
@@ -203,9 +204,9 @@ export async function transcodeToProRes(
   ]
 
   return new Promise((resolve, reject) => {
-    console.log('[Transcode] FFmpeg command:', ffmpegStatic, args.join(' '))
+    console.log('[Transcode] FFmpeg command:', ffmpegPath, args.join(' '))
 
-    const ffmpegProcess = spawn(ffmpegStatic as string, args)
+    const ffmpegProcess = spawn(ffmpegPath, args)
     let stderrBuffer = ''
 
     // Capture stderr for progress and errors

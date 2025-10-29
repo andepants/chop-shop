@@ -50,6 +50,7 @@ ipcMain.handle(
         size: metadata.size,
         thumbnail,
         intermediatePath: metadata.intermediatePath || undefined,
+        hasAudio: metadata.hasAudio, // Pass through audio stream detection for export
         createdAt: Date.now()
       }
 

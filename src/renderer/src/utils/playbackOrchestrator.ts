@@ -79,9 +79,11 @@ export class PlaybackOrchestrator {
   private onPlayStateChange?: (isPlaying: boolean) => void
   private onPlaybackEnd?: () => void
   private onActiveClipsChange?: (clipIds: string[]) => void
+  private onSourcesLoading?: (loaded: number, total: number) => void
+  private onSourcesReady?: (loaded: number, total: number) => void
 
   constructor() {
-    console.log('[PlaybackOrchestrator] Initialized')
+    // Initialize playback orchestrator
   }
 
   /**
@@ -89,7 +91,6 @@ export class PlaybackOrchestrator {
    */
   initializeCompositor(canvas: HTMLCanvasElement, width: number, height: number): void {
     if (this.compositor) {
-      console.warn('[PlaybackOrchestrator] Compositor already initialized, disposing old instance')
       this.compositor.dispose()
     }
 
@@ -127,7 +128,17 @@ export class PlaybackOrchestrator {
       }
     })
 
-    console.log('[PlaybackOrchestrator] Compositor initialized')
+    this.compositor.on('sourcesLoading', (event) => {
+      if (event.loaded !== undefined && event.total !== undefined) {
+        this.onSourcesLoading?.(event.loaded, event.total)
+      }
+    })
+
+    this.compositor.on('sourcesReady', (event) => {
+      if (event.loaded !== undefined && event.total !== undefined) {
+        this.onSourcesReady?.(event.loaded, event.total)
+      }
+    })
   }
 
   /**
@@ -220,6 +231,19 @@ export class PlaybackOrchestrator {
   }
 
   /**
+   * Resize the compositor canvas
+   * @param width New canvas width
+   * @param height New canvas height
+   */
+  resize(width: number, height: number): void {
+    if (!this.compositor) {
+      throw new Error('Compositor not initialized')
+    }
+
+    this.compositor.resize(width, height)
+  }
+
+  /**
    * Set callback functions
    */
   setCallbacks(callbacks: {
@@ -227,11 +251,15 @@ export class PlaybackOrchestrator {
     onPlayStateChange?: (isPlaying: boolean) => void
     onPlaybackEnd?: () => void
     onActiveClipsChange?: (clipIds: string[]) => void
+    onSourcesLoading?: (loaded: number, total: number) => void
+    onSourcesReady?: (loaded: number, total: number) => void
   }): void {
     this.onTimeUpdate = callbacks.onTimeUpdate
     this.onPlayStateChange = callbacks.onPlayStateChange
     this.onPlaybackEnd = callbacks.onPlaybackEnd
     this.onActiveClipsChange = callbacks.onActiveClipsChange
+    this.onSourcesLoading = callbacks.onSourcesLoading
+    this.onSourcesReady = callbacks.onSourcesReady
   }
 
   /**
@@ -265,8 +293,6 @@ export class PlaybackOrchestrator {
     this.onPlayStateChange = undefined
     this.onPlaybackEnd = undefined
     this.onActiveClipsChange = undefined
-
-    console.log('[PlaybackOrchestrator] Disposed')
   }
 }
 

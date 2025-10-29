@@ -81,7 +81,6 @@ interface SnapPoint {
 export function Timeline(): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const dragRafRef = useRef<number | null>(null)
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [mousePosition, setMousePosition] = useState<{ x: number; y: number } | null>(null)
   const [snapPoints, setSnapPoints] = useState<SnapPoint[]>([])
   const [dragPreview, setDragPreview] = useState<{ position: number; clipId: string; duration: number } | null>(null)
@@ -106,13 +105,11 @@ export function Timeline(): React.JSX.Element {
     zoomIn,
     zoomOut,
     setZoomLevel,
-    fitToTimeline
+    fitToTimeline,
+    undo,
+    redo
   } = useTimelineStore()
 
-  // DEBUG: Track pixelsPerSecond changes
-  useEffect(() => {
-    console.log('[Timeline] pixelsPerSecond updated:', pixelsPerSecond, 'zoomLevel:', useTimelineStore.getState().zoomLevel)
-  }, [pixelsPerSecond])
 
   // Note: Auto-zoom removed in Story 4.2 - users now control zoom manually
   // Use "Fit" button (backslash key) to fit timeline to viewport
@@ -124,17 +121,11 @@ export function Timeline(): React.JSX.Element {
   function handleDragOver(e: React.DragEvent): void {
     e.preventDefault()
 
-    // Check if this is a clip reorder drag (has clipIndex) or library drag (has fileId)
+    // Check if this is a clip move (position-based drag) or library drag (has fileId)
     // Note: dataTransfer.types lowercases the keys
-    const isClipReorder = e.dataTransfer.types.includes('clipindex')
     const isClipMove = e.dataTransfer.types.includes('clipid')
 
-    if (isClipReorder) {
-      // Clip reorder: calculate drop position
-      e.dataTransfer.dropEffect = 'move'
-      const dropIndex = calculateDropIndex(e)
-      setDragOverIndex(dropIndex)
-    } else if (isClipMove) {
+    if (isClipMove) {
       // Clip move (position-based drag): show snap guides and preview
       e.dataTransfer.dropEffect = 'move'
 
@@ -177,14 +168,13 @@ export function Timeline(): React.JSX.Element {
     } else {
       // Library drag: use copy effect
       e.dataTransfer.dropEffect = 'copy'
-      setDragOverIndex(null)
       setSnapPoints([])
       setDragPreview(null)
     }
   }
 
   /**
-   * Handle drag leave - clear drop indicator, snap guides, and preview
+   * Handle drag leave - clear snap guides and preview
    */
   function handleDragLeave(): void {
     // Cancel any pending animation frame
@@ -193,36 +183,8 @@ export function Timeline(): React.JSX.Element {
       dragRafRef.current = null
     }
 
-    setDragOverIndex(null)
     setSnapPoints([])
     setDragPreview(null)
-  }
-
-  /**
-   * Calculate drop index based on mouse position
-   */
-  function calculateDropIndex(e: React.DragEvent): number {
-    if (!containerRef.current) return 0
-
-    const rect = containerRef.current.getBoundingClientRect()
-    const relativeX = e.clientX - rect.left
-    const clickedTime = relativeX / pixelsPerSecond
-
-    const clips = tracks[0]?.clips || []
-    if (clips.length === 0) return 0
-
-    // Find insertion point based on clicked time
-    for (let i = 0; i < clips.length; i++) {
-      const clip = clips[i]
-      const clipMidpoint = clip.startTime + (clip.duration - clip.trimIn - clip.trimOut) / 2
-
-      if (clickedTime < clipMidpoint) {
-        return i
-      }
-    }
-
-    // Default to end of timeline
-    return clips.length
   }
 
   /**
@@ -270,7 +232,6 @@ export function Timeline(): React.JSX.Element {
       const dropPosition = relativeX / pixelsPerSecond
 
       // Clear drag state
-      setDragOverIndex(null)
       setSnapPoints([])
       setDragPreview(null)
 
@@ -280,7 +241,6 @@ export function Timeline(): React.JSX.Element {
     }
 
     // Clear drag state for library drops
-    setDragOverIndex(null)
     setSnapPoints([])
     setDragPreview(null)
 
@@ -299,13 +259,16 @@ export function Timeline(): React.JSX.Element {
     // Add clip to specific track (AC #2)
     addClipToTrack(
       {
+        name: file.name,
         sourceFile: file.path,
         intermediatePath: file.intermediatePath || file.path, // Use intermediate if available, fallback to source
         startTime: nextPosition,
         duration: file.duration,
         trimIn: 0,
         trimOut: 0,
-        thumbnail: file.thumbnail
+        thumbnail: file.thumbnail,
+        hasAudio: file.hasAudio, // Pass through audio stream detection for export
+        resolution: file.resolution // Pass through resolution for H.264 level calculation
       },
       trackId
     )
@@ -348,14 +311,12 @@ export function Timeline(): React.JSX.Element {
 
       if (splitTime > clipStart + EDGE_MARGIN && splitTime < clipEnd - EDGE_MARGIN) {
         splitClip(clipId, splitTime)
-        console.log(`[Timeline] Split clip ${clipId} at ${splitTime.toFixed(2)}s (mouse position)`)
       } else {
         // Show user feedback when split fails (too close to edges)
         useUIStore.getState().showError(
           'Cannot split too close to the edge of a clip.',
           'Cannot Split Clip'
         )
-        console.warn('[Timeline] Split position too close to clip edge')
       }
     } else {
       // Select or Trim tool: Handle clip selection with modifier keys
@@ -409,9 +370,7 @@ export function Timeline(): React.JSX.Element {
       }
 
       // DEBUG: Log all keyboard events with Cmd/Ctrl modifier
-      if (e.metaKey || e.ctrlKey) {
-        console.log(`[Keyboard] Cmd/Ctrl pressed - key="${e.key}" code="${e.code}" metaKey=${e.metaKey} ctrlKey=${e.ctrlKey} shiftKey=${e.shiftKey} altKey=${e.altKey}`)
-      }
+      // Keyboard shortcuts active
 
       // Tool selection shortcuts (V/C)
       const { setTool } = useToolStore.getState()
@@ -423,21 +382,28 @@ export function Timeline(): React.JSX.Element {
         return
       }
 
+      // Undo/Redo shortcuts (Adobe Premiere Pro style)
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z') {
+        e.preventDefault()
+        redo()
+        return
+      } else if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+        e.preventDefault()
+        undo()
+        return
+      }
+
       // Zoom shortcuts (Story 4.2)
       if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+' || e.code === 'Equal')) {
-        console.log('[Keyboard] ZOOM IN triggered')
         zoomIn()
         return
       } else if ((e.metaKey || e.ctrlKey) && (e.key === '-' || e.code === 'Minus')) {
-        console.log('[Keyboard] ZOOM OUT triggered')
         zoomOut()
         return
       } else if ((e.metaKey || e.ctrlKey) && (e.key === '0' || e.code === 'Digit0')) {
-        console.log('[Keyboard] ZOOM RESET triggered')
         setZoomLevel(1.0) // Reset to 100%
         return
       } else if (e.key === '\\' || e.code === 'Backslash') {
-        console.log('[Keyboard] FIT TIMELINE triggered')
         fitToTimeline()
         return
       }
@@ -448,20 +414,15 @@ export function Timeline(): React.JSX.Element {
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedClipIds.length > 0) {
         e.preventDefault() // Prevent browser back navigation on Backspace
 
-        // Shift+Delete: Ripple delete (close gaps)
-        // Normal Delete: Leave gaps (Premiere Pro default)
-        if (e.shiftKey) {
-          rippleDeleteClips(selectedClipIds)
-        } else {
-          // Delete all selected clips one by one (leaves gaps)
-          selectedClipIds.forEach((clipId) => removeClip(clipId))
-        }
+        // Premiere Pro style: Ripple delete (atomic multi-clip removal with gap closing)
+        // This prevents the stale position bug that occurs with iterative delete
+        rippleDeleteClips(selectedClipIds)
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedClipIds, clearSelection, removeClip, rippleDeleteClips, zoomIn, zoomOut, setZoomLevel, fitToTimeline])
+  }, [selectedClipIds, clearSelection, removeClip, rippleDeleteClips, zoomIn, zoomOut, setZoomLevel, fitToTimeline, undo, redo])
 
   /**
    * Track mouse position on timeline for cursor-aware zoom
@@ -639,26 +600,6 @@ export function Timeline(): React.JSX.Element {
               {formatTimecode(dragPreview.position)}
             </div>
           </div>
-        )}
-
-        {/* Drop indicator - shows where clip will be inserted during drag */}
-        {dragOverIndex !== null && tracks[0]?.clips && (
-          <div
-            className="absolute h-full w-1 pointer-events-none z-10"
-            style={{
-              left: `${
-                dragOverIndex === 0
-                  ? 0
-                  : (tracks[0].clips[dragOverIndex - 1]?.startTime || 0) * pixelsPerSecond +
-                    (tracks[0].clips[dragOverIndex - 1]?.duration -
-                      tracks[0].clips[dragOverIndex - 1]?.trimIn -
-                      tracks[0].clips[dragOverIndex - 1]?.trimOut || 0) *
-                      pixelsPerSecond
-              }px`,
-              backgroundColor: 'var(--accent)',
-              opacity: 0.8
-            }}
-          />
         )}
 
         {/* Tracks - AC #1, AC #2 (multi-track) */}

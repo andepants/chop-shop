@@ -1,10 +1,10 @@
 /**
  * MediaLibrary Component
  * Container for displaying all imported media files in a 2-column grid
- * Adobe Premiere Pro-inspired design with full-panel drag-drop and sorting
+ * Adobe Premiere Pro-inspired design with refined colors and modern styling
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMediaStore } from '../../store/mediaStore'
 import { useUIStore } from '../../store/uiStore'
 import { MediaItem } from './MediaItem'
@@ -33,6 +33,7 @@ export function MediaLibrary(): React.JSX.Element {
   const files = useMediaStore((state) => state.files)
   const selectedFileId = useMediaStore((state) => state.selectedFileId)
   const selectFile = useMediaStore((state) => state.selectFile)
+  const removeFile = useMediaStore((state) => state.removeFile)
   const addFile = useMediaStore((state) => state.addFile)
   const isImporting = useMediaStore((state) => state.isImporting)
   const setIsImporting = useMediaStore((state) => state.setIsImporting)
@@ -54,19 +55,14 @@ export function MediaLibrary(): React.JSX.Element {
    */
   async function importFile(file: File): Promise<void> {
     try {
-      console.log('[Renderer] Importing file:', file.name)
-
       const response = await window.api.importFileFromObject(file)
 
       if (response.success && response.data) {
         addFile(response.data)
-        console.log('[Renderer] File imported successfully:', response.data.name)
       } else {
         throw new Error(response.error || 'Unknown error occurred')
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error('[Renderer] Import failed:', errorMessage)
       throw error
     }
   }
@@ -162,6 +158,23 @@ export function MediaLibrary(): React.JSX.Element {
     }
   }
 
+  /**
+   * Handle keyboard shortcuts for media library
+   * Delete/Backspace: Delete selected media file
+   */
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent): void {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedFileId) {
+        e.preventDefault() // Prevent browser back navigation on Backspace
+        removeFile(selectedFileId)
+        selectFile(null)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedFileId, removeFile, selectFile])
+
   // Show empty state with drag-drop capability
   if (files.length === 0) {
     return (
@@ -177,7 +190,7 @@ export function MediaLibrary(): React.JSX.Element {
         {isImporting ? (
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500 mx-auto mb-2"></div>
-            <p className="text-sm text-zinc-400">Importing...</p>
+            <p className="text-sm text-slate-400">Importing...</p>
           </div>
         ) : (
           <EmptyState />
@@ -190,26 +203,19 @@ export function MediaLibrary(): React.JSX.Element {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Sorting Header */}
-      <div className="px-3 py-2 border-b border-zinc-700 bg-zinc-800/50">
-        <div className="flex items-center gap-2">
-          <svg
-            className="w-4 h-4 text-zinc-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"
-            />
-          </svg>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="flex-1 bg-zinc-700 text-zinc-100 text-xs rounded px-2 py-1 border border-zinc-600 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+      {/* Sorting Header - Clean and Simple */}
+      <div className="px-3 py-2.5 border-b border-slate-700/50 bg-slate-900/50">
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as SortOption)}
+            className={cn(
+            'w-full bg-slate-800 text-slate-100 text-xs rounded-md px-2.5 py-1.5',
+            'border border-slate-700/50',
+            'focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20',
+            'transition-all duration-150',
+            'hover:border-slate-600',
+            'shadow-sm'
+          )}
           >
             <option value="name-asc">Name (A→Z)</option>
             <option value="name-desc">Name (Z→A)</option>
@@ -219,21 +225,20 @@ export function MediaLibrary(): React.JSX.Element {
             <option value="duration-shortest">Duration (Shortest)</option>
             <option value="size-largest">Size (Largest)</option>
             <option value="size-smallest">Size (Smallest)</option>
-          </select>
-        </div>
+        </select>
       </div>
 
-      {/* Grid Container with Drag-Drop */}
+      {/* Grid Container with Drag-Drop - Increased Gap */}
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={handleBackgroundClick}
         className={cn(
-          'flex-1 overflow-y-auto p-3 scroll-smooth',
-          'scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent',
-          'grid grid-cols-2 gap-3 auto-rows-min content-start',
-          'transition-all',
+          'flex-1 overflow-y-auto p-4 scroll-smooth',
+          'scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent',
+          'grid grid-cols-2 gap-4 auto-rows-min content-start',
+          'transition-all duration-200',
           isDragOver && 'bg-cyan-500/5 ring-2 ring-inset ring-cyan-500',
           isImporting && 'opacity-50 pointer-events-none'
         )}

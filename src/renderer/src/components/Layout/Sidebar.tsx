@@ -1,6 +1,6 @@
 /**
  * Sidebar Component
- * Left sidebar panel for media library
+ * Left sidebar panel for media library with refined Adobe Premiere Pro styling
  */
 
 import { MediaLibrary } from '../MediaLibrary'
@@ -9,7 +9,7 @@ import { useUIStore } from '../../store/uiStore'
 import { Button } from '@/components/ui/button'
 
 /**
- * Sidebar component for displaying media library
+ * Sidebar component with polished design and refined button styling
  */
 export function Sidebar(): React.JSX.Element {
   const isImporting = useMediaStore((state) => state.isImporting)
@@ -35,7 +35,6 @@ export function Sidebar(): React.JSX.Element {
         return // User canceled
       }
 
-      console.log('[Renderer] Importing', filePaths.length, 'files from picker')
       setIsImporting(true)
 
       // Import each file using existing import-file IPC
@@ -61,28 +60,30 @@ export function Sidebar(): React.JSX.Element {
 
       if (successfulImports.length > 0) {
         addFiles(successfulImports)
-        console.log('[Renderer] Successfully imported', successfulImports.length, 'files')
       }
 
       setIsImporting(false)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error('[Renderer] File picker failed:', errorMessage)
       showError(`Failed to open file picker. ${errorMessage}`, 'Error')
       setIsImporting(false)
     }
   }
 
   return (
-    <aside className="w-[280px] flex flex-col pb-16 bg-zinc-800 border-r border-zinc-700">
-      <div className="px-4 py-3 border-b border-zinc-700">
+    <aside className="w-[280px] flex flex-col pb-16 bg-slate-900/95 border-r border-slate-700/50">
+      <div className="px-4 py-3.5 border-b border-slate-700/50 bg-slate-950/50">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-zinc-100">Media</h2>
+          <h2 className="text-base font-semibold text-slate-100 tracking-tight">Media</h2>
           <Button
             onClick={handleImportClick}
             disabled={isImporting}
             size="sm"
-            className={isImporting ? 'bg-zinc-900' : 'bg-cyan-500 hover:bg-cyan-600'}
+            className={
+              isImporting
+                ? 'bg-slate-800 text-slate-400 cursor-not-allowed shadow-sm'
+                : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-md hover:shadow-lg transition-all duration-150'
+            }
           >
             {isImporting ? 'Importing...' : 'Import'}
           </Button>

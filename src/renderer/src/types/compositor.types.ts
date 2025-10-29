@@ -19,6 +19,8 @@ export interface VideoSource {
   duration: number
   /** Last time this source was accessed (for LRU caching) */
   lastAccessed: number
+  /** Last rendered video.currentTime (for frame staleness detection) */
+  lastRenderedTime: number
 }
 
 /**
@@ -112,6 +114,8 @@ export type CompositorEventType =
   | 'clipchange'
   | 'sourceloaded'
   | 'sourceerror'
+  | 'sourcesLoading'
+  | 'sourcesReady'
 
 /**
  * Event data for compositor events
@@ -123,6 +127,10 @@ export interface CompositorEvent {
   error?: Error
   clipIds?: string[]
   sourceFile?: string
+  /** Number of sources loaded (for sourcesLoading/sourcesReady events) */
+  loaded?: number
+  /** Total number of sources to load (for sourcesLoading/sourcesReady events) */
+  total?: number
 }
 
 /**

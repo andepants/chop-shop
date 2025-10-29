@@ -4,7 +4,7 @@
  */
 import { spawn, ChildProcess } from 'child_process'
 import { existsSync, unlinkSync } from 'fs'
-import ffmpegStatic from 'ffmpeg-static'
+import { getFfmpegPath as getBinaryPath } from '../utils/binaryPaths'
 import type { Clip } from '../../renderer/src/components/Timeline/timeline.types'
 
 /**
@@ -43,10 +43,11 @@ export interface ProgressCallback {
  * @returns Path to FFmpeg binary
  */
 export function getFfmpegPath(): string {
-  if (!ffmpegStatic) {
+  const path = getBinaryPath()
+  if (!path) {
     throw new FFmpegError('FFmpeg binary not found', FFmpegErrorCode.FILE_NOT_FOUND)
   }
-  return ffmpegStatic
+  return path
 }
 
 /**
@@ -98,6 +99,43 @@ function parseFFmpegError(stderr: string, exitCode: number): FFmpegError {
   console.error('[FFmpeg] Error output:', stderr)
   console.error('[FFmpeg] Exit code:', exitCode)
 
+  // Check for buffer/memory issues (common with large high-res files)
+  if (
+    stderr.includes('Conversion failed') ||
+    stderr.includes('Encoder buffer') ||
+    stderr.includes('buffer underflow') ||
+    stderr.includes('buffer overflow')
+  ) {
+    return new FFmpegError(
+      'Export failed due to video complexity or file size. Try exporting at lower resolution (1080p or 720p) or splitting timeline into shorter clips.',
+      FFmpegErrorCode.EXECUTION_FAILED
+    )
+  }
+
+  // Check for muxer/concat failures (common with incompatible intermediate files)
+  if (
+    stderr.includes('av_interleaved_write_frame') ||
+    stderr.includes('muxer') ||
+    (stderr.includes('concat') && (stderr.includes('error') || stderr.includes('failed')))
+  ) {
+    return new FFmpegError(
+      'Export failed during video concatenation. This may be due to incompatible intermediate files or codec issues. Try re-importing your source videos or exporting at lower resolution.',
+      FFmpegErrorCode.EXECUTION_FAILED
+    )
+  }
+
+  // Check for timestamp/DTS issues (common with H.264 Intra concat)
+  if (
+    stderr.includes('non-monotonous DTS') ||
+    stderr.includes('Timestamps are unset') ||
+    stderr.includes('DTS out of order')
+  ) {
+    return new FFmpegError(
+      'Export failed due to timestamp discontinuities. This can occur with certain video formats. Try re-importing your source videos or contact support.',
+      FFmpegErrorCode.EXECUTION_FAILED
+    )
+  }
+
   if (stderr.includes('Invalid data found') || stderr.includes('could not find codec')) {
     return new FFmpegError('Unsupported video format', FFmpegErrorCode.UNSUPPORTED_FORMAT)
   }
@@ -124,12 +162,15 @@ function parseFFmpegError(stderr: string, exitCode: number): FFmpegError {
  * @param args - FFmpeg command arguments
  * @param onProgress - Optional progress callback
  * @param totalDuration - Optional total duration for progress calculation
+ * @param clips - Optional clips array for detailed error logging
  * @returns Promise that resolves on success
  */
 export function executeFFmpegCommand(
   args: string[],
   onProgress?: ProgressCallback,
-  totalDuration?: number
+  totalDuration?: number,
+  clips?: Clip[],
+  timeoutMs?: number
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const ffmpegPath = getFfmpegPath()
@@ -137,6 +178,24 @@ export function executeFFmpegCommand(
 
     const ffmpegProcess: ChildProcess = spawn(ffmpegPath, args)
     let stderrBuffer = ''
+    const MAX_STDERR_BUFFER = 5 * 1024 * 1024 // 5MB limit to prevent memory overflow
+    let lastLogTime = 0
+    const LOG_THROTTLE_MS = 500 // Throttle logging to max every 500ms
+
+    // Add timeout if specified
+    let timeoutHandle: NodeJS.Timeout | null = null
+    if (timeoutMs) {
+      timeoutHandle = setTimeout(() => {
+        console.error(`[FFmpeg] ❌ Export timed out after ${timeoutMs / 1000}s`)
+        ffmpegProcess.kill('SIGKILL')
+        reject(
+          new FFmpegError(
+            `Export timed out after ${timeoutMs / 1000}s. Try exporting at lower resolution or splitting into shorter clips.`,
+            FFmpegErrorCode.EXECUTION_FAILED
+          )
+        )
+      }, timeoutMs)
+    }
 
     // Capture stdout (usually empty for FFmpeg)
     ffmpegProcess.stdout?.on('data', (data: Buffer) => {
@@ -147,7 +206,32 @@ export function executeFFmpegCommand(
     // Capture stderr (where FFmpeg outputs progress and errors)
     ffmpegProcess.stderr?.on('data', (data: Buffer) => {
       const output = data.toString()
-      stderrBuffer += output
+
+      // Prevent buffer overflow - only accumulate up to MAX_STDERR_BUFFER
+      if (stderrBuffer.length < MAX_STDERR_BUFFER) {
+        stderrBuffer += output
+      }
+
+      // Throttle console logging to reduce I/O overhead on main thread
+      const now = Date.now()
+      if (now - lastLogTime >= LOG_THROTTLE_MS) {
+        console.log('[FFmpeg] stderr:', output.trim())
+        lastLogTime = now
+      }
+
+      // Detect H.264-specific warnings and errors
+      if (output.includes('non-monotonous DTS') || output.includes('non monotonous DTS')) {
+        console.warn('[FFmpeg] ⚠️  WARNING: Non-monotonous DTS detected - timestamp discontinuity in H.264 stream')
+      }
+      if (output.includes('Invalid data found') || output.includes('invalid data')) {
+        console.error('[FFmpeg] ❌ ERROR: Invalid data found in input stream - possible codec incompatibility')
+      }
+      if (output.includes('Timestamps are unset') || output.includes('timestamp')) {
+        console.warn('[FFmpeg] ⚠️  WARNING: Timestamp issue detected')
+      }
+      if (output.includes('concat') && (output.includes('error') || output.includes('Error'))) {
+        console.error('[FFmpeg] ❌ ERROR: Concatenation error - H.264 Intra streams may have incompatible parameters')
+      }
 
       // Parse progress if callback provided
       if (onProgress) {
@@ -163,10 +247,45 @@ export function executeFFmpegCommand(
 
     // Handle process completion
     ffmpegProcess.on('close', (code: number | null) => {
+      // Clear timeout on completion
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle)
+      }
+
       if (code === 0) {
         console.log('[FFmpeg] Command completed successfully')
         resolve()
       } else {
+        console.error('[FFmpeg] =====================================')
+        console.error('[FFmpeg] ❌ EXPORT FAILED')
+        console.error('[FFmpeg] =====================================')
+        console.error('[FFmpeg] Exit code:', code)
+        console.error('[FFmpeg] FFmpeg version: Static 5.2.0 (FFmpeg 6.0)')
+        console.error('[FFmpeg] --------- Command Arguments ---------')
+        console.error('[FFmpeg] Full command:', ffmpegPath, args.join(' '))
+        console.error('[FFmpeg] --------- Full stderr Buffer ---------')
+        console.error('[FFmpeg] stderr (complete):\n', stderrBuffer)
+
+        // Log detailed clip information if available
+        if (clips && clips.length > 0) {
+          console.error('[FFmpeg] --------- Input Clips Details ---------')
+          clips.forEach((clip, index) => {
+            console.error(`[FFmpeg] Clip ${index + 1}/${clips.length}:`, {
+              id: clip.id,
+              name: clip.name,
+              intermediatePath: clip.intermediatePath,
+              fileExists: existsSync(clip.intermediatePath || ''),
+              trimIn: clip.trimIn,
+              trimOut: clip.trimOut,
+              duration: clip.duration,
+              trimmedDuration: clip.duration - clip.trimIn - clip.trimOut,
+              startTime: clip.startTime
+            })
+          })
+        }
+
+        console.error('[FFmpeg] =====================================')
+
         const error = parseFFmpegError(stderrBuffer, code ?? -1)
         reject(error)
       }
@@ -281,6 +400,81 @@ function calculateTotalDuration(clips: Clip[]): number {
 }
 
 /**
+ * Calculate required H.264 level based on resolution and framerate
+ * H.264 levels define maximum resolution, bitrate, and decoder capabilities
+ * @param width - Video width in pixels
+ * @param height - Video height in pixels
+ * @param fps - Frame rate (default 30)
+ * @returns H.264 level string (e.g., "5.1")
+ */
+function calculateH264Level(width: number, height: number, fps: number = 30): string {
+  const pixels = width * height
+  const macroblocksPerFrame = Math.ceil(width / 16) * Math.ceil(height / 16)
+
+  console.log('[FFmpeg] Calculating H.264 level:', {
+    resolution: `${width}×${height}`,
+    pixels,
+    macroblocks: macroblocksPerFrame,
+    fps
+  })
+
+  // 4K and above (3840x2160 = 8,294,400 pixels, ~32,400 macroblocks)
+  // Level 5.1: Max 4096×2160 @ 30fps, 36,864 MB/frame, 240 Mbps
+  // Level 5.2: Max 4096×2160 @ 60fps, 36,864 MB/frame, 240 Mbps
+  if (pixels >= 3840 * 2160 || macroblocksPerFrame > 22080) {
+    return fps > 30 ? '5.2' : '5.1'
+  }
+
+  // 2.5K - 4K (2560x1920 = 4,915,200 pixels, ~14,400 macroblocks)
+  // Level 5.0: Max 2560×1920 @ 30fps, 22,080 MB/frame, 135 Mbps
+  if (pixels >= 2560 * 1920 || macroblocksPerFrame > 8704) {
+    return '5.0'
+  }
+
+  // 1080p (1920x1080 = 2,073,600 pixels, ~8,100 macroblocks)
+  // Level 4.0: Max 2048×1088 @ 30fps, 8,192 MB/frame, 25 Mbps
+  // Level 4.1: Max 2048×1088 @ 30fps, 8,192 MB/frame, 50 Mbps
+  if (pixels >= 1920 * 1080 || macroblocksPerFrame > 3600) {
+    return fps > 30 ? '4.1' : '4.0'
+  }
+
+  // 720p and below
+  // Level 4.0: Sufficient for 720p and lower
+  return '4.0'
+}
+
+/**
+ * Validate resolution for H.264 encoding
+ * H.264 supports up to 4096×2160 (DCI 4K) with Level 5.1/5.2
+ * @param width - Video width in pixels
+ * @param height - Video height in pixels
+ * @throws FFmpegError if resolution exceeds H.264 limits
+ */
+function validateH264Resolution(width: number, height: number): void {
+  const pixels = width * height
+  const MAX_PIXELS_4K = 4096 * 2160 // DCI 4K (larger than UHD 4K 3840×2160)
+
+  console.log('[FFmpeg] Validating resolution:', { width, height, pixels })
+
+  // Reject resolutions beyond H.264 Level 5.2 limits
+  if (pixels > MAX_PIXELS_4K) {
+    throw new FFmpegError(
+      `Resolution ${width}×${height} exceeds H.264 maximum (4096×2160 DCI 4K). ` +
+        `Please downscale to 4K (3840×2160), 1080p (1920×1080), or 720p (1280×720).`,
+      FFmpegErrorCode.UNSUPPORTED_FORMAT
+    )
+  }
+
+  // Log warning for 4K exports (very large files, slow encoding)
+  if (width >= 3840 && height >= 2160) {
+    console.warn(
+      `[FFmpeg] ⚠️  4K export detected (${width}×${height}). ` +
+        `Encoding will be slow and produce very large files (H.264 Intra all-I-frames).`
+    )
+  }
+}
+
+/**
  * Build FFmpeg command for timeline export with concat and trim support
  * Reads from intermediate ProRes files for frame-accurate export
  * @param clips - Array of timeline clips to export
@@ -297,17 +491,30 @@ export function buildFFmpegCommand(
 
   // Add input files with trim parameters
   // Each input needs its own -ss and -t positioned correctly
-  clips.forEach((clip) => {
-    // Use intermediate path for export (ProRes provides better quality)
+  clips.forEach((clip, index) => {
+    // Use intermediate path for export (H.264 Intra provides frame-accurate seeking)
     const inputFile = clip.intermediatePath
+
+    console.log(`[FFmpeg] Validating clip ${index + 1}/${clips.length}:`, {
+      clipId: clip.id,
+      name: clip.name,
+      intermediatePath: inputFile,
+      trimIn: clip.trimIn,
+      trimOut: clip.trimOut,
+      duration: clip.duration,
+      trimmedDuration: clip.duration - clip.trimIn - clip.trimOut
+    })
 
     // Validate input file exists
     if (!existsSync(inputFile)) {
+      console.error(`[FFmpeg] ERROR: Intermediate file not found for clip ${clip.id}:`, inputFile)
       throw new FFmpegError(
-        `Intermediate file not found: ${inputFile}`,
+        `Intermediate file not found for clip "${clip.name}": ${inputFile}`,
         FFmpegErrorCode.FILE_NOT_FOUND
       )
     }
+
+    console.log(`[FFmpeg] ✓ Clip ${index + 1} intermediate file exists`)
 
     // Apply trim start (seek to position before reading - more efficient)
     if (clip.trimIn > 0) {
@@ -324,18 +531,79 @@ export function buildFFmpegCommand(
     }
   })
 
+  // Determine output resolution for H.264 level calculation and validation
+  let outputWidth: number
+  let outputHeight: number
+
+  if (resolution === '720p') {
+    outputWidth = 1280
+    outputHeight = 720
+  } else if (resolution === '1080p') {
+    outputWidth = 1920
+    outputHeight = 1080
+  } else {
+    // Source resolution - get from first clip
+    const firstClip = clips[0]
+    outputWidth = firstClip.resolution?.width || 1920
+    outputHeight = firstClip.resolution?.height || 1080
+    console.log('[FFmpeg] Source resolution export:', {
+      width: outputWidth,
+      height: outputHeight,
+      clipResolution: firstClip.resolution
+    })
+  }
+
+  // Validate resolution is within H.264 limits (max 4096×2160)
+  validateH264Resolution(outputWidth, outputHeight)
+
+  // Calculate required H.264 level based on output resolution
+  // Assume 30fps (can be made dynamic if needed)
+  const h264Level = calculateH264Level(outputWidth, outputHeight, 30)
+  console.log('[FFmpeg] Using H.264 Level:', h264Level)
+
+  // Check if any clips have audio (default to true for backwards compatibility)
+  const hasAnyAudio = clips.some((clip) => clip.hasAudio !== false)
+  console.log('[FFmpeg] Audio detection:', {
+    totalClips: clips.length,
+    hasAnyAudio,
+    clipAudioStatus: clips.map((c) => ({ name: c.name, hasAudio: c.hasAudio ?? true }))
+  })
+
   // Build filter_complex for concatenation if multiple clips
   if (clips.length > 1) {
     let filterComplex = ''
 
-    // Build concat inputs [0:v][0:a][1:v][1:a]...
+    // Build concat inputs - only include audio streams if clips have audio
     for (let i = 0; i < clips.length; i++) {
-      filterComplex += `[${i}:v][${i}:a]`
+      const clipHasAudio = clips[i].hasAudio !== false // Default true for backwards compatibility
+      if (hasAnyAudio && clipHasAudio) {
+        filterComplex += `[${i}:v][${i}:a]`
+      } else if (hasAnyAudio && !clipHasAudio) {
+        // Clip has no audio but other clips do - generate silent audio
+        filterComplex += `[${i}:v][silent${i}]`
+      } else {
+        // No clips have audio
+        filterComplex += `[${i}:v]`
+      }
     }
 
-    // Add concat filter - output to intermediate label if scaling needed
+    // If mixing audio and video-only clips, generate silent audio for video-only clips
+    if (hasAnyAudio && clips.some((c) => c.hasAudio === false)) {
+      // Prepend silent audio generation for clips without audio
+      let silentAudioFilters = ''
+      clips.forEach((clip, i) => {
+        if (clip.hasAudio === false) {
+          // Generate silent audio with same duration as video
+          silentAudioFilters += `anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=${clip.duration - clip.trimIn - clip.trimOut}[silent${i}];`
+        }
+      })
+      filterComplex = silentAudioFilters + filterComplex
+    }
+
+    // Add concat filter - include audio streams only if any clips have audio
+    const audioOutputs = hasAnyAudio ? ':a=1[concatv][outa]' : ':a=0[concatv]'
     if (resolution === '720p' || resolution === '1080p') {
-      filterComplex += `concat=n=${clips.length}:v=1:a=1[concatv][outa]`
+      filterComplex += `concat=n=${clips.length}:v=1${audioOutputs}`
 
       // Add scaling filter in the same filter_complex chain
       if (resolution === '720p') {
@@ -345,11 +613,15 @@ export function buildFFmpegCommand(
       }
     } else {
       // Source quality - no scaling needed
-      filterComplex += `concat=n=${clips.length}:v=1:a=1[outv][outa]`
+      const outputLabels = hasAnyAudio ? '[outv][outa]' : '[outv]'
+      filterComplex += `concat=n=${clips.length}:v=1${audioOutputs.replace('[concatv][outa]', outputLabels).replace('[concatv]', outputLabels)}`
     }
 
     args.push('-filter_complex', filterComplex)
-    args.push('-map', '[outv]', '-map', '[outa]')
+    args.push('-map', '[outv]')
+    if (hasAnyAudio) {
+      args.push('-map', '[outa]')
+    }
   } else {
     // Single clip - use simpler -vf for scaling (no filter_complex needed)
     if (resolution === '720p') {
@@ -360,14 +632,32 @@ export function buildFFmpegCommand(
     // For 'source', no scaling is applied
   }
 
-  // Video codec settings - H.264 with high quality (CRF 18-20)
+  // Video codec settings - H.264 with high quality and proper level/profile
   args.push('-c:v', 'libx264')
+  args.push('-profile:v', 'high') // High profile for best compression efficiency
+  args.push('-level', h264Level) // Dynamic level based on resolution (4.0, 5.1, etc.)
   args.push('-crf', '18') // High quality constant rate factor (lower = better quality)
   args.push('-preset', 'slow') // Slower preset for better compression/quality balance
 
-  // Audio codec settings
-  args.push('-c:a', 'aac')
-  args.push('-b:a', '192k')
+  // For high-resolution exports (1080p+), add bitrate/buffer constraints
+  // This prevents encoder buffer overflow and ensures decoder compatibility
+  if (resolution === 'source' && (outputWidth >= 1920 || outputHeight >= 1080)) {
+    const maxrate = outputWidth >= 3840 ? '300M' : outputWidth >= 2560 ? '150M' : '80M' // 300M for 4K, 150M for 2.5K, 80M for 1080p
+    const bufsize = outputWidth >= 3840 ? '600M' : outputWidth >= 2560 ? '300M' : '160M' // 2x maxrate
+    args.push('-maxrate', maxrate)
+    args.push('-bufsize', bufsize)
+    console.log(`[FFmpeg] High-resolution export (${outputWidth}×${outputHeight}): Added buffer constraints (maxrate=${maxrate}, bufsize=${bufsize})`)
+  }
+
+  // Audio codec settings - only if clips have audio
+  if (hasAnyAudio) {
+    args.push('-c:a', 'aac')
+    args.push('-b:a', '192k')
+  } else {
+    // No audio - explicitly disable audio stream
+    args.push('-an')
+    console.log('[FFmpeg] No audio streams detected - exporting video-only')
+  }
 
   // Overwrite output file
   args.push('-y')
@@ -412,7 +702,12 @@ export async function executeExport(
     // Calculate total duration for progress tracking
     const totalDuration = calculateTotalDuration(clips)
 
-    // Execute FFmpeg with progress callback
+    // Calculate timeout: 10x realtime (generous for slow systems and high-res exports)
+    // Minimum 2 minutes to handle startup overhead
+    const timeoutMs = Math.max(totalDuration * 1000 * 10, 120000)
+    console.log(`[FFmpeg] Export timeout set to ${(timeoutMs / 1000).toFixed(0)}s (video duration: ${totalDuration.toFixed(1)}s)`)
+
+    // Execute FFmpeg with progress callback and timeout
     await executeFFmpegCommand(
       args,
       onProgress
@@ -421,7 +716,9 @@ export async function executeExport(
             onProgress(Math.round(progress.percent))
           }
         : undefined,
-      totalDuration
+      totalDuration,
+      clips, // Pass clips for detailed error logging
+      timeoutMs // Pass timeout
     )
 
     // Verify output file was created
@@ -506,12 +803,24 @@ export function buildMultiTrackFFmpegCommand(options: MultiTrackExportOptions): 
   const hasOverlay = tracks.overlay.length > 0
 
   // Add Track 1 inputs with trim (using intermediate files)
-  tracks.main.forEach((clip) => {
+  tracks.main.forEach((clip, index) => {
     const inputFile = clip.intermediatePath
 
+    console.log(`[FFmpeg] Validating Track 1 clip ${index + 1}/${tracks.main.length}:`, {
+      clipId: clip.id,
+      name: clip.name,
+      intermediatePath: inputFile,
+      trimIn: clip.trimIn,
+      trimOut: clip.trimOut,
+      duration: clip.duration
+    })
+
     if (!existsSync(inputFile)) {
-      throw new FFmpegError(`Intermediate file not found: ${inputFile}`, FFmpegErrorCode.FILE_NOT_FOUND)
+      console.error(`[FFmpeg] ERROR: Track 1 intermediate file not found for clip ${clip.id}:`, inputFile)
+      throw new FFmpegError(`Track 1 intermediate file not found for clip "${clip.name}": ${inputFile}`, FFmpegErrorCode.FILE_NOT_FOUND)
     }
+
+    console.log(`[FFmpeg] ✓ Track 1 clip ${index + 1} intermediate file exists`)
 
     if (clip.trimIn > 0) {
       args.push('-ss', clip.trimIn.toString())
@@ -529,12 +838,24 @@ export function buildMultiTrackFFmpegCommand(options: MultiTrackExportOptions): 
 
   // Add Track 2 inputs with trim (if overlay exists, using intermediate files)
   if (hasOverlay) {
-    tracks.overlay.forEach((clip) => {
+    tracks.overlay.forEach((clip, index) => {
       const inputFile = clip.intermediatePath
 
+      console.log(`[FFmpeg] Validating Track 2 clip ${index + 1}/${tracks.overlay.length}:`, {
+        clipId: clip.id,
+        name: clip.name,
+        intermediatePath: inputFile,
+        trimIn: clip.trimIn,
+        trimOut: clip.trimOut,
+        duration: clip.duration
+      })
+
       if (!existsSync(inputFile)) {
-        throw new FFmpegError(`Intermediate file not found: ${inputFile}`, FFmpegErrorCode.FILE_NOT_FOUND)
+        console.error(`[FFmpeg] ERROR: Track 2 intermediate file not found for clip ${clip.id}:`, inputFile)
+        throw new FFmpegError(`Track 2 intermediate file not found for clip "${clip.name}": ${inputFile}`, FFmpegErrorCode.FILE_NOT_FOUND)
       }
+
+      console.log(`[FFmpeg] ✓ Track 2 clip ${index + 1} intermediate file exists`)
 
       if (clip.trimIn > 0) {
         args.push('-ss', clip.trimIn.toString())
@@ -548,18 +869,88 @@ export function buildMultiTrackFFmpegCommand(options: MultiTrackExportOptions): 
     })
   }
 
+  // Determine output resolution for H.264 level calculation and validation
+  let outputWidth: number
+  let outputHeight: number
+
+  if (resolution === '720p') {
+    outputWidth = 1280
+    outputHeight = 720
+  } else if (resolution === '1080p') {
+    outputWidth = 1920
+    outputHeight = 1080
+  } else {
+    // Source resolution - get from first clip of main track
+    const firstClip = tracks.main[0]
+    outputWidth = firstClip.resolution?.width || 1920
+    outputHeight = firstClip.resolution?.height || 1080
+    console.log('[FFmpeg] Multi-track source resolution export:', {
+      width: outputWidth,
+      height: outputHeight,
+      clipResolution: firstClip.resolution
+    })
+  }
+
+  // Validate resolution is within H.264 limits (max 4096×2160)
+  validateH264Resolution(outputWidth, outputHeight)
+
+  // Calculate required H.264 level based on output resolution
+  const h264Level = calculateH264Level(outputWidth, outputHeight, 30)
+  console.log('[FFmpeg] Multi-track using H.264 Level:', h264Level)
+
+  // Detect audio in tracks (default to true for backwards compatibility)
+  const track1HasAudio = tracks.main.some((clip) => clip.hasAudio !== false)
+  const track2HasAudio = hasOverlay && tracks.overlay.some((clip) => clip.hasAudio !== false)
+  const hasAnyAudio = track1HasAudio || track2HasAudio
+
+  console.log('[FFmpeg] Multi-track audio detection:', {
+    track1HasAudio,
+    track2HasAudio,
+    hasAnyAudio,
+    track1Clips: tracks.main.map((c) => ({ name: c.name, hasAudio: c.hasAudio ?? true })),
+    track2Clips: tracks.overlay.map((c) => ({ name: c.name, hasAudio: c.hasAudio ?? true }))
+  })
+
   // Build complex filter
   let filterComplex = ''
 
   // Concatenate Track 1 clips if multiple
   if (tracks.main.length > 1) {
     for (let i = 0; i < tracks.main.length; i++) {
-      filterComplex += `[${i}:v][${i}:a]`
+      const clipHasAudio = tracks.main[i].hasAudio !== false
+      if (track1HasAudio && clipHasAudio) {
+        filterComplex += `[${i}:v][${i}:a]`
+      } else if (track1HasAudio && !clipHasAudio) {
+        filterComplex += `[${i}:v][silent_t1_${i}]`
+      } else {
+        filterComplex += `[${i}:v]`
+      }
     }
-    filterComplex += `concat=n=${tracks.main.length}:v=1:a=1[main][a1]`
+
+    // Generate silent audio for Track 1 clips without audio
+    if (track1HasAudio && tracks.main.some((c) => c.hasAudio === false)) {
+      let silentFilters = ''
+      tracks.main.forEach((clip, i) => {
+        if (clip.hasAudio === false) {
+          silentFilters += `anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=${clip.duration - clip.trimIn - clip.trimOut}[silent_t1_${i}];`
+        }
+      })
+      filterComplex = silentFilters + filterComplex
+    }
+
+    filterComplex += `concat=n=${tracks.main.length}:v=1:a=${track1HasAudio ? 1 : 0}[main]${track1HasAudio ? '[a1]' : ''}`
   } else {
     // Single Track 1 clip - just label it
-    filterComplex += '[0:v]copy[main];[0:a]copy[a1]'
+    const clipHasAudio = tracks.main[0].hasAudio !== false
+    if (track1HasAudio && clipHasAudio) {
+      filterComplex += '[0:v]copy[main];[0:a]copy[a1]'
+    } else if (track1HasAudio && !clipHasAudio) {
+      // Generate silent audio
+      const clip = tracks.main[0]
+      filterComplex += `anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=${clip.duration - clip.trimIn - clip.trimOut}[a1];[0:v]copy[main]`
+    } else {
+      filterComplex += '[0:v]copy[main]'
+    }
   }
 
   // Concatenate Track 2 clips if multiple and overlay exists
@@ -569,13 +960,43 @@ export function buildMultiTrackFFmpegCommand(options: MultiTrackExportOptions): 
     if (tracks.overlay.length > 1) {
       for (let i = 0; i < tracks.overlay.length; i++) {
         const inputIndex = track1InputCount + i
-        filterComplex += `[${inputIndex}:v][${inputIndex}:a]`
+        const clipHasAudio = tracks.overlay[i].hasAudio !== false
+        if (track2HasAudio && clipHasAudio) {
+          filterComplex += `[${inputIndex}:v][${inputIndex}:a]`
+        } else if (track2HasAudio && !clipHasAudio) {
+          filterComplex += `[${inputIndex}:v][silent_t2_${i}]`
+        } else {
+          filterComplex += `[${inputIndex}:v]`
+        }
       }
-      filterComplex += `concat=n=${tracks.overlay.length}:v=1:a=1[overlay][a2]`
+
+      // Generate silent audio for Track 2 clips without audio
+      if (track2HasAudio && tracks.overlay.some((c) => c.hasAudio === false)) {
+        let silentFilters = ''
+        tracks.overlay.forEach((clip, i) => {
+          if (clip.hasAudio === false) {
+            silentFilters += `anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=${clip.duration - clip.trimIn - clip.trimOut}[silent_t2_${i}];`
+          }
+        })
+        // Insert silent audio generation before concat inputs
+        const concatStart = filterComplex.lastIndexOf('[')
+        filterComplex = filterComplex.substring(0, concatStart) + silentFilters + filterComplex.substring(concatStart)
+      }
+
+      filterComplex += `concat=n=${tracks.overlay.length}:v=1:a=${track2HasAudio ? 1 : 0}[overlay]${track2HasAudio ? '[a2]' : ''}`
     } else {
       // Single Track 2 clip
       const overlayInputIndex = track1InputCount
-      filterComplex += `[${overlayInputIndex}:v]copy[overlay];[${overlayInputIndex}:a]copy[a2]`
+      const clipHasAudio = tracks.overlay[0].hasAudio !== false
+      if (track2HasAudio && clipHasAudio) {
+        filterComplex += `[${overlayInputIndex}:v]copy[overlay];[${overlayInputIndex}:a]copy[a2]`
+      } else if (track2HasAudio && !clipHasAudio) {
+        // Generate silent audio
+        const clip = tracks.overlay[0]
+        filterComplex += `anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=${clip.duration - clip.trimIn - clip.trimOut}[a2];[${overlayInputIndex}:v]copy[overlay]`
+      } else {
+        filterComplex += `[${overlayInputIndex}:v]copy[overlay]`
+      }
     }
 
     // Apply overlay filter
@@ -583,11 +1004,24 @@ export function buildMultiTrackFFmpegCommand(options: MultiTrackExportOptions): 
     filterComplex += buildOverlayFilter(pipPosition, pipSize)
     filterComplex += '[outv]'
 
-    // Mix audio: Track 1 @ 100% (0dB), Track 2 @ 50% (-6dB)
-    filterComplex += ';[a1]volume=1.0[a1out];[a2]volume=0.5[a2out];[a1out][a2out]amix=inputs=2:duration=longest[outa]'
+    // Mix audio only if tracks have audio
+    if (track1HasAudio && track2HasAudio) {
+      // Both tracks have audio - mix them
+      filterComplex += ';[a1]volume=1.0[a1out];[a2]volume=0.5[a2out];[a1out][a2out]amix=inputs=2:duration=longest[outa]'
+    } else if (track1HasAudio) {
+      // Only Track 1 has audio
+      filterComplex += ';[a1]copy[outa]'
+    } else if (track2HasAudio) {
+      // Only Track 2 has audio
+      filterComplex += ';[a2]copy[outa]'
+    }
+    // If no tracks have audio, no audio filter needed
   } else {
     // No overlay - just use Track 1 video and audio
-    filterComplex += ';[main]copy[outv];[a1]copy[outa]'
+    filterComplex += ';[main]copy[outv]'
+    if (track1HasAudio) {
+      filterComplex += ';[a1]copy[outa]'
+    }
   }
 
   // Apply resolution scaling if needed
@@ -600,14 +1034,25 @@ export function buildMultiTrackFFmpegCommand(options: MultiTrackExportOptions): 
   }
 
   args.push('-filter_complex', filterComplex)
-  args.push('-map', '[outv]', '-map', '[outa]')
+  args.push('-map', '[outv]')
+  if (hasAnyAudio) {
+    args.push('-map', '[outa]')
+  }
 
   // Codec settings - H.264 with high quality (CRF 18-20)
   args.push('-c:v', 'libx264')
   args.push('-crf', '18') // High quality constant rate factor
   args.push('-preset', 'slow') // Better compression/quality balance
-  args.push('-c:a', 'aac')
-  args.push('-b:a', '192k')
+
+  // Audio codec settings - only if tracks have audio
+  if (hasAnyAudio) {
+    args.push('-c:a', 'aac')
+    args.push('-b:a', '192k')
+  } else {
+    // No audio - explicitly disable audio stream
+    args.push('-an')
+    console.log('[FFmpeg] Multi-track: No audio streams detected - exporting video-only')
+  }
 
   // Overwrite output
   args.push('-y')
@@ -654,7 +1099,15 @@ export async function executeMultiTrackExport(
     const track2Duration = tracks.overlay.length > 0 ? calculateTotalDuration(tracks.overlay) : 0
     const totalDuration = Math.max(track1Duration, track2Duration)
 
-    // Execute FFmpeg with progress callback
+    // Calculate timeout: 10x realtime (generous for slow systems and high-res exports)
+    // Minimum 2 minutes to handle startup overhead
+    const timeoutMs = Math.max(totalDuration * 1000 * 10, 120000)
+    console.log(`[FFmpeg] Multi-track export timeout set to ${(timeoutMs / 1000).toFixed(0)}s (video duration: ${totalDuration.toFixed(1)}s)`)
+
+    // Combine all clips for error logging
+    const allClips = [...tracks.main, ...tracks.overlay]
+
+    // Execute FFmpeg with progress callback and timeout
     await executeFFmpegCommand(
       args,
       onProgress
@@ -662,7 +1115,9 @@ export async function executeMultiTrackExport(
             onProgress(Math.round(progress.percent))
           }
         : undefined,
-      totalDuration
+      totalDuration,
+      allClips, // Pass all clips for detailed error logging
+      timeoutMs // Pass timeout
     )
 
     // Verify output file was created

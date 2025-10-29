@@ -67,7 +67,7 @@ function loadSavedZoom(): number {
       }
     }
   } catch (error) {
-    console.warn('[TimelineStore] Failed to load saved zoom:', error)
+    // Silent fail - use default
   }
   return DEFAULT_ZOOM_MULTIPLIER
 }
@@ -79,7 +79,7 @@ function saveZoom(zoomLevel: number): void {
   try {
     localStorage.setItem(ZOOM_STORAGE_KEY, zoomLevel.toString())
   } catch (error) {
-    console.warn('[TimelineStore] Failed to save zoom:', error)
+    // Silent fail
   }
 }
 
@@ -97,7 +97,7 @@ function loadSavedSnapTolerance(): number {
       }
     }
   } catch (error) {
-    console.warn('[TimelineStore] Failed to load saved snap tolerance:', error)
+    // Silent fail - use default
   }
   return SNAP_THRESHOLD
 }
@@ -109,7 +109,7 @@ function saveSnapTolerance(snapTolerance: number): void {
   try {
     localStorage.setItem(SNAP_STORAGE_KEY, snapTolerance.toString())
   } catch (error) {
-    console.warn('[TimelineStore] Failed to save snap tolerance:', error)
+    // Silent fail
   }
 }
 
@@ -136,6 +136,22 @@ function getEffectiveDuration(clip: Clip): number {
 function snapToFrame(position: number, framerate: number = DEFAULT_FRAMERATE): number {
   const frameInterval = 1 / framerate
   return Math.round(position / frameInterval) * frameInterval
+}
+
+/**
+ * Maximum number of history snapshots to keep
+ * Prevents unbounded memory growth
+ */
+const MAX_HISTORY_SIZE = 50
+
+/**
+ * Create a deep copy of tracks to avoid reference issues in history
+ */
+function cloneTracks(tracks: import('@/components/Timeline/timeline.types').Track[]): import('@/components/Timeline/timeline.types').Track[] {
+  return tracks.map(track => ({
+    ...track,
+    clips: track.clips.map(clip => ({ ...clip }))
+  }))
 }
 
 /**
@@ -173,11 +189,39 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
     pixelsPerSecond: BASE_PIXELS_PER_SECOND * initialZoom,
     snapTolerance: initialSnapTolerance,
     selectedClipIds: [],
+    historyStack: [],
+    historyIndex: -1,
 
     // Backward-compatible getter for components still using selectedClipId (singular)
     // Returns first selected clip ID or null
     get selectedClipId() {
       return get().selectedClipIds[0] ?? null
+    },
+
+    // Helper: Save current state to history before mutation
+    // Call this at the start of any action that modifies tracks/clips
+    _saveHistory: () => {
+      const state = get()
+      const snapshot: import('@/components/Timeline/timeline.types').TimelineSnapshot = {
+        tracks: cloneTracks(state.tracks),
+        playheadPosition: state.playheadPosition,
+        totalDuration: state.totalDuration,
+        selectedClipIds: [...state.selectedClipIds]
+      }
+
+      // If we're not at the end of history, truncate future history
+      const newStack = state.historyStack.slice(0, state.historyIndex + 1)
+      newStack.push(snapshot)
+
+      // Keep only last MAX_HISTORY_SIZE snapshots
+      if (newStack.length > MAX_HISTORY_SIZE) {
+        newStack.shift()
+      }
+
+      set({
+        historyStack: newStack,
+        historyIndex: newStack.length - 1
+      })
     },
 
     // Actions
@@ -186,7 +230,10 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
    * Add a new clip to the timeline
    * Generates UUID and adds clip to specified track
    */
-  addClip: (clipData) =>
+  addClip: (clipData) => {
+    // Save history before mutation
+    get()._saveHistory()
+
     set((state) => {
       const newClip: Clip = {
         id: crypto.randomUUID(),
@@ -214,7 +261,8 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
         tracks: updatedTracks,
         totalDuration: maxEndTime
       }
-    }),
+    })
+  },
 
   /**
    * Add a clip to a specific track
@@ -283,7 +331,6 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
 
       // If clip not found, return unchanged state
       if (!deletedClip) {
-        console.warn(`Clip ${clipId} not found for removal`)
         return state
       }
 
@@ -291,12 +338,23 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
       const deletedDuration = getEffectiveDuration(deletedClip)
       const deletedEnd = deletedStart + deletedDuration
 
-      // Remove clip (Premiere Pro style: leave gaps, don't shift remaining clips)
+      // Remove clip with auto-close: shift remaining clips left to close gap
       const updatedTracks = state.tracks.map((track) => {
         if (track.id !== deletedTrackId) return track
 
-        // Filter out the deleted clip - keep remaining clips at their positions
-        const remainingClips = track.clips.filter((clip) => clip.id !== clipId)
+        // Filter out the deleted clip
+        let remainingClips = track.clips.filter((clip) => clip.id !== clipId)
+
+        // Shift all clips that start after the deleted clip left by the deleted clip's duration
+        remainingClips = remainingClips.map((clip) => {
+          if (clip.startTime > deletedStart) {
+            return {
+              ...clip,
+              startTime: clip.startTime - deletedDuration
+            }
+          }
+          return clip
+        })
 
         return {
           ...track,
@@ -311,13 +369,15 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
         return endTime > max ? endTime : max
       }, 0)
 
-      // Update playhead if it was within deleted clip bounds (Premiere Pro style)
+      // Update playhead if it was within or after deleted clip
       let newPlayhead = state.playheadPosition
       if (state.playheadPosition >= deletedStart && state.playheadPosition < deletedEnd) {
         // Playhead was on deleted clip - move to clip's start position
         newPlayhead = deletedStart
+      } else if (state.playheadPosition >= deletedEnd) {
+        // Playhead was after deleted clip - shift left by deleted duration
+        newPlayhead = Math.max(deletedStart, state.playheadPosition - deletedDuration)
       }
-      // Don't shift playhead if it was after deleted clip (leave gaps)
 
       return {
         tracks: updatedTracks,
@@ -439,12 +499,93 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
    */
   updateClip: (clipId, updates) =>
     set((state) => {
-      const updatedTracks = state.tracks.map((track) => ({
-        ...track,
-        clips: track.clips
-          .map((clip) => (clip.id === clipId ? { ...clip, ...updates } : clip))
-          .sort((a, b) => a.startTime - b.startTime)
-      }))
+      const updatedTracks = state.tracks.map((track) => {
+        const targetClip = track.clips.find((c) => c.id === clipId)
+        if (!targetClip) return track
+
+        // Check if startTime is being updated (trim operation that moves clip position)
+        const isStartTimeUpdate = updates.startTime !== undefined && updates.startTime !== targetClip.startTime
+
+        if (isStartTimeUpdate) {
+          // Apply the updates to get the new clip state
+          const updatedClip = { ...targetClip, ...updates }
+          const updatedDuration = getEffectiveDuration(updatedClip)
+          const newStartTime = updates.startTime!
+          const newEndTime = newStartTime + updatedDuration
+
+          // Get other clips on this track
+          const otherClips = track.clips.filter((c) => c.id !== clipId)
+
+          // Cascading collision detection for trim operations
+          // Create working array with updated clip
+          const workingClips: Clip[] = [
+            ...otherClips.map(c => ({ ...c })),
+            updatedClip
+          ]
+
+          // Sort by startTime to process clips in order
+          workingClips.sort((a, b) => a.startTime - b.startTime)
+
+          // Iteratively resolve collisions
+          let hasCollisions = true
+          let iterations = 0
+          const MAX_ITERATIONS = 10
+
+          while (hasCollisions && iterations < MAX_ITERATIONS) {
+            hasCollisions = false
+            iterations++
+
+            for (let i = 1; i < workingClips.length; i++) {
+              const prevClip = workingClips[i - 1]
+              const currClip = workingClips[i]
+
+              const prevEnd = prevClip.startTime + getEffectiveDuration(prevClip)
+              const currStart = currClip.startTime
+
+              const EPSILON = 0.001
+              if (prevEnd > currStart + EPSILON) {
+                // Collision! Push current clip forward
+                currClip.startTime = prevEnd
+                hasCollisions = true
+
+                console.debug('[Trim] Cascading collision resolved:', {
+                  iteration: iterations,
+                  prevClip: prevClip.id.substring(0, 8),
+                  prevEnd: prevEnd.toFixed(3),
+                  currClip: currClip.id.substring(0, 8),
+                  newStart: currClip.startTime.toFixed(3)
+                })
+              }
+            }
+          }
+
+          if (iterations >= MAX_ITERATIONS) {
+            console.warn('[Trim] Max collision iterations reached')
+          }
+
+          console.debug('[Trim] Collision resolution complete:', {
+            trimmedClip: clipId.substring(0, 8),
+            newStart: newStartTime.toFixed(2),
+            newEnd: newEndTime.toFixed(2),
+            iterations
+          })
+
+          const updatedClips = workingClips.sort((a, b) => a.startTime - b.startTime)
+
+          return {
+            ...track,
+            clips: updatedClips
+          }
+        } else {
+          // No startTime update, just apply updates without collision check
+          return {
+            ...track,
+            clips: track.clips
+              .map((clip) => (clip.id === clipId ? { ...clip, ...updates } : clip))
+              .sort((a, b) => a.startTime - b.startTime)
+          }
+        }
+      })
 
       // Recalculate total duration using effective duration (accounts for trimming)
       const allClips = updatedTracks.flatMap((track) => track.clips)
@@ -476,7 +617,6 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
         const clipStart = originalClip.startTime
         const clipEnd = originalClip.startTime + getEffectiveDuration(originalClip)
         if (splitTime <= clipStart || splitTime >= clipEnd) {
-          console.warn(`Split time ${splitTime}s is outside clip bounds (${clipStart}s-${clipEnd}s)`)
           return track
         }
 
@@ -498,6 +638,21 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
           id: crypto.randomUUID(),
           startTime: splitTime,
           trimIn: originalClip.trimIn + offsetFromStart
+        }
+
+        // Defensive validation: ensure clips don't overlap
+        const clipAEnd = clipA.startTime + getEffectiveDuration(clipA)
+        const clipBStart = clipB.startTime
+        if (clipAEnd > clipBStart) {
+          // Force clipB to start exactly where clipA ends
+          clipB.startTime = clipAEnd
+        }
+
+        // Defensive validation: ensure effective durations are positive
+        const clipADuration = getEffectiveDuration(clipA)
+        const clipBDuration = getEffectiveDuration(clipB)
+        if (clipADuration <= 0 || clipBDuration <= 0) {
+          return track // Abort split for this track
         }
 
         // Replace original clip with two new clips
@@ -645,38 +800,8 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
         const otherClips = track.clips.filter((c) => c.id !== clipId)
         const moveDuration = getEffectiveDuration(clipToMove)
 
-        // Collision detection: check if target position overlaps any existing clip
-        let finalPosition = Math.max(0, targetPosition) // Don't allow negative positions
-
-        // Check for collisions and find snap points
-        for (const otherClip of otherClips) {
-          const otherStart = otherClip.startTime
-          const otherEnd = otherClip.startTime + getEffectiveDuration(otherClip)
-
-          // Check if our target position would overlap this clip
-          const wouldOverlap =
-            (finalPosition >= otherStart && finalPosition < otherEnd) ||
-            (finalPosition + moveDuration > otherStart && finalPosition < otherStart)
-
-          if (wouldOverlap) {
-            // Snap to nearest edge (before or after the other clip)
-            const distanceToBefore = Math.abs(finalPosition - (otherEnd))
-            const distanceToAfter = Math.abs(finalPosition - otherStart + moveDuration)
-
-            if (distanceToBefore < distanceToAfter) {
-              finalPosition = otherEnd // Snap to end of other clip
-            } else {
-              finalPosition = otherStart - moveDuration // Snap before other clip
-            }
-          }
-
-          // Magnetic snap to edges (within threshold)
-          if (Math.abs(finalPosition - otherEnd) < state.snapTolerance) {
-            finalPosition = otherEnd // Snap to end of other clip
-          } else if (Math.abs(finalPosition + moveDuration - otherStart) < state.snapTolerance) {
-            finalPosition = otherStart - moveDuration // Snap end to start of other clip
-          }
-        }
+        // Start with target position, ensure non-negative
+        let finalPosition = Math.max(0, targetPosition)
 
         // Magnetic snap to timeline start
         if (finalPosition < state.snapTolerance && finalPosition > 0) {
@@ -688,16 +813,94 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
           finalPosition = playheadPos
         }
 
-        // Apply frame-accurate quantization to final position
-        // Ensures clips land on exact frame boundaries (1/30s for 30fps)
+        // Check for magnetic snap to other clip edges (before checking collision)
+        for (const otherClip of otherClips) {
+          const otherStart = otherClip.startTime
+          const otherEnd = otherClip.startTime + getEffectiveDuration(otherClip)
+
+          // Snap to end of other clip (our start near their end)
+          if (Math.abs(finalPosition - otherEnd) < state.snapTolerance) {
+            finalPosition = otherEnd
+          }
+          // Snap to start of other clip (our end near their start)
+          else if (Math.abs(finalPosition + moveDuration - otherStart) < state.snapTolerance) {
+            finalPosition = otherStart - moveDuration
+            // Ensure snap doesn't create negative position
+            if (finalPosition < 0) {
+              finalPosition = 0
+            }
+          }
+        }
+
+        // Apply frame-accurate quantization
         finalPosition = snapToFrame(finalPosition, DEFAULT_FRAMERATE)
 
-        // Update clip position
-        const updatedClips = track.clips
-          .map((clip) =>
-            clip.id === clipId ? { ...clip, startTime: finalPosition } : clip
-          )
-          .sort((a, b) => a.startTime - b.startTime)
+        // Adobe Premiere Pro style ripple behavior with cascading collision detection:
+        // If clip overlaps others, iteratively push all affected clips forward
+
+        // Create working array with moving clip at new position
+        const workingClips: Clip[] = [
+          ...otherClips.map(c => ({ ...c })),
+          { ...clipToMove, startTime: finalPosition }
+        ]
+
+        // Sort by startTime to process clips in order
+        workingClips.sort((a, b) => a.startTime - b.startTime)
+
+        // Iteratively resolve collisions (max 10 iterations to prevent infinite loops)
+        let hasCollisions = true
+        let iterations = 0
+        const MAX_ITERATIONS = 10
+
+        while (hasCollisions && iterations < MAX_ITERATIONS) {
+          hasCollisions = false
+          iterations++
+
+          // Check each clip against the previous clip
+          for (let i = 1; i < workingClips.length; i++) {
+            const prevClip = workingClips[i - 1]
+            const currClip = workingClips[i]
+
+            const prevEnd = prevClip.startTime + getEffectiveDuration(prevClip)
+            const currStart = currClip.startTime
+
+            // Check for overlap (with small epsilon for floating point comparison)
+            const EPSILON = 0.001
+            if (prevEnd > currStart + EPSILON) {
+              // Collision detected! Push current clip to end of previous
+              // Don't snap to frames for rippled clips - maintains exact positioning
+              currClip.startTime = prevEnd
+              hasCollisions = true
+
+              console.debug('[Drag] Cascading collision resolved:', {
+                iteration: iterations,
+                prevClip: prevClip.id.substring(0, 8),
+                prevEnd: prevEnd.toFixed(3),
+                currClip: currClip.id.substring(0, 8),
+                oldStart: currStart.toFixed(3),
+                newStart: currClip.startTime.toFixed(3)
+              })
+            }
+          }
+        }
+
+        if (iterations >= MAX_ITERATIONS) {
+          console.warn('[Drag] Max collision iterations reached - timeline may be too crowded')
+        }
+
+        // Debug log final result
+        console.debug('[Drag] Collision resolution complete:', {
+          draggedClip: clipId.substring(0, 8),
+          targetPos: finalPosition.toFixed(2),
+          iterations,
+          finalPositions: workingClips.map(c => ({
+            id: c.id.substring(0, 8),
+            start: c.startTime.toFixed(2),
+            end: (c.startTime + getEffectiveDuration(c)).toFixed(2)
+          }))
+        })
+
+        const updatedClips = workingClips.sort((a, b) => a.startTime - b.startTime)
 
         return {
           ...track,
@@ -884,6 +1087,49 @@ export const useTimelineStore = create<TimelineState>((set, get) => {
 
         return {
           snapTolerance: clampedValue
+        }
+      }),
+
+    /**
+     * Undo the last action
+     * Restores timeline state from history stack
+     */
+    undo: () =>
+      set((state) => {
+        if (state.historyIndex < 0) {
+          return state // No history to undo
+        }
+
+        const snapshot = state.historyStack[state.historyIndex]
+
+        return {
+          tracks: cloneTracks(snapshot.tracks),
+          playheadPosition: snapshot.playheadPosition,
+          totalDuration: snapshot.totalDuration,
+          selectedClipIds: [...snapshot.selectedClipIds],
+          historyIndex: state.historyIndex - 1
+        }
+      }),
+
+    /**
+     * Redo the last undone action
+     * Restores timeline state from history stack
+     */
+    redo: () =>
+      set((state) => {
+        if (state.historyIndex >= state.historyStack.length - 1) {
+          return state // No history to redo
+        }
+
+        const nextIndex = state.historyIndex + 1
+        const snapshot = state.historyStack[nextIndex]
+
+        return {
+          tracks: cloneTracks(snapshot.tracks),
+          playheadPosition: snapshot.playheadPosition,
+          totalDuration: snapshot.totalDuration,
+          selectedClipIds: [...snapshot.selectedClipIds],
+          historyIndex: nextIndex
         }
       })
   }

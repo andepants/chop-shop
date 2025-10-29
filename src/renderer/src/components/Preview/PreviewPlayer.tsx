@@ -27,6 +27,7 @@ export function PreviewPlayer(): React.JSX.Element {
   const pause = usePlaybackStore((state) => state.pause)
   const initializeCompositor = usePlaybackStore((state) => state.initializeCompositor)
   const loadTimeline = usePlaybackStore((state) => state.loadTimeline)
+  const resize = usePlaybackStore((state) => state.resize)
 
   // Timeline state
   const tracks = useTimelineStore((state) => state.tracks)
@@ -42,8 +43,6 @@ export function PreviewPlayer(): React.JSX.Element {
       return
     }
 
-    console.log('[PreviewPlayer] Initializing compositor')
-
     // Get container dimensions for canvas sizing
     const rect = container.getBoundingClientRect()
     const width = rect.width || 1280
@@ -53,11 +52,8 @@ export function PreviewPlayer(): React.JSX.Element {
     initializeCompositor(canvas, width, height)
     isInitialized.current = true
 
-    console.log('[PreviewPlayer] Compositor initialized', { width, height })
-
     // Cleanup on unmount
     return () => {
-      console.log('[PreviewPlayer] Unmounting, compositor will be disposed')
       isInitialized.current = false
     }
   }, [initializeCompositor])
@@ -82,7 +78,6 @@ export function PreviewPlayer(): React.JSX.Element {
    */
   function handlePlayerClick() {
     if (duration === 0) {
-      console.log('[PreviewPlayer] No timeline loaded, ignoring click')
       return
     }
 
@@ -94,28 +89,32 @@ export function PreviewPlayer(): React.JSX.Element {
   }
 
   /**
-   * Handle canvas resize on window resize
+   * Handle container resize with ResizeObserver
+   * More reliable than window resize for flex layouts
    */
   useEffect(() => {
-    const handleResize = () => {
-      const canvas = canvasRef.current
-      const container = containerRef.current
+    const container = containerRef.current
 
-      if (!canvas || !container) return
+    if (!container) return
 
-      const rect = container.getBoundingClientRect()
-      canvas.width = rect.width
-      canvas.height = rect.height
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect
 
-      console.log('[PreviewPlayer] Canvas resized', { width: rect.width, height: rect.height })
-    }
+        // Only resize if dimensions are valid and compositor is initialized
+        if (width > 0 && height > 0 && isInitialized.current) {
+          resize(width, height)
+          console.log('[PreviewPlayer] Container resized', { width, height })
+        }
+      }
+    })
 
-    window.addEventListener('resize', handleResize)
+    resizeObserver.observe(container)
 
     return () => {
-      window.removeEventListener('resize', handleResize)
+      resizeObserver.disconnect()
     }
-  }, [])
+  }, [resize])
 
   const hasTimeline = duration > 0
   const isMultiTrack = tracks.filter((t) => t.clips.length > 0).length > 1
@@ -170,9 +169,6 @@ export function PreviewPlayer(): React.JSX.Element {
         style={{
           width: '100%',
           height: '100%',
-          maxWidth: '100%',
-          maxHeight: '100%',
-          objectFit: 'contain',
           display: 'block'
         }}
       />

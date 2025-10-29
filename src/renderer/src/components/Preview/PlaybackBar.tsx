@@ -3,7 +3,7 @@
  * Enhanced playback control bar with play/pause, time display, frame controls, and volume
  */
 
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Loader2 } from 'lucide-react'
 import { usePlaybackStore } from '@/store/playbackStore'
 
 /**
@@ -25,6 +25,8 @@ export function PlaybackBar(): React.JSX.Element {
   const duration = usePlaybackStore((state) => state.duration)
   const volume = usePlaybackStore((state) => state.volume)
   const isMuted = usePlaybackStore((state) => state.isMuted)
+  const isLoadingSources = usePlaybackStore((state) => state.isLoadingSources)
+  const sourcesLoadProgress = usePlaybackStore((state) => state.sourcesLoadProgress)
 
   // Playback actions
   const play = usePlaybackStore((state) => state.play)
@@ -42,23 +44,13 @@ export function PlaybackBar(): React.JSX.Element {
    * Compositor manages all clips automatically
    */
   function handlePlayPause() {
-    console.log('[PlaybackBar] Play/Pause button clicked', {
-      isPlaying,
-      hasTimeline,
-      currentTime,
-      duration
-    })
-
     if (!hasTimeline) {
-      console.log('[PlaybackBar] No timeline loaded')
       return
     }
 
     if (isPlaying) {
-      console.log('[PlaybackBar] Pausing playback')
       pause()
     } else {
-      console.log('[PlaybackBar] Starting playback')
       play()
     }
   }
@@ -84,16 +76,34 @@ export function PlaybackBar(): React.JSX.Element {
         {/* Play/Pause Button */}
         <button
           onClick={handlePlayPause}
-          disabled={!hasTimeline}
+          disabled={!hasTimeline || isLoadingSources}
           className="w-14 h-14 rounded-lg flex items-center justify-center transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed hover:scale-105 active:scale-95 shadow-lg"
           style={{
-            backgroundColor: !hasTimeline ? 'var(--bg-secondary)' : 'var(--accent)',
+            backgroundColor: !hasTimeline || isLoadingSources ? 'var(--bg-secondary)' : 'var(--accent)',
             color: 'var(--text-primary)'
           }}
-          aria-label={isPlaying ? 'Pause' : 'Play'}
-          title={isPlaying ? 'Pause' : 'Play'}
+          aria-label={
+            isLoadingSources
+              ? 'Loading sources...'
+              : isPlaying
+                ? 'Pause'
+                : 'Play'
+          }
+          title={
+            isLoadingSources
+              ? `Loading sources ${sourcesLoadProgress.loaded}/${sourcesLoadProgress.total}...`
+              : isPlaying
+                ? 'Pause'
+                : 'Play'
+          }
         >
-          {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+          {isLoadingSources ? (
+            <Loader2 size={24} className="animate-spin" />
+          ) : isPlaying ? (
+            <Pause size={24} />
+          ) : (
+            <Play size={24} />
+          )}
         </button>
 
         {/* Frame Controls */}

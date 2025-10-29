@@ -5,14 +5,14 @@
 
 import { exec } from 'child_process'
 import { promisify } from 'util'
-import ffmpegStatic from 'ffmpeg-static'
+import { getFfmpegPath } from '../utils/binaryPaths'
 
 const execAsync = promisify(exec)
 
 /**
  * Path to bundled ffmpeg binary
  */
-const ffmpegPath = ffmpegStatic as string
+const ffmpegPath = getFfmpegPath()
 
 /**
  * Generate thumbnail from video at specified timestamp

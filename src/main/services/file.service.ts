@@ -8,7 +8,6 @@ import { promisify } from 'util'
 import { access, stat } from 'fs/promises'
 import { constants } from 'fs'
 import path from 'path'
-import ffprobeStatic from 'ffprobe-static'
 import type { VideoMetadata } from '../../shared/types'
 import { MAX_FILE_SIZE } from '../../shared/constants'
 import {
@@ -17,13 +16,14 @@ import {
   transcodeToProRes,
   type TranscodeProgressCallback
 } from './transcode.service'
+import { getFfprobePath } from '../utils/binaryPaths'
 
 const execAsync = promisify(exec)
 
 /**
  * Path to bundled ffprobe binary
  */
-const ffprobePath = ffprobeStatic.path
+const ffprobePath = getFfprobePath()
 
 /**
  * Validate video file and extract metadata using FFprobe

@@ -32,6 +32,12 @@ export interface Clip {
   pipPosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
   /** PiP size as percentage (e.g., 0.25 = 25% of canvas width) */
   pipSize?: number
+  /** Whether the clip has an audio stream (default: true for backwards compatibility) */
+  hasAudio?: boolean
+  /** Human-readable name for the clip (usually filename without extension) */
+  name?: string
+  /** Video resolution (width x height) for H.264 level calculation */
+  resolution?: { width: number; height: number }
 }
 
 /**
@@ -44,6 +50,16 @@ export interface Track {
   clips: Clip[]
   /** Height of track in pixels (default: 80px) */
   height: number
+}
+
+/**
+ * Snapshot of timeline state for undo/redo functionality
+ */
+export interface TimelineSnapshot {
+  tracks: Track[]
+  playheadPosition: number
+  totalDuration: number
+  selectedClipIds: string[]
 }
 
 /**
@@ -64,6 +80,10 @@ export interface TimelineState {
   snapTolerance: number
   /** IDs of currently selected clips (empty array if none selected) */
   selectedClipIds: string[]
+  /** History stack for undo/redo (max 50 snapshots) */
+  historyStack: TimelineSnapshot[]
+  /** Current position in history stack (-1 means no history) */
+  historyIndex: number
 
   // Actions
   /** Add a new clip to the timeline */
@@ -104,4 +124,8 @@ export interface TimelineState {
   fitToTimeline: () => void
   /** Set snap tolerance for magnetic snapping (0.1 to 2.0 seconds) */
   setSnapTolerance: (value: number) => void
+  /** Undo the last action */
+  undo: () => void
+  /** Redo the last undone action */
+  redo: () => void
 }

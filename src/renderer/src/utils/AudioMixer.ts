@@ -32,17 +32,7 @@ export class AudioMixer {
     try {
       this.audioContext = new AudioContext()
       this.hasAudio = true
-      console.log('[AudioMixer] AudioContext initialized', {
-        state: this.audioContext.state,
-        sampleRate: this.audioContext.sampleRate
-      })
-
-      // Handle AudioContext state changes
-      this.audioContext.addEventListener('statechange', () => {
-        console.log('[AudioMixer] AudioContext state changed:', this.audioContext?.state)
-      })
     } catch (error) {
-      console.error('[AudioMixer] Failed to initialize AudioContext (blocked or unsupported):', error)
       this.audioContext = null
       this.hasAudio = false
     }
@@ -61,13 +51,11 @@ export class AudioMixer {
 
     // Skip if AudioContext failed to initialize
     if (!this.audioContext) {
-      console.warn('[AudioMixer] AudioContext not available, continuing without audio mixing')
       return
     }
 
     // Disconnect if already connected (prevent double-connection)
     if (this.sourceNodes.has(video)) {
-      console.log('[AudioMixer] Video already connected, disconnecting first')
       this.disconnectVideo(video)
     }
 
@@ -90,15 +78,7 @@ export class AudioMixer {
       // Store nodes
       this.sourceNodes.set(video, sourceNode)
       this.gainNodes.set(video, gainNode)
-
-      console.log('[AudioMixer] Video connected', {
-        trackIndex,
-        gain,
-        videoSrc: video.src.slice(0, 50)
-      })
     } catch (error) {
-      console.error('[AudioMixer] Failed to connect video to audio graph:', error)
-
       // Clean up on error
       if (this.sourceNodes.has(video)) {
         this.disconnectVideo(video)
@@ -131,8 +111,6 @@ export class AudioMixer {
       }
       this.gainNodes.delete(video)
     }
-
-    console.log('[AudioMixer] Video disconnected')
   }
 
   /**
@@ -143,7 +121,6 @@ export class AudioMixer {
   setGain(video: HTMLVideoElement, gain: number): void {
     const gainNode = this.gainNodes.get(video)
     if (!gainNode) {
-      console.warn('[AudioMixer] Cannot set gain, video not connected')
       return
     }
 
@@ -151,7 +128,6 @@ export class AudioMixer {
     gain = Math.max(0, Math.min(1, gain))
 
     gainNode.gain.value = gain
-    console.log('[AudioMixer] Gain updated', { gain })
   }
 
   /**
@@ -160,16 +136,14 @@ export class AudioMixer {
    */
   async resumeContext(): Promise<void> {
     if (!this.audioContext) {
-      console.warn('[AudioMixer] AudioContext not initialized')
       return
     }
 
     if (this.audioContext.state === 'suspended') {
       try {
         await this.audioContext.resume()
-        console.log('[AudioMixer] AudioContext resumed')
       } catch (error) {
-        console.error('[AudioMixer] Failed to resume AudioContext:', error)
+        // Failed to resume
       }
     }
   }
@@ -193,8 +167,6 @@ export class AudioMixer {
    * Cleanup and dispose of all resources
    */
   dispose(): void {
-    console.log('[AudioMixer] Disposing')
-
     // Disconnect all videos
     for (const video of this.sourceNodes.keys()) {
       this.disconnectVideo(video)
@@ -202,8 +174,8 @@ export class AudioMixer {
 
     // Close AudioContext
     if (this.audioContext) {
-      this.audioContext.close().catch((error) => {
-        console.error('[AudioMixer] Error closing AudioContext:', error)
+      this.audioContext.close().catch(() => {
+        // Error closing context
       })
       this.audioContext = null
     }

@@ -111,14 +111,9 @@ export function TimelineClip({
     : clip.startTime
 
   const leftPosition = previewStartTime * zoomLevel
-  // Ensure minimum width of 80px so clips are always visible
-  const calculatedWidth = effectiveDuration * zoomLevel
-  const width = Math.max(80, calculatedWidth)
+  // Width is always proportional to duration (use zoom to make small clips larger)
+  const width = effectiveDuration * zoomLevel
 
-  // DEBUG: Track zoom level changes and clip width
-  useEffect(() => {
-    console.log(`[TimelineClip ${clip.id.substring(0, 8)}] zoomLevel:`, zoomLevel, 'effectiveDuration:', effectiveDuration, 'calculatedWidth:', calculatedWidth, 'finalWidth:', width)
-  }, [zoomLevel, effectiveDuration, calculatedWidth, width, clip.id])
 
   // Determine cursor based on active tool and edge hover state
   const cursorStyle = isDragging
@@ -138,13 +133,12 @@ export function TimelineClip({
               : 'grab'
 
   /**
-   * Handle drag start - store clip ID and index for drop handler
+   * Handle drag start - store clip ID for position-based drop handler
    */
   function handleDragStart(e: React.DragEvent): void {
     setIsDragging(true)
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('clipId', clip.id)
-    e.dataTransfer.setData('clipIndex', clipIndex.toString())
 
     // Create semi-transparent drag image
     if (e.currentTarget instanceof HTMLElement) {
