@@ -73,3 +73,13 @@ development_status:
   4-7-enhanced-preview-with-multi-track-compositing: review
   4-8-intermediate-codec-conversion-for-frame-accurate-editing: in-progress
   epic-4-retrospective: optional
+
+  epic-5: contexted
+  5-1-recording-service-setup: drafted
+  5-2-recording-mode-selection-ui: drafted
+  5-3-screen-only-recording: drafted
+  5-4-webcam-only-recording: drafted
+  5-5-picture-in-picture-recording: drafted
+  5-6-recording-timer-and-controls: drafted
+  5-7-auto-import-and-timeline-placement: drafted
+  epic-5-retrospective: optional
