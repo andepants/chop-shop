@@ -43,19 +43,19 @@ const PLATFORM_CONFIG: Array<{
   {
     id: 'youtube',
     label: 'YouTube Description',
-    icon: <Youtube className="w-5 h-5" />,
+    icon: <Youtube className="w-4 h-4" />,
     color: 'text-red-500'
   },
   {
     id: 'twitter',
     label: 'Twitter Post',
-    icon: <Twitter className="w-5 h-5" />,
+    icon: <Twitter className="w-4 h-4" />,
     color: 'text-blue-400'
   },
   {
     id: 'linkedin',
     label: 'LinkedIn Post',
-    icon: <Linkedin className="w-5 h-5" />,
+    icon: <Linkedin className="w-4 h-4" />,
     color: 'text-blue-600'
   }
 ]
@@ -90,14 +90,14 @@ function PlatformNavItem({
     <button
       onClick={onClick}
       className={`
-        w-full p-3 rounded-lg mb-2 text-left transition-all
+        w-full p-2 rounded-lg mb-2 text-left transition-all
         ${isActive ? 'bg-zinc-800 border border-cyan-500/30' : 'bg-zinc-900 border border-zinc-800 hover:bg-zinc-850'}
       `}
     >
       {/* Platform Icon and Label */}
       <div className="flex items-center gap-2 mb-2">
         <span className={config.color}>{config.icon}</span>
-        <span className="text-sm font-medium text-zinc-300">{config.label}</span>
+        <span className="text-xs font-medium text-zinc-300">{config.label}</span>
       </div>
 
       {/* Status Indicators */}
@@ -427,7 +427,7 @@ export function ResultsPanel() {
   return (
     <div className="h-full flex">
       {/* Left Sidebar */}
-      <div className="w-72 border-r border-zinc-800 p-4 overflow-y-auto">
+      <div className="w-56 border-r border-zinc-800 p-4 overflow-y-auto">
         <div className="mb-4">
           <h3 className="text-sm font-medium text-zinc-500 mb-3">Platforms</h3>
         </div>

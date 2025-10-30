@@ -203,7 +203,10 @@ export class ContentGeneratorService {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage }
         ],
-        stream: true
+        stream: true,
+        frequency_penalty: 0.5, // Penalize word repetition
+        presence_penalty: 0.3, // Encourage topic diversity
+        temperature: 0.8 // Controlled randomness for better output quality
       })
 
       // Accumulate chunks and stream to renderer

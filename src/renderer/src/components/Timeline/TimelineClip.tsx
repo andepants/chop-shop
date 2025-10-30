@@ -6,11 +6,12 @@
  * scaled by the current zoom level (pixels per second).
  */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { formatTime } from '@/utils'
 import { cn } from '@/utils/cn.util'
 import { useToolStore } from '@/store/toolStore'
 import { useTimelineStore } from '@/store/timelineStore'
+import { useDrag } from '@/hooks/useDrag'
 import type { Clip } from './timeline.types'
 
 interface TimelineClipProps {
@@ -54,12 +55,20 @@ export function TimelineClip({
   // Get active tool for conditional rendering
   const selectedTool = useToolStore((state) => state.selectedTool)
 
-  // Drag state for visual feedback
-  const [isDragging, setIsDragging] = useState(false)
-
   // Razor tool state - tracks mouse position for split preview
   const [razorMouseX, setRazorMouseX] = useState<number | null>(null)
   const clipRef = useRef<HTMLDivElement>(null)
+
+  // Timeline container ref for drag calculations
+  const timelineContainerRef = useRef<HTMLElement | null>(null)
+
+  // Find timeline container on mount
+  useEffect(() => {
+    if (clipRef.current) {
+      const container = clipRef.current.closest('[data-timeline-container]') as HTMLElement
+      timelineContainerRef.current = container
+    }
+  }, [])
 
   // Edge trim state - Adobe Premiere style edge detection
   type EdgeHoverState = 'start-edge' | 'end-edge' | 'center' | null
@@ -91,6 +100,21 @@ export function TimelineClip({
 
   // Store for updating clip
   const updateClip = useTimelineStore((state) => state.updateClip)
+  const moveClipToPosition = useTimelineStore((state) => state.moveClipToPosition)
+
+  // Custom drag with cursor offset preservation (Adobe Premiere Pro pattern)
+  // Only allow drag when in select tool and cursor is on center (not edges)
+  const isDragEnabled = selectedTool === 'select' && edgeHoverState === 'center' && !isTrimming
+
+  const { isDragging, dragPosition, onMouseDown: startDrag } = useDrag({
+    containerRef: timelineContainerRef,
+    disabled: !isDragEnabled,
+    onDragEnd: (position) => {
+      // Convert pixel position to time
+      const timePosition = position / zoomLevel
+      moveClipToPosition(clip.id, timePosition)
+    }
+  })
 
   // Sync preview values when clip changes
   useEffect(() => {
@@ -110,9 +134,17 @@ export function TimelineClip({
     ? trimStartRef.current.startTime + (previewTrimIn - trimStartRef.current.trimIn)
     : clip.startTime
 
-  const leftPosition = previewStartTime * zoomLevel
+  // Use drag position if currently dragging, otherwise use clip position
+  const leftPosition = useMemo(() => {
+    return isDragging && dragPosition !== null
+      ? dragPosition
+      : previewStartTime * zoomLevel
+  }, [isDragging, dragPosition, previewStartTime, zoomLevel])
+
   // Width is always proportional to duration (use zoom to make small clips larger)
-  const width = effectiveDuration * zoomLevel
+  const width = useMemo(() => {
+    return effectiveDuration * zoomLevel
+  }, [effectiveDuration, zoomLevel])
 
 
   // Determine cursor based on active tool and edge hover state
@@ -132,30 +164,6 @@ export function TimelineClip({
               ? 'w-resize'
               : 'grab'
 
-  /**
-   * Handle drag start - store clip ID for position-based drop handler
-   */
-  function handleDragStart(e: React.DragEvent): void {
-    setIsDragging(true)
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('clipId', clip.id)
-
-    // Create semi-transparent drag image
-    if (e.currentTarget instanceof HTMLElement) {
-      const dragImage = e.currentTarget.cloneNode(true) as HTMLElement
-      dragImage.style.opacity = '0.5'
-      document.body.appendChild(dragImage)
-      e.dataTransfer.setDragImage(dragImage, 0, 0)
-      setTimeout(() => document.body.removeChild(dragImage), 0)
-    }
-  }
-
-  /**
-   * Handle drag end - clear dragging state
-   */
-  function handleDragEnd(): void {
-    setIsDragging(false)
-  }
 
   /**
    * Handle mouse move - detects edge proximity for trimming and tracks razor position
@@ -230,10 +238,10 @@ export function TimelineClip({
   }
 
   /**
-   * Handle mouse down on clip - start trim if on edge, otherwise allow drag
+   * Handle mouse down on clip - start trim if on edge, start drag if on center
    */
   function handleMouseDown(e: React.MouseEvent): void {
-    // Only handle trim on edges in select mode
+    // Handle trim on edges in select mode
     if (selectedTool === 'select' && (edgeHoverState === 'start-edge' || edgeHoverState === 'end-edge')) {
       e.preventDefault()
       e.stopPropagation()
@@ -251,6 +259,10 @@ export function TimelineClip({
 
       setIsTrimming(true)
       setTrimmingEdge(edgeHoverState === 'start-edge' ? 'start' : 'end')
+    }
+    // Handle drag on center in select mode
+    else if (selectedTool === 'select' && edgeHoverState === 'center') {
+      startDrag(e)
     }
   }
 
@@ -347,10 +359,8 @@ export function TimelineClip({
       ref={clipRef}
       className={cn(
         'absolute rounded-sm z-5',
-        'transition-all duration-200 ease-out',
         // Fallback background if no thumbnail
-        !clip.thumbnail && 'bg-cyan-500/60',
-        isDragging && 'opacity-50 scale-105'
+        !clip.thumbnail && 'bg-cyan-500/60'
       )}
       style={{
         left: `${leftPosition}px`,
@@ -364,11 +374,12 @@ export function TimelineClip({
           : '1px solid rgba(63, 63, 70, 0.8)', // zinc-700 with opacity
         boxShadow: isSelected
           ? '0 0 0 1px rgb(34, 211, 238), 0 0 12px rgba(34, 211, 238, 0.6), 0 4px 8px rgba(0, 0, 0, 0.4)' // Selection glow
-          : '0 2px 4px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)' // Subtle depth
+          : '0 2px 4px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)', // Subtle depth
+        // Visual feedback during drag
+        opacity: isDragging ? 0.7 : 1,
+        zIndex: isDragging ? 100 : undefined,
+        transition: 'none' // No transitions on position/size to prevent jumping
       }}
-      draggable={selectedTool === 'select' && edgeHoverState === 'center'}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onMouseDown={handleMouseDown}
@@ -405,6 +416,24 @@ export function TimelineClip({
         <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded text-xs font-mono bg-black/75 text-zinc-100 z-10 opacity-0 hover:opacity-100 transition-opacity">
           Track {clip.trackId}
         </div>
+
+        {/* Drag position tooltip - Premiere Pro style */}
+        {isDragging && dragPosition !== null && (
+          <div
+            className="absolute pointer-events-none z-30 px-2 py-1 rounded text-xs font-mono whitespace-nowrap"
+            style={{
+              left: '50%',
+              top: '-32px',
+              transform: 'translateX(-50%)',
+              backgroundColor: 'rgba(0, 0, 0, 0.95)',
+              color: 'rgb(34, 211, 238)', // cyan-400
+              border: '1px solid rgb(34, 211, 238)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.5)'
+            }}
+          >
+            {formatTime(dragPosition / zoomLevel)}
+          </div>
+        )}
 
         {/* Trim preview overlay - grey out trimmed area during drag */}
         {isTrimming && trimmingEdge && (() => {

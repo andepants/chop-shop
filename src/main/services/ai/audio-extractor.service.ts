@@ -12,8 +12,7 @@ import { spawn } from 'child_process'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import * as os from 'os'
-import ffmpegPath from 'ffmpeg-static'
-import { getFfprobePath } from '../../utils/binaryPaths'
+import { getFfmpegPath, getFfprobePath } from '../../utils/binaryPaths'
 
 /**
  * Timeline clip structure (subset of full Clip type)
@@ -336,12 +335,8 @@ export class AudioExtractorService {
    * @private
    */
   private async runFFmpeg(args: string[], description: string): Promise<void> {
-    if (!ffmpegPath) {
-      throw new Error('FFmpeg binary not found')
-    }
-
     return new Promise((resolve, reject) => {
-      const ffmpeg = spawn(ffmpegPath, args)
+      const ffmpeg = spawn(getFfmpegPath(), args)
       let stderr = ''
 
       ffmpeg.stderr.on('data', (data) => {

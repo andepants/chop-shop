@@ -70,20 +70,9 @@ function calculateNextPosition(clips: Array<{ startTime: number; duration: numbe
  * - AC #6: Timeline auto-adjusts zoom to fit clips
  * - AC #7: Playhead visible at timeline start
  */
-/**
- * Snap point type for visual guides during drag
- */
-interface SnapPoint {
-  position: number // Time position in seconds
-  type: 'timeline-start' | 'playhead' | 'clip-edge'
-}
-
 export function Timeline(): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
-  const dragRafRef = useRef<number | null>(null)
   const [mousePosition, setMousePosition] = useState<{ x: number; y: number } | null>(null)
-  const [snapPoints, setSnapPoints] = useState<SnapPoint[]>([])
-  const [dragPreview, setDragPreview] = useState<{ position: number; clipId: string; duration: number } | null>(null)
 
   const { files, selectFile } = useMediaStore()
   const {
@@ -101,7 +90,6 @@ export function Timeline(): React.JSX.Element {
     clearSelection,
     removeClip,
     rippleDeleteClips,
-    moveClipToPosition,
     zoomIn,
     zoomOut,
     setZoomLevel,
@@ -115,134 +103,29 @@ export function Timeline(): React.JSX.Element {
   // Use "Fit" button (backslash key) to fit timeline to viewport
 
   /**
-   * Handle drag over - allow drop and show drop indicator, snap guides, and preview
-   * Throttled with requestAnimationFrame for performance
+   * Handle drag over - allow drop for library files
+   * Clips now handle their own dragging via mouse events
    */
   function handleDragOver(e: React.DragEvent): void {
     e.preventDefault()
-
-    // Check if this is a clip move (position-based drag) or library drag (has fileId)
-    // Note: dataTransfer.types lowercases the keys
-    const isClipMove = e.dataTransfer.types.includes('clipid')
-
-    if (isClipMove) {
-      // Clip move (position-based drag): show snap guides and preview
-      e.dataTransfer.dropEffect = 'move'
-
-      // Throttle with requestAnimationFrame for smooth performance
-      if (dragRafRef.current !== null) {
-        return // Already scheduled, skip this frame
-      }
-
-      dragRafRef.current = requestAnimationFrame(() => {
-        dragRafRef.current = null
-
-        if (!containerRef.current) return
-
-        const rect = containerRef.current.getBoundingClientRect()
-        const relativeX = e.clientX - rect.left
-        const dropPosition = relativeX / pixelsPerSecond
-
-        // Get dragged clip info
-        const clipId = e.dataTransfer.getData('clipId') || null
-
-        // Calculate snap points once (they don't change during drag)
-        if (snapPoints.length === 0) {
-          const points = calculateSnapPoints(clipId)
-          setSnapPoints(points)
-        }
-
-        // Find the dragged clip to show preview
-        if (clipId) {
-          const draggedClip = tracks.flatMap(t => t.clips).find(c => c.id === clipId)
-          if (draggedClip) {
-            const effectiveDuration = draggedClip.duration - draggedClip.trimIn - draggedClip.trimOut
-            setDragPreview({
-              position: dropPosition,
-              clipId,
-              duration: effectiveDuration
-            })
-          }
-        }
-      })
-    } else {
-      // Library drag: use copy effect
-      e.dataTransfer.dropEffect = 'copy'
-      setSnapPoints([])
-      setDragPreview(null)
-    }
+    // Library drag: use copy effect
+    e.dataTransfer.dropEffect = 'copy'
   }
 
   /**
-   * Handle drag leave - clear snap guides and preview
+   * Handle drag leave - cleanup for library file drags
    */
   function handleDragLeave(): void {
-    // Cancel any pending animation frame
-    if (dragRafRef.current !== null) {
-      cancelAnimationFrame(dragRafRef.current)
-      dragRafRef.current = null
-    }
-
-    setSnapPoints([])
-    setDragPreview(null)
+    // No cleanup needed - clips handle their own dragging
   }
 
-  /**
-   * Calculate snap points for visual guides
-   * Returns array of positions where clips should snap during drag
-   */
-  function calculateSnapPoints(draggedClipId: string | null): SnapPoint[] {
-    const points: SnapPoint[] = []
-
-    // Timeline start (0s)
-    points.push({ position: 0, type: 'timeline-start' })
-
-    // Playhead position
-    points.push({ position: playheadPosition, type: 'playhead' })
-
-    // All clip edges (excluding the dragged clip)
-    for (const track of tracks) {
-      for (const clip of track.clips) {
-        if (clip.id === draggedClipId) continue
-
-        const effectiveDuration = clip.duration - clip.trimIn - clip.trimOut
-        points.push({ position: clip.startTime, type: 'clip-edge' })
-        points.push({ position: clip.startTime + effectiveDuration, type: 'clip-edge' })
-      }
-    }
-
-    return points
-  }
 
   /**
-   * Handle drop on specific track - adds clip to targeted track
-   * Implements AC #2 (multi-track drag-drop)
+   * Handle drop on specific track - adds library files to targeted track
+   * Clips now handle their own dragging via mouse events
    */
   function handleTrackDrop(e: React.DragEvent, trackId: number): void {
     e.preventDefault()
-
-    // Check for clip reorder/move (Story 3.4 + position-based movement)
-    const clipId = e.dataTransfer.getData('clipId')
-    if (clipId && clipId !== '') {
-      // Calculate actual timeline position from drop coordinates
-      if (!containerRef.current) return
-
-      const rect = containerRef.current.getBoundingClientRect()
-      const relativeX = e.clientX - rect.left
-      const dropPosition = relativeX / pixelsPerSecond
-
-      // Clear drag state
-      setSnapPoints([])
-      setDragPreview(null)
-
-      // Move clip to the dropped position (allows gaps, Premiere Pro style)
-      moveClipToPosition(clipId, dropPosition)
-      return
-    }
-
-    // Clear drag state for library drops
-    setSnapPoints([])
-    setDragPreview(null)
 
     // Library drag to specific track (Story 4.1)
     const fileId = e.dataTransfer.getData('fileId')
@@ -553,57 +436,6 @@ export function Timeline(): React.JSX.Element {
 
         {/* Playhead - AC #7 */}
         <Playhead zoomLevel={pixelsPerSecond} />
-
-        {/* Snap guides - visual indicators for magnetic snap points during drag */}
-        {snapPoints.map((point, index) => {
-          const color =
-            point.type === 'timeline-start'
-              ? 'rgb(34, 197, 94)' // green-500
-              : point.type === 'playhead'
-                ? 'rgb(239, 68, 68)' // red-500
-                : 'rgb(251, 191, 36)' // amber-400
-
-          return (
-            <div
-              key={`snap-${point.type}-${index}`}
-              className="absolute h-full w-0.5 pointer-events-none z-20"
-              style={{
-                left: `${point.position * pixelsPerSecond}px`,
-                backgroundColor: color,
-                opacity: 0.6,
-                boxShadow: `0 0 8px ${color}`
-              }}
-            />
-          )
-        })}
-
-        {/* Drag preview - ghost outline showing where clip will land */}
-        {dragPreview && (
-          <div
-            className="absolute h-full pointer-events-none z-15"
-            style={{
-              left: `${dragPreview.position * pixelsPerSecond}px`,
-              width: `${dragPreview.duration * pixelsPerSecond}px`,
-              top: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(34, 211, 238, 0.2)', // cyan-500 with transparency
-              border: '2px dashed rgba(34, 211, 238, 0.6)',
-              borderRadius: '4px'
-            }}
-          >
-            {/* Timecode tooltip */}
-            <div
-              className="absolute -top-6 left-0 px-2 py-0.5 rounded text-[10px] font-mono whitespace-nowrap pointer-events-none"
-              style={{
-                backgroundColor: 'rgba(24, 24, 27, 0.95)',
-                color: 'rgb(34, 211, 238)',
-                border: '1px solid rgba(34, 211, 238, 0.4)'
-              }}
-            >
-              {formatTimecode(dragPreview.position)}
-            </div>
-          </div>
-        )}
 
         {/* Tracks - AC #1, AC #2 (multi-track) */}
         {tracks.map((track) => (

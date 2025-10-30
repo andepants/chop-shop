@@ -13,8 +13,7 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import * as os from 'os'
 import { spawn } from 'child_process'
-import ffmpegPath from 'ffmpeg-static'
-import { getFfprobePath } from '../../utils/binaryPaths'
+import { getFfmpegPath, getFfprobePath } from '../../utils/binaryPaths'
 
 /**
  * Whisper API constraints
@@ -249,10 +248,6 @@ export class WhisperService {
       `compressed-${timestamp}-${random}.mp3`
     )
 
-    if (!ffmpegPath) {
-      throw new Error('FFmpeg binary not found')
-    }
-
     return new Promise((resolve, reject) => {
       // Compress using lower bitrate (64kbps)
       const args = [
@@ -271,7 +266,7 @@ export class WhisperService {
         compressedPath
       ]
 
-      const ffmpeg = spawn(ffmpegPath, args)
+      const ffmpeg = spawn(getFfmpegPath(), args)
       let stderr = ''
 
       ffmpeg.stderr.on('data', (data) => {
@@ -373,10 +368,6 @@ export class WhisperService {
     const timestamp = Date.now()
     const chunkPath = path.join(this.tempDir, `chunk-${index}-${timestamp}.mp3`)
 
-    if (!ffmpegPath) {
-      throw new Error('FFmpeg binary not found')
-    }
-
     return new Promise((resolve, reject) => {
       // Extract chunk using FFmpeg
       // -ss: start time
@@ -401,7 +392,7 @@ export class WhisperService {
         chunkPath
       ]
 
-      const ffmpeg = spawn(ffmpegPath, args)
+      const ffmpeg = spawn(getFfmpegPath(), args)
       let stderr = ''
 
       ffmpeg.stderr.on('data', (data) => {
