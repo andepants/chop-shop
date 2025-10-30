@@ -674,60 +674,72 @@ export class VideoCompositor {
       if (!source || !source.isLoaded) continue
 
       const video = source.element
-      if (video.readyState < 2) continue // Need at least HAVE_CURRENT_DATA
+      // Only skip if video has no data at all (readyState 0 = HAVE_NOTHING)
+      // Otherwise render last frame to prevent flicker during buffering
+      if (video.readyState === 0) continue
 
       // Calculate clip position in timeline
       const clipElapsed = this.state.currentTime - clip.startTime
       const sourceTime = clip.trimIn + clipElapsed
 
       // Frame staleness detection: Relaxed to reduce flickering with variable framerate recordings
-      // Only skip if frame is significantly stale (hasn't advanced in >0.05s of playback time)
+      // Only skip if frame is significantly stale (hasn't advanced in >0.15s of playback time)
       const frameAge = this.state.currentTime - (source.lastRenderedTime || 0)
       if (source.lastRenderedTime === video.currentTime &&
           source.lastRenderedTime !== -1 &&
-          frameAge > 0.05) {
-        // Frame stuck for >0.05s - skip to prevent ghosting
-        continue
+          frameAge > 0.15) {
+        // Frame stuck for >0.15s - continue rendering last frame to prevent flicker
+        // (Don't skip - better to show stale frame than black screen)
       }
 
       // Verify video is at correct time (relaxed tolerance for smoother playback)
       const timeDiff = Math.abs(video.currentTime - sourceTime)
-      if (timeDiff > 0.033) { // ~2 frames at 30fps (relaxed to reduce flickering)
+      if (timeDiff > 0.1) { // ~3 frames at 30fps (relaxed to reduce flickering)
         // Video element out of sync, seek it
         video.currentTime = sourceTime
-        // Skip this frame until video seeks to correct position
-        continue
+        // Continue rendering last frame while seeking to prevent flicker
       }
 
       // Draw video to canvas with opacity
       this.ctx.globalAlpha = clip.opacity
 
       if (clip.trackIndex === 0) {
-        // Track 1: Render full-screen with aspect-fill (like Adobe Premiere Pro)
-        // Video fills entire canvas, crops edges if needed to maintain aspect ratio
+        // Track 1: Render full-screen with aspect-fit (letterboxing)
+        // Video fits entirely within canvas, showing black bars if needed to maintain aspect ratio
         const videoAspect = video.videoWidth / video.videoHeight
         const canvasAspect = this.width / this.height
 
-        let sourceX = 0
-        let sourceY = 0
-        let sourceWidth = video.videoWidth
-        let sourceHeight = video.videoHeight
+        // Use full source video (no cropping)
+        const sourceX = 0
+        const sourceY = 0
+        const sourceWidth = video.videoWidth
+        const sourceHeight = video.videoHeight
+
+        // Calculate destination dimensions to fit video inside canvas
+        let destWidth: number
+        let destHeight: number
+        let destX: number
+        let destY: number
 
         if (videoAspect > canvasAspect) {
-          // Video is wider than canvas - crop left/right edges
-          sourceWidth = video.videoHeight * canvasAspect
-          sourceX = (video.videoWidth - sourceWidth) / 2
+          // Video is wider than canvas - fit to canvas width, letterbox top/bottom
+          destWidth = this.width
+          destHeight = this.width / videoAspect
+          destX = 0
+          destY = (this.height - destHeight) / 2
         } else {
-          // Video is taller than canvas - crop top/bottom edges
-          sourceHeight = video.videoWidth / canvasAspect
-          sourceY = (video.videoHeight - sourceHeight) / 2
+          // Video is taller than canvas - fit to canvas height, letterbox left/right
+          destWidth = this.height * videoAspect
+          destHeight = this.height
+          destX = (this.width - destWidth) / 2
+          destY = 0
         }
 
-        // Draw cropped portion to fill entire canvas
+        // Draw full video with letterboxing (black bars will show automatically)
         this.ctx.drawImage(
           video,
-          sourceX, sourceY, sourceWidth, sourceHeight,  // source crop rectangle
-          0, 0, this.width, this.height                  // destination (full canvas)
+          sourceX, sourceY, sourceWidth, sourceHeight,  // source (full video)
+          destX, destY, destWidth, destHeight            // destination (centered with letterboxing)
         )
 
         // Update last rendered time to prevent stale frame rendering
@@ -1063,9 +1075,9 @@ export class VideoCompositor {
       previousClipIds.some((id, i) => id !== newClipIds[i])
 
     if (clipsChanged) {
-      // Clear canvas immediately to prevent stale frames during transition
-      this.ctx.fillStyle = '#000000'
-      this.ctx.fillRect(0, 0, this.width, this.height)
+      // Don't clear canvas to prevent black flashes - next frame will naturally replace previous
+      // this.ctx.fillStyle = '#000000'
+      // this.ctx.fillRect(0, 0, this.width, this.height)
 
       this.state.activeClips = newActiveClips
 

@@ -55,14 +55,26 @@ export class ApiKeyManager {
       }
 
       // Check if safeStorage is available
+      console.log('[ApiKeyManager] Checking safeStorage availability...')
+      console.log('[ApiKeyManager] Platform:', process.platform)
+      console.log('[ApiKeyManager] App ready:', app.isReady())
+      console.log('[ApiKeyManager] Encryption available:', safeStorage.isEncryptionAvailable())
+
       if (!safeStorage.isEncryptionAvailable()) {
+        const error = 'Encryption is not available on this system. This usually means the app needs to be properly code-signed.'
+        console.error('[ApiKeyManager] safeStorage not available:', {
+          platform: process.platform,
+          isReady: app.isReady(),
+          configPath: this.configPath
+        })
         return {
           success: false,
-          error: 'Encryption is not available on this system'
+          error
         }
       }
 
       // Encrypt the key
+      console.log('[ApiKeyManager] Encrypting API key...')
       const encryptedBuffer = safeStorage.encryptString(apiKey)
       const encryptedKey = encryptedBuffer.toString('base64')
 
@@ -73,14 +85,21 @@ export class ApiKeyManager {
       }
 
       // Write to file
+      console.log('[ApiKeyManager] Writing encrypted key to:', this.configPath)
       await fs.writeFile(
         this.configPath,
         JSON.stringify(storage, null, 2),
         'utf-8'
       )
 
+      console.log('[ApiKeyManager] API key stored successfully')
       return { success: true }
     } catch (error) {
+      console.error('[ApiKeyManager] Failed to store API key:', error)
+      console.error('[ApiKeyManager] Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      })
       return {
         success: false,
         error: `Failed to store API key: ${error instanceof Error ? error.message : 'Unknown error'}`

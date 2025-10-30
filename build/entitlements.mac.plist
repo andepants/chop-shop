@@ -12,5 +12,19 @@
     <true/>
     <key>com.apple.security.device.audio-input</key>
     <true/>
+    <!-- Network access for API calls -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <!-- File access for media files -->
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+    <!-- Keychain access for secure API key storage (requires code signing) -->
+    <!-- Note: keychain-access-groups requires a Team ID from Apple Developer account -->
+    <!-- Uncomment and replace with your Team ID when code signing is configured:
+    <key>keychain-access-groups</key>
+    <array>
+      <string>$(AppIdentifierPrefix)com.chopshop.app</string>
+    </array>
+    -->
   </dict>
 </plist>

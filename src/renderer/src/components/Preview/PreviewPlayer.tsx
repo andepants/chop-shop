@@ -125,7 +125,7 @@ export function PreviewPlayer(): React.JSX.Element {
   const invalidMultiTrack = track1Empty && track2HasClips
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center bg-black" ref={containerRef}>
+    <div className="flex flex-1 flex-col bg-black" ref={containerRef}>
       {!hasTimeline && (
         <div
           style={{ color: 'var(--text-secondary)', position: 'absolute', zIndex: 10 }}
