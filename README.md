@@ -2,6 +2,8 @@
 
 An AI-first desktop video editor built with Electron, React, and FFmpeg.
 
+(Mac Download)[https://drive.google.com/drive/folders/1H_BFbeqE5PgqxbzT_xw93ezli059Ve7]
+
 ## Overview
 
 **Chop Shop** is a modern, modular video editing application designed for performance and AI-assisted development. It features a professional 3-panel interface (media library, preview, timeline) with real-time video compositing, multi-track editing, and FFmpeg-powered export capabilities.
